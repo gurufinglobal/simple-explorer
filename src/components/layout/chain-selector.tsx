@@ -1,51 +1,31 @@
 "use client";
-
-import { useEffect, useMemo, useState } from "react";
-import { FormControl, InputLabel, MenuItem, Select, Stack } from "@mui/material";
-import { setActiveChainKeyCookie, getActiveChainKeyFromClientCookie } from "@/lib/chain-selection";
-import { getChainByKey, getConfiguredChains, getDefaultChainKey } from "@/lib/env";
-
+import { useEffect, useState } from "react";
+import { Alert, FormControl, InputLabel, MenuItem, Select, Stack } from "@mui/material";
+import { setActiveChainKeyCookie, getActiveChainConfig } from "@/lib/chain-selection";
+import { getConfiguredChains, type ChainConfig } from "@/lib/env";
 export function ChainSelector() {
-  const chains = useMemo(() => getConfiguredChains(), []);
-  const defaultKey = useMemo(() => getDefaultChainKey(), []);
-  const [value, setValue] = useState(defaultKey);
-
+  const [value, setValue] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  let chains: ChainConfig[] = [];
+  let configError: string | null = null;
+  try { chains = getConfiguredChains(); } catch (e) { configError = e instanceof Error ? e.message : "체인 설정 오류"; }
   useEffect(() => {
-    const fromCookie = getActiveChainKeyFromClientCookie();
-    const resolved = getChainByKey(fromCookie)?.key ?? defaultKey;
-    setValue(resolved);
-    setActiveChainKeyCookie(resolved);
-  }, [defaultKey]);
-
-  if (chains.length <= 1) {
-    return null;
-  }
-
-  return (
-    <Stack spacing={0.75} sx={{ px: 0, pt: 2 }}>
-      <FormControl size="small" fullWidth>
-        <InputLabel id="chain-select-label">Select Chain</InputLabel>
-        <Select
-          labelId="chain-select-label"
-          label="Select Chain"
-          value={value}
-          onChange={(event) => {
-            const next = event.target.value;
-            if (next === value) {
-              return;
-            }
-            setValue(next);
-            setActiveChainKeyCookie(next);
-            window.location.reload();
-          }}
-        >
-          {chains.map((chain) => (
-            <MenuItem key={chain.key} value={chain.key}>
-              {chain.name}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
-    </Stack>
-  );
+    const sync = () => {
+      try { setValue(getActiveChainConfig().key); setError(null); }
+      catch (e) { setValue(""); setError(e instanceof Error ? e.message : "체인 설정 오류"); }
+    };
+    sync();
+    window.addEventListener("explorer:chain-changed", sync);
+    return () => window.removeEventListener("explorer:chain-changed", sync);
+  }, []);
+  return <Stack spacing={1} sx={{ pt: 2 }}>
+    {(configError ?? error) && <Alert severity="error">{configError ?? error}</Alert>}
+    <FormControl size="small" fullWidth disabled={!chains.length}>
+      <InputLabel id="chain-select-label">Select Chain</InputLabel>
+      <Select labelId="chain-select-label" label="Select Chain" value={chains.some(c => c.key === value) ? value : ""}
+        onChange={event => { setActiveChainKeyCookie(event.target.value); setValue(event.target.value); setError(null); }}>
+        {chains.map(chain => <MenuItem key={chain.key} value={chain.key}>{chain.name}</MenuItem>)}
+      </Select>
+    </FormControl>
+  </Stack>;
 }

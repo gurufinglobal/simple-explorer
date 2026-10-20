@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import {
+  Alert,
   AppBar,
   Box,
   Drawer,
@@ -29,7 +30,7 @@ import { HeaderWalletMenu } from "@/components/wallet/header-wallet-menu";
 import { ChainSelector } from "@/components/layout/chain-selector";
 import { TopNavSearch } from "@/components/search/top-nav-search";
 import { getActiveChainConfigFromClientCookie } from "@/lib/chain-selection";
-import { getChainByKey, getConfiguredChains, getDefaultChainKey, type ChainConfig } from "@/lib/env";
+import { type ChainConfig } from "@/lib/env";
 
 const drawerWidth = 240;
 
@@ -58,23 +59,25 @@ const menus: MenuItem[] = [
 
 export function ExplorerShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const [activeChain, setActiveChain] = useState<ChainConfig>(() => {
-    const fallback = getChainByKey(getDefaultChainKey());
-    return fallback ?? getConfiguredChains()[0];
-  });
-
+  const [activeChain, setActiveChain] = useState<ChainConfig | null>(null);
+  const [configError, setConfigError] = useState<string | null>(null);
   useEffect(() => {
-    setActiveChain(getActiveChainConfigFromClientCookie());
+    const sync = () => {
+      try { setActiveChain(getActiveChainConfigFromClientCookie()); setConfigError(null); }
+      catch (e) { setActiveChain(null); setConfigError(e instanceof Error ? e.message : "체인 설정 오류"); }
+    };
+    sync(); window.addEventListener("explorer:chain-changed", sync);
+    return () => window.removeEventListener("explorer:chain-changed", sync);
   }, []);
 
   const visibleMenus = menus.filter((menu) => {
-    if (menu.requiresBex && activeChain.features?.bex !== true) {
+    if (menu.requiresBex && activeChain?.features?.bex !== true) {
       return false;
     }
-    if (menu.requiresFeePolicy && activeChain.features?.feepolicy !== true) {
+    if (menu.requiresFeePolicy && activeChain?.features?.feepolicy !== true) {
       return false;
     }
-    if (menu.requiresOracle && activeChain.features?.oracle !== true) {
+    if (menu.requiresOracle && activeChain?.features?.oracle !== true) {
       return false;
     }
     return true;
@@ -95,9 +98,9 @@ export function ExplorerShell({ children }: { children: ReactNode }) {
             Guru Chain Explorer
           </Typography>
           <Box sx={{ flex: 1, minWidth: 220, maxWidth: 640 }}>
-            <TopNavSearch />
+            {activeChain && <TopNavSearch />}
           </Box>
-          <HeaderWalletMenu />
+          {activeChain && <HeaderWalletMenu />}
         </Toolbar>
       </AppBar>
       <Drawer
@@ -134,7 +137,7 @@ export function ExplorerShell({ children }: { children: ReactNode }) {
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, p: 3, ml: 0 }}>
         <Toolbar />
-        {children}
+        {configError ? <Alert severity="error">{configError} 왼쪽에서 체인을 선택하세요.</Alert> : activeChain ? <Box key={activeChain.key}>{children}</Box> : <Alert severity="info">체인 설정 확인 중…</Alert>}
       </Box>
     </Box>
   );

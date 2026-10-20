@@ -71,7 +71,7 @@ export function ValidatorDetailView({ detail }: Props) {
   const nowMs = useNowTick(1000);
   const { status, walletType, sessionTopic, bech32Address } = useWalletSessionStore();
   const effectiveAddress = useEffectiveCosmosAddress();
-  const canSignCosmos = status === "connected" && (walletType === "keplr" || walletType === "walletconnect");
+  const canSignCosmos = useWalletSessionStore(s => s.status === "connected" && s.writeStatus === "ready");
   const isMetamask = status === "connected" && walletType === "metamask";
 
   const positionQuery = useQuery(`delegator:${effectiveAddress}:${detail.operatorAddress}`, client => getDelegatorValidatorPosition(effectiveAddress!, detail.operatorAddress, client), undefined, status === "connected" && !!effectiveAddress);

@@ -1,0 +1,98 @@
+"use client";
+import { SigningStargateClient, type GasPrice } from "@cosmjs/stargate";
+import type { StdFee } from "@cosmjs/amino";
+import { isOfflineDirectSigner, type EncodeObject, type OfflineSigner } from "@cosmjs/proto-signing";
+import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
+import { bech32 } from "bech32";
+import { getActiveChainConfig } from "@/lib/chain-selection";
+import { useWalletSessionStore as store, type WalletConnectorKind } from "@/stores/wallet-session.store";
+import { verifyChainEndpoints, writeBlockReason } from "./chain-eligibility";
+import { createWalletConnectOfflineSigner } from "./walletconnect-cosmos-signer";
+import { assertWalletConnectApproval } from "./walletconnect-session";
+import { getActiveWalletConnectSession } from "./walletconnect-client";
+import { createQueryClient } from "@/services/clients";
+
+export type SigningInput = { walletType: WalletConnectorKind; sessionTopic: string | null; bech32Address: string | null };
+export async function createBoundSigningClient(params: SigningInput, gasPrice: GasPrice) {
+  const chain = getActiveChainConfig();
+  const state = store.getState();
+  const assertCurrent = () => {
+    const now = store.getState();
+    if (now.generation !== state.generation || now.status !== "connected" || getActiveChainConfig().key !== chain.key ||
+      now.bech32Address !== params.bech32Address || now.walletType !== params.walletType || now.sessionTopic !== params.sessionTopic) {
+      throw new Error("체인·지갑·계정이 변경되었습니다. 다시 연결하고 거래를 확인하세요.");
+    }
+  };
+  assertCurrent();
+  const reason = writeBlockReason(chain, state);
+  if (reason) throw new Error(reason);
+  if (gasPrice.denom !== chain.feeDenom) throw new Error("수수료 denom이 검증된 체인 설정과 다릅니다.");
+  const address = state.bech32Address!;
+  if (bech32.decode(address).prefix !== chain.bech32Prefix) throw new Error("계정 prefix가 선택 체인과 다릅니다.");
+  await verifyChainEndpoints(chain);
+  assertCurrent();
+  let signer: OfflineSigner;
+  if (params.walletType === "keplr") {
+    if (!window.keplr || !window.getOfflineSigner) throw new Error("Keplr 지갑을 찾을 수 없습니다.");
+    await window.keplr.enable(chain.chainId!);
+    assertCurrent();
+    signer = window.getOfflineSigner(chain.chainId!) as unknown as OfflineSigner;
+  } else {
+    const session = await getActiveWalletConnectSession(state.sessionTopic!);
+    assertCurrent();
+    if (!session) throw new Error("WalletConnect 세션이 없습니다. 다시 연결하세요.");
+    assertWalletConnectApproval(session, chain, address);
+    signer = createWalletConnectOfflineSigner({ topic: state.sessionTopic!, chainId: chain.chainId!, signerAddress: address, pubkey: state.pubkey!, assertCurrent });
+  }
+  const getAccounts = async () => {
+    assertCurrent();
+    const accounts = await signer.getAccounts();
+    assertCurrent();
+    const account = accounts.find(a => a.address === address);
+    if (!account || !account.pubkey?.length || !state.pubkey || account.pubkey.length !== state.pubkey.length || account.pubkey.some((v, i) => v !== state.pubkey![i])) {
+      throw new Error("실제 signer 계정·공개키가 연결 계정과 다릅니다. 다시 연결하세요.");
+    }
+    return accounts;
+  };
+  await getAccounts();
+  const signingMethod = isOfflineDirectSigner(signer) ? "direct" : "amino";
+  if (!chain.signing?.some(s => s.wallet === state.walletType && s.method === signingMethod)) throw new Error("실제 signer 방식이 검증된 서명 방식과 다릅니다.");
+  const guarded: OfflineSigner = isOfflineDirectSigner(signer) ? {
+    getAccounts,
+    signDirect: async (who, doc) => {
+      await getAccounts();
+      if (who !== address || doc.chainId !== chain.chainId) throw new Error("서명 대상 체인·계정 불일치");
+      const response = await signer.signDirect(who, doc);
+      assertCurrent();
+      if (response.signed.chainId !== chain.chainId) throw new Error("반환된 서명의 체인이 다릅니다.");
+      return response;
+    },
+  } : {
+    getAccounts,
+    signAmino: async (who, doc) => {
+      await getAccounts();
+      if (who !== address || doc.chain_id !== chain.chainId) throw new Error("서명 대상 체인·계정 불일치");
+      const response = await signer.signAmino(who, doc);
+      assertCurrent();
+      if (response.signed.chain_id !== chain.chainId) throw new Error("반환된 서명의 체인이 다릅니다.");
+      return response;
+    },
+  };
+  return {
+    signerAddress: address, queryClient: createQueryClient(chain),
+    client: {
+      signAndBroadcast: async (who: string, messages: readonly EncodeObject[], fee: StdFee) => {
+        assertCurrent();
+        const client = await SigningStargateClient.connectWithSigner(chain.rpcUrl!, guarded, { gasPrice });
+        try {
+          assertCurrent();
+          if (who !== address) throw new Error("거래 계정 불일치");
+          // Separate signing from broadcast to invalidate a pending wallet prompt on account/chain change.
+          const signed = await client.sign(who, messages, fee, "");
+          assertCurrent();
+          return await client.broadcastTx(TxRaw.encode(signed).finish());
+        } finally { client.disconnect(); }
+      },
+    },
+  };
+}

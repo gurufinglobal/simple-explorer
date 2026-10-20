@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-const ChainConfigSchema = z.object({
+export const ChainConfigSchema = z.object({
   key: z.string().min(1),
   name: z.string().min(1),
   lcdUrl: z.url(),
@@ -10,8 +10,28 @@ const ChainConfigSchema = z.object({
   evmChainId: z.string().min(1).optional(),
   bech32Prefix: z.string().min(1).optional(),
   denom: z.string().min(1).optional(),
+  chainId: z.string().min(1).optional(),
+  nativeDenom: z.string().min(1).optional(),
+  bondDenom: z.string().min(1).optional(),
+  feeDenom: z.string().min(1).optional(),
+  decimals: z.number().int().min(0).max(30).optional(),
+  signing: z.array(z.object({
+    wallet: z.enum(["keplr", "walletconnect"]),
+    method: z.enum(["direct", "amino"]),
+    evidence: z.string().min(1),
+  })).optional(),
+  rpcAccess: z.object({
+    origin: z.url(),
+    get: z.literal(true), post: z.literal(true), options: z.literal(true),
+    observedAt: z.string().min(1), evidence: z.string().min(1),
+  }).optional(),
+  evidence: z.array(z.string()).optional(),
   features: z
     .object({
+      bank: z.boolean().optional(),
+      staking: z.boolean().optional(),
+      governance: z.boolean().optional(),
+      distribution: z.boolean().optional(),
       bex: z.boolean().optional(),
       feepolicy: z.boolean().optional(),
       oracle: z.boolean().optional(),
@@ -76,20 +96,26 @@ function defaultChainConfig(env: {
   };
 }
 
-function parseChainConfigs(raw: string | undefined): ChainConfig[] {
-  if (!raw?.trim()) {
-    return [];
-  }
-  try {
-    const json = JSON.parse(raw) as unknown;
-    const parsed = z.array(ChainConfigSchema).safeParse(json);
-    if (!parsed.success) {
-      return [];
+export function parseChainConfigs(raw: string | undefined): ChainConfig[] {
+  if (raw === undefined) return [];
+  let json: unknown;
+  try { json = JSON.parse(raw); }
+  catch { throw new Error("체인 설정 JSON이 올바르지 않습니다. 설정을 수정하고 새로고침하세요."); }
+  const parsed = z.array(ChainConfigSchema).min(1).safeParse(json);
+  if (!parsed.success) throw new Error("체인 endpoint 또는 설정 필드가 올바르지 않습니다.");
+  if (new Set(parsed.data.map(c => c.key)).size !== parsed.data.length) throw new Error("중복 체인 key입니다.");
+  for (const chain of parsed.data) {
+    for (const url of [chain.lcdUrl, chain.rpcUrl, chain.evmRpcUrl]) {
+      if (url && !/^https?:\/\//.test(url)) throw new Error("체인 endpoint는 HTTP(S) URL이어야 합니다.");
     }
-    return parsed.data;
-  } catch {
-    return [];
   }
+  return parsed.data.map(chain => {
+    // W01 public observations; no prefix, fee, decimals or wallet support inferred.
+    if (chain.key !== "tgxn" || chain.lcdUrl.replace(/\/$/, "") !== "https://tgxn.gurufin.io:1317") return chain;
+    return { ...chain, chainId: "guru_631-1", rpcUrl: chain.rpcUrl ?? "https://tgxn.gurufin.io:26657",
+      denom: "agxn", nativeDenom: "agxn", bondDenom: "agxn",
+      evidence: [...(chain.evidence ?? []), "W01 2026-10-20T04:43:48Z: LCD/RPC guru_631-1; native/bond agxn. Terminal observation only; browser CORS and signing unverified."] };
+  });
 }
 
 export function readPublicEnv(): AppEnv {
@@ -144,7 +170,8 @@ export function getDefaultChainKey(): string {
   if (env.NEXT_PUBLIC_DEFAULT_CHAIN_KEY && chains.some((chain) => chain.key === env.NEXT_PUBLIC_DEFAULT_CHAIN_KEY)) {
     return env.NEXT_PUBLIC_DEFAULT_CHAIN_KEY;
   }
-  return chains[0]?.key ?? DEFAULT_CHAIN_KEY;
+  if (env.NEXT_PUBLIC_DEFAULT_CHAIN_KEY) throw new Error("기본 체인 key가 설정 목록에 없습니다. 체인을 선택하세요.");
+  return chains[0].key;
 }
 
 export function getChainByKey(key: string | null | undefined): ChainConfig | null {

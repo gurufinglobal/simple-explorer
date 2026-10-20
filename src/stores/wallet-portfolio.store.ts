@@ -13,10 +13,12 @@ export type WalletPortfolioState = WalletPortfolioSnapshot & {
 };
 const empty = { balance: '—', staking: '—', reward: '—', unbonding: '—' };
 export const useWalletPortfolioStore = create<WalletPortfolioState>((set, get) => {
+  let generation = 0;
   let active: AbortController | null = null;
   return {
     ...empty, loading: false, error: null, result: initialResult({ chain: '', target: '' }),
     clear: () => {
+      generation += 1;
       active?.abort(); active = null;
       set({ ...empty, loading: false, error: null, result: initialResult({ chain: '', target: '' }) });
     },
@@ -27,11 +29,13 @@ export const useWalletPortfolioStore = create<WalletPortfolioState>((set, get) =
       const same = current.context.chain === context.chain && current.context.target === context.target;
       if (same && (active || (current.error?.retryAt ?? 0) > Date.now())) return;
       active?.abort();
+      const requestGeneration = ++generation;
       const controller = new AbortController(); active = controller;
       const previous = same ? current : initialResult<WalletPortfolioSnapshot>(context);
       set({ ...(same ? {} : empty), loading: true, error: null, result: { ...previous, status: 'loading' } });
       const result = await readQuery(context, () => getWalletPortfolio(address, createQueryClient(chain, controller.signal)), previous);
-      if (controller.signal.aborted) return;
+      if (controller.signal.aborted || requestGeneration !== generation) return;
+      try { if (getActiveChainConfig().key !== chain.key) return; } catch { return; }
       active = null;
       set({ ...(result.data ?? empty), loading: false, error: result.error?.message ?? null, result });
     },

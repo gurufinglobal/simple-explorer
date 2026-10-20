@@ -95,7 +95,7 @@ export function GovernanceProposalDetail({
 
   const denom = proposal.totalDeposit[0]?.denom ?? "agxn";
 
-  const canSignCosmos = walletStatus === "connected" && (walletType === "keplr" || walletType === "walletconnect");
+  const canSignCosmos = useWalletSessionStore(s => s.status === "connected" && s.writeStatus === "ready");
   const metamaskReadonly = walletStatus === "connected" && walletType === "metamask";
 
   const onVote = async (option: VoteOption) => {
