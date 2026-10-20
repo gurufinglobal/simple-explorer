@@ -36,6 +36,8 @@ describe('module query states via real HTTP transforms', () => {
   });
   it('keeps validator core data when rewards fail', async () => {
     mockQueryHttp(url => {
+      const amount = amountResponse(url);
+      if (amount) return amount;
       if (url.pathname.endsWith('/outstanding_rewards')) return new Response('', { status: 500 });
       if (url.pathname.endsWith('/commission')) return { commission: { commission: [] } };
       if (url.pathname.endsWith('/delegations')) return { delegation_responses: [], pagination: { next_key: null } };
