@@ -12,15 +12,17 @@ import type { ChainConfig } from "@/lib/env";
 import type { QueryClient } from "@/services/clients";
 import type { EncodeObject } from "@cosmjs/proto-signing";
 import type { StdFee } from "@cosmjs/amino";
-import type { TransactionSnapshot, StakingContext } from "./transaction";
+import type { TransactionSnapshot, StakingContext, GovernanceContext } from "./transaction";
 
 type TransactionSetup = {
   message: EncodeObject;
   policy: NonNullable<ChainConfig["sendFeePolicy"]>;
-  display: Pick<TransactionSnapshot, "action" | "recipient" | "displayAmount" | "unit" | "amount" | "denom" | "observedRewards" | "targetLabel">;
+  display: Pick<TransactionSnapshot, "action" | "recipient" | "displayAmount" | "unit" | "amount" | "denom" | "observedRewards" | "targetLabel" | "governance">;
   context?: StakingContext;
+  governance?: GovernanceContext;
   allowedSigning?: readonly { wallet: string; method: string }[];
   check: (fee: StdFee) => Promise<void>;
+  assertValid?: () => void;
 };
 const inFlight = new Set<string>();
 
@@ -34,8 +36,10 @@ export async function prepareTransaction(params: SigningInput, setup: (context: 
   const state = store.getState();
   let cancelled = false;
   let preparedAt = 0;
+  let assertActionCurrent = () => {};
   const assertCurrent = () => {
     assertInputCurrent();
+    assertActionCurrent();
     if (preparedAt && Date.now() - preparedAt > 120_000) throw new Error("확인 후 2분이 지났습니다. 수수료와 잔액을 다시 확인하세요.");
     if (cancelled || getChainSelectionGeneration() !== chainGeneration || JSON.stringify(getActiveChainConfig()) !== JSON.stringify(chain) || store.getState().generation !== state.generation) {
       throw new Error("입력·체인·계정·연결이 변경되었습니다. 거래를 다시 확인하세요.");
@@ -50,7 +54,8 @@ export async function prepareTransaction(params: SigningInput, setup: (context: 
   assertCurrent();
   const sender = state.bech32Address!;
   const query = createQueryClient(chain);
-  const { message, policy, display, context, check, allowedSigning } = await setup({ chain, query, sender, assertCurrent });
+  const { message, policy, display, context, governance, check, allowedSigning, assertValid } = await setup({ chain, query, sender, assertCurrent });
+  assertActionCurrent = assertValid ?? (() => {});
   assertCurrent();
   const price = GasPrice.fromString(policy.gasPrice);
   if (price.denom !== chain.feeDenom || BigInt(price.amount.atomics) <= BigInt(0)) throw new Error("수수료 가격·자산이 검증된 체인 설정과 다릅니다.");
@@ -108,6 +113,7 @@ export async function prepareTransaction(params: SigningInput, setup: (context: 
       let hash: string | null = null;
       const receipt = (status: TransactionReceipt["status"], message: string, code?: number): TransactionReceipt => ({
         chainKey: chain.key, chainId: chain.chainId!, sender, hash, status, message, code, ...(context ? { staking: context } : {}),
+        ...(governance ? { governance } : {}),
         estimatedFee: fee.amount.map(c => ({ ...c })), actualFee: null,
       });
       try {

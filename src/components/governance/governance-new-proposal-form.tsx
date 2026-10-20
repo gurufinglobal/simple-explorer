@@ -4,7 +4,12 @@ import { useAmountEntry } from "@/components/amount/amount-entry";
 import Link from "next/link";
 import { useState } from "react";
 import { Alert, Button, Card, CardContent, Stack, TextField, Typography } from "@mui/material";
-import { submitTextProposalTx } from "@/services/guru/governance-tx.client";
+import { prepareGovernanceTx, governanceBlockReason } from "@/services/guru/governance-tx.client";
+import { getActiveChainConfig } from "@/lib/chain-selection";
+import { writeBlockReason } from "@/services/wallet/chain-eligibility";
+import { useTransactionFlow } from "@/hooks/use-transaction-flow";
+import { TransactionConfirmDialog } from "@/components/transactions/transaction-confirm-dialog";
+import { TransactionResult, SavedTransactions } from "@/components/transactions/transaction-result";
 import { useWalletSessionStore } from "@/stores/wallet-session.store";
 
 type Props = {
@@ -18,48 +23,20 @@ export function GovernanceNewProposalForm({ defaultDenom }: Props) {
   const [description, setDescription] = useState("");
   const [deposit, setDeposit] = useState("");
   const [denom, setDenom] = useState(defaultDenom);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
+  const wallet = useWalletSessionStore();
+  const chain = getActiveChainConfig();
   const amountEntry = useAmountEntry(deposit, denom);
-  const canSign = useWalletSessionStore(s => s.status === "connected" && s.writeStatus === "ready");
+  const flow = useTransactionFlow(JSON.stringify([chain.key, wallet.generation, title, summary, description, deposit, denom, amountEntry.base, amountEntry.ready]));
+  const reason = writeBlockReason(chain, wallet) ?? governanceBlockReason(chain, "proposal", walletType);
+  const canSign = !reason;
+  const busy = flow.busy || flow.phase === "confirming";
   const metamask = status === "connected" && walletType === "metamask";
-
-  const onSubmit = async () => {
-    if (!canSign || !walletType) {
-      setError("Keplr 또는 WalletConnect로 연결하세요.");
-      return;
-    }
-    if (!title.trim() || !summary.trim()) {
-      setError("제목과 요약은 필수입니다.");
-      return;
-    }
-    if (!amountEntry.ready) {
-      setError("표시 수량과 전송 원본을 확인하세요.");
-      return;
-    }
-    setError(null);
-    setSuccess(null);
-    setBusy(true);
-    try {
-      const { txHash } = await submitTextProposalTx({
-        walletType,
-        sessionTopic,
-        bech32Address,
-        title: title.trim(),
-        summary: summary.trim(),
-        description: description.trim() || summary.trim(),
-        initialDepositAmount: amountEntry.requireBase(),
-        denom,
-      });
-      setSuccess(`제안이 전송되었습니다. Tx: ${txHash}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "제안 전송에 실패했습니다.");
-    } finally {
-      setBusy(false);
-    }
-  };
+  const onSubmit = () => flow.begin(assertCurrent => {
+    if (!walletType) throw new Error("지갑을 연결하세요.");
+    return prepareGovernanceTx({ walletType, sessionTopic, bech32Address, action: "proposal",
+      title: title.trim(), summary: summary.trim(), description: description.trim() || summary.trim(),
+      amount: amountEntry.requireBase(), denom, displayAmount: deposit }, assertCurrent);
+  });
 
   return (
     <Stack spacing={2}>
@@ -73,10 +50,15 @@ export function GovernanceNewProposalForm({ defaultDenom }: Props) {
       </Stack>
 
       {metamask ? (
-        <Alert severity="info">MetaMask는 Cosmos 제안 서명을 지원하지 않습니다. Keplr 또는 WalletConnect를 사용하세요.</Alert>
+        <Alert severity="info">MetaMask는 Cosmos 제안 서명을 지원하지 않습니다. 검증된 Keplr Direct 서명 설정이 필요합니다.</Alert>
       ) : null}
-      {error ? <Alert severity="error">{error}</Alert> : null}
-      {success ? <Alert severity="success">{success}</Alert> : null}
+      {reason && <Alert severity="info">{reason}</Alert>}
+      {flow.error && <Alert severity="warning" role="status">{flow.error}</Alert>}
+      {flow.phase === "validating" && <Alert severity="info" role="status">Params·authority·잔액·수수료 확인 중</Alert>}
+      {flow.phase === "signing" && <Alert severity="info" role="status">지갑 서명 대기 중</Alert>}
+      {flow.receipt && <TransactionResult key={`${flow.receipt.hash}:${flow.receipt.status}`} receipt={flow.receipt} />}
+      <SavedTransactions chainKey={chain.key} excludeHash={flow.receipt?.hash} />
+      <TransactionConfirmDialog snapshot={flow.prepared?.snapshot ?? null} onCancel={flow.cancel} onConfirm={() => void flow.confirm()} />
 
       <Card variant="outlined">
         <CardContent>
@@ -103,7 +85,7 @@ export function GovernanceNewProposalForm({ defaultDenom }: Props) {
               label="초기 예치 (표시 단위)"
               value={deposit}
               onChange={(e) => setDeposit(e.target.value)}
-              helperText="체인 최소 예치 요건을 충족해야 합니다."
+              helperText="앱 정책: 현재 최소 예치 전액 이상, 단일 denom만 지원합니다."
             />
             <TextField label="Denom" value={denom} onChange={(e) => setDenom(e.target.value)} />
             {amountEntry.confirmation}

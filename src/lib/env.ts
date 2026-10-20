@@ -43,6 +43,16 @@ export const ChainConfigSchema = z.object({
     delegate: StakingCapabilitySchema.optional(), undelegate: StakingCapabilitySchema.optional(),
     reward: StakingCapabilitySchema.optional(), commission: StakingCapabilitySchema.optional(),
   }).optional(),
+  governanceCapabilities: z.object({
+    vote: StakingCapabilitySchema.optional(),
+    deposit: StakingCapabilitySchema.optional(),
+    proposal: StakingCapabilitySchema.extend({
+      legacyContent: z.object({
+        authority: z.string().min(1),
+        evidence: z.string().min(1),
+      }).optional(),
+    }).optional(),
+  }).optional(),
   decimals: z.number().int().min(0).max(30).optional(),
   signing: z.array(z.object({
     wallet: z.enum(["keplr", "walletconnect"]),

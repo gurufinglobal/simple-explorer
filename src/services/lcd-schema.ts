@@ -49,7 +49,8 @@ export function validateLcdJson<T>(path: string, value: T): T {
   if (/\/result$/.test(route) && !("result" in body)) schemaError('Oracle result 응답이 올바르지 않습니다.');
   if (/\/params\/(voting|tallying|deposit)$/.test(route)) {
     const key = route.endsWith('/voting') ? 'voting_params' : route.endsWith('/tallying') ? 'tally_params' : 'deposit_params';
-    if (!body[key] || typeof body[key] !== 'object') schemaError(`응답의 ${key}가 올바르지 않습니다.`);
+    const container = route.startsWith('/cosmos/gov/v1/') ? body.params ?? body[key] : body[key];
+    if (!container || typeof container !== 'object' || Array.isArray(container)) schemaError(`응답의 ${key}/params가 올바르지 않습니다.`);
   }
   return value;
 }

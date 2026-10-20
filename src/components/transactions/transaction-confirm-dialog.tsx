@@ -14,6 +14,11 @@ export function TransactionConfirmDialog({ snapshot, onCancel, onConfirm }: {
         <Typography>체인: {snapshot.chainKey} / {snapshot.chainId}</Typography>
         <Typography>서명 계정: {snapshot.sender}</Typography>
         <Typography>{snapshot.targetLabel ?? "전체 수신 주소"}: {snapshot.recipient}</Typography>
+        {snapshot.governance?.option && <Typography>투표 선택: {snapshot.governance.option}</Typography>}
+        {snapshot.governance?.title && <Typography sx={{ whiteSpace: "pre-wrap" }}>제목: {snapshot.governance.title}</Typography>}
+        {snapshot.governance?.summary && <Typography sx={{ whiteSpace: "pre-wrap" }}>요약: {snapshot.governance.summary}</Typography>}
+        {snapshot.governance?.description && <Typography sx={{ whiteSpace: "pre-wrap" }}>본문: {snapshot.governance.description}</Typography>}
+        {snapshot.governance?.depositPolicy && <Typography>{snapshot.governance.depositPolicy}</Typography>}
         {snapshot.amount !== undefined && <><Typography>표시 수량: {snapshot.displayAmount} {snapshot.unit}</Typography>
         <Typography>전송 원본: {snapshot.amount} {snapshot.denom}</Typography></>}
         {snapshot.observedRewards && <><Typography>수량 없는 회수 메시지 · 보상은 체인 실행 시 결정됩니다.</Typography>

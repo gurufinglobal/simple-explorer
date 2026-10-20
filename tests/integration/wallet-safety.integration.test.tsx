@@ -15,7 +15,7 @@ import { normalizeWalletConnectSession } from "@/services/wallet/walletconnect-s
 import { resetWalletConnectClientForTests } from "@/services/wallet/walletconnect-client";
 import { prepareSendTx, submitSendTx as executeSend, type SendTxInput } from "@/services/guru/bank-tx.client";
 import { prepareStakingTx } from "@/services/guru/staking-tx.client";
-import { submitGovernanceVoteTx, submitGovernanceDepositTx, submitTextProposalTx } from "@/services/guru/governance-tx.client";
+import { prepareGovernanceTx, governanceMessages } from "@/services/guru/governance-tx.client";
 import { GovernanceNewProposalForm } from "@/components/governance/governance-new-proposal-form";
 import { HeaderWalletMenu } from "@/components/wallet/header-wallet-menu";
 import { ChainSelector } from "@/components/layout/chain-selector";
@@ -40,6 +40,8 @@ const pubkey = new Uint8Array(33).fill(3);
 const a: ChainConfig = {
   key: "a", name: "Chain A", chainId: "a-1", lcdUrl: "https://a.test:1317", rpcUrl: "https://a.test:26657",
   bech32Prefix: "guru", denom: "agxn", nativeDenom: "agxn", bondDenom: "agxn", feeDenom: "agxn", decimals: 18,
+  features: { governance: true },
+  governanceCapabilities: { proposal: { typeUrl: governanceMessages.proposal.typeUrl, evidence: 'synthetic only', legacyContent: { authority: addressB, evidence: 'synthetic only' }, signing: [{ wallet: 'keplr', method: 'direct', evidence: 'synthetic only' }], fee: { mode: 'fixed', gasPrice: '0.001agxn', gas: 900000, evidence: 'synthetic', limitation: 'synthetic only' } } },
   sendFeePolicy: { mode: "fixed", gasPrice: "0.001agxn", gas: 220000, evidence: "synthetic fee policy", limitation: "synthetic only" },
   signing: [{ wallet: "keplr", method: "direct", evidence: "synthetic wallet boundary" }, { wallet: "walletconnect", method: "amino", evidence: "synthetic wallet boundary" }],
   rpcAccess: { origin: "http://localhost:3000", get: true, post: true, options: true, observedAt: "2026-10-20", evidence: "synthetic browser boundary" },
@@ -154,9 +156,9 @@ describe("W03 chain configuration and signing boundaries", () => {
     () => prepareStakingTx({ action: "undelegate", ...base, validatorAddress: addressB, amount: "1", denom: "agxn" }),
     () => prepareStakingTx({ action: "reward", ...base, validatorAddress: addressB }),
     () => prepareStakingTx({ action: "commission", ...base, validatorAddress: addressB }),
-    () => submitGovernanceVoteTx({ ...base, proposalId: "1", option: "yes" }),
-    () => submitGovernanceDepositTx({ ...base, proposalId: "1", amount: "1", denom: "agxn" }),
-    () => submitTextProposalTx({ ...base, title: "test", summary: "test", description: "test", initialDepositAmount: "1", denom: "agxn" }),
+    () => prepareGovernanceTx({ action: "vote", ...base, proposalId: "1", option: "yes" }),
+    () => prepareGovernanceTx({ action: "deposit", ...base, proposalId: "1", amount: "1", denom: "agxn" }),
+    () => prepareGovernanceTx({ action: "proposal", ...base, title: "test", summary: "test", description: "test", amount: "1", denom: "agxn" }),
   ])("every existing transaction entry rejects a disconnected session before signing", async submit => {
     await expect(submit()).rejects.toThrow(); expect(sign).not.toHaveBeenCalled(); expect(boundary.connectSigner).not.toHaveBeenCalled(); expect(boundary.broadcast).not.toHaveBeenCalled();
   });
@@ -354,7 +356,8 @@ describe("W03 pending WalletConnect session invalidation", () => {
     fireEvent.change(screen.getByLabelText("초기 예치 (표시 단위)"), { target: { value: "1" } });
     await screen.findByText(/전송 원본 1000000000000000000 agxn/);
     fireEvent.click(screen.getByRole("checkbox", { name: "표시 수량과 전송 원본을 확인했습니다" }));
-    expect((screen.getByRole("button", { name: "제안 전송" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "제안 전송" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText(/gov v1 Amino 변환/)).toBeTruthy();
     expect(boundary.request).not.toHaveBeenCalled();
     expect(boundary.broadcast).not.toHaveBeenCalled();
   });
