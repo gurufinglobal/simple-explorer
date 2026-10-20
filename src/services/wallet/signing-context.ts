@@ -3,6 +3,7 @@ import { SigningStargateClient, type GasPrice } from "@cosmjs/stargate";
 import type { StdFee } from "@cosmjs/amino";
 import { isOfflineDirectSigner, type EncodeObject, type OfflineSigner } from "@cosmjs/proto-signing";
 import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
+import { sha256 } from "@cosmjs/crypto";
 import { bech32 } from "bech32";
 import { getActiveChainConfig } from "@/lib/chain-selection";
 import { useWalletSessionStore as store, type WalletConnectorKind } from "@/stores/wallet-session.store";
@@ -13,10 +14,15 @@ import { getActiveWalletConnectSession } from "./walletconnect-client";
 import { createQueryClient } from "@/services/clients";
 
 export type SigningInput = { walletType: WalletConnectorKind; sessionTopic: string | null; bech32Address: string | null };
-export async function createBoundSigningClient(params: SigningInput, gasPrice: GasPrice) {
+export type SigningGuard = {
+  assertCurrent: () => void;
+  onBroadcast?: (hash: string) => void;
+};
+export async function createBoundSigningClient(params: SigningInput, gasPrice: GasPrice, guard?: SigningGuard) {
   const chain = getActiveChainConfig();
   const state = store.getState();
   const assertCurrent = () => {
+    guard?.assertCurrent();
     const now = store.getState();
     if (now.generation !== state.generation || now.status !== "connected" || getActiveChainConfig().key !== chain.key ||
       now.bech32Address !== params.bech32Address || now.walletType !== params.walletType || now.sessionTopic !== params.sessionTopic) {
@@ -62,9 +68,13 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
     signDirect: async (who, doc) => {
       await getAccounts();
       if (who !== address || doc.chainId !== chain.chainId) throw new Error("서명 대상 체인·계정 불일치");
+      const bodyBeforeSigning = doc.bodyBytes.slice();
       const response = await signer.signDirect(who, doc);
       assertCurrent();
       if (response.signed.chainId !== chain.chainId) throw new Error("반환된 서명의 체인이 다릅니다.");
+      if (guard && (response.signed.bodyBytes.length !== bodyBeforeSigning.length || response.signed.bodyBytes.some((byte, i) => byte !== bodyBeforeSigning[i]))) {
+        throw new Error("지갑이 확인한 거래 본문을 변경했습니다. 다시 확인하세요.");
+      }
       return response;
     },
   } : {
@@ -72,9 +82,14 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
     signAmino: async (who, doc) => {
       await getAccounts();
       if (who !== address || doc.chain_id !== chain.chainId) throw new Error("서명 대상 체인·계정 불일치");
+      const messagesBeforeSigning = JSON.stringify(doc.msgs);
+      const memoBeforeSigning = doc.memo;
       const response = await signer.signAmino(who, doc);
       assertCurrent();
       if (response.signed.chain_id !== chain.chainId) throw new Error("반환된 서명의 체인이 다릅니다.");
+      if (guard && (JSON.stringify(response.signed.msgs) !== messagesBeforeSigning || response.signed.memo !== memoBeforeSigning)) {
+        throw new Error("지갑이 확인한 거래 본문을 변경했습니다. 다시 확인하세요.");
+      }
       return response;
     },
   };
@@ -90,7 +105,10 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
           // Separate signing from broadcast to invalidate a pending wallet prompt on account/chain change.
           const signed = await client.sign(who, messages, fee, "");
           assertCurrent();
-          return await client.broadcastTx(TxRaw.encode(signed).finish());
+          const bytes = TxRaw.encode(signed).finish();
+          const hash = Array.from(sha256(bytes), b => b.toString(16).padStart(2, "0")).join("").toUpperCase();
+          guard?.onBroadcast?.(hash);
+          return await client.broadcastTx(bytes);
         } finally { client.disconnect(); }
       },
     },

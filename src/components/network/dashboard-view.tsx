@@ -36,7 +36,8 @@ import {
 } from "@/services/guru/network-summary.service";
 import { useEffectiveCosmosAddress } from "@/hooks/use-effective-cosmos-address";
 import { getTopValidators } from "@/services/guru/staking.service";
-import { submitSendTx } from "@/services/guru/bank-tx.client";
+import { SendForm } from "@/components/transactions/send-form";
+import { SavedTransactions } from "@/components/transactions/transaction-result";
 import { submitDelegateTx } from "@/services/guru/staking-tx.client";
 import { useWalletPortfolioStore } from "@/stores/wallet-portfolio.store";
 import { useWalletSessionStore } from "@/stores/wallet-session.store";
@@ -67,9 +68,6 @@ export function DashboardView() {
   const canSignCosmos = useWalletSessionStore(s => s.status === "connected" && s.writeStatus === "ready");
   const isMetamask = wallet.status === "connected" && wallet.walletType === "metamask";
   const [activeAction, setActiveAction] = useState<"send" | "delegate" | null>(null);
-  const [sendToAddress, setSendToAddress] = useState("");
-  const [sendAmount, setSendAmount] = useState("");
-  const [sendDenom, setSendDenom] = useState(getActiveChainConfig().nativeDenom ?? "");
   const [delegateValidatorAddress, setDelegateValidatorAddress] = useState("");
   const [delegateAmount, setDelegateAmount] = useState("");
   const delegateDenom = getActiveChainConfig().bondDenom ?? "";
@@ -77,46 +75,12 @@ export function DashboardView() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
 
-  const sendEntry = useAmountEntry(sendAmount, sendDenom);
   const delegateEntry = useAmountEntry(delegateAmount, delegateDenom);
 
   const walletTitle = useMemo(
     () => (wallet.status === "connected" ? `Connected (${wallet.walletType ?? "wallet"})` : "Not Connected"),
     [wallet.status, wallet.walletType],
   );
-
-  const onSend = async () => {
-    if (!canSignCosmos || !wallet.walletType) {
-      setActionError("Keplr 또는 WalletConnect를 연결해야 SEND를 실행할 수 있습니다.");
-      return;
-    }
-    if (!sendToAddress.trim()) {
-      setActionError("수신 주소를 입력해주세요.");
-      return;
-    }
-    if (!sendEntry.ready) {
-      setActionError("표시 수량과 전송 원본을 확인하세요.");
-      return;
-    }
-    setActionError(null);
-    setActionSuccess(null);
-    setActionBusy("send");
-    try {
-      const { txHash } = await submitSendTx({
-        walletType: wallet.walletType,
-        sessionTopic: wallet.sessionTopic,
-        bech32Address: wallet.bech32Address,
-        toAddress: sendToAddress.trim(),
-        amount: sendEntry.requireBase(),
-        denom: sendDenom,
-      });
-      setActionSuccess(`SEND 트랜잭션이 전송되었습니다. Tx: ${txHash}`);
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "SEND 트랜잭션 전송에 실패했습니다.");
-    } finally {
-      setActionBusy(null);
-    }
-  };
 
   const onDelegate = async () => {
     if (!canSignCosmos || !wallet.walletType) {
@@ -367,45 +331,8 @@ export function DashboardView() {
               DELEGATE
             </Button>
           </Stack>
-          {activeAction === "send" ? (
-            <Stack spacing={1} sx={{ mt: 2 }}>
-              <Typography variant="subtitle2">SEND</Typography>
-              <TextField
-                label="수신 주소"
-                size="small"
-                value={sendToAddress}
-                onChange={(e) => setSendToAddress(e.target.value.trim())}
-                disabled={!canSignCosmos || actionBusy !== null}
-              />
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                <TextField
-                  label="수량 (표시 단위)"
-                  size="small"
-                  value={sendAmount}
-                  onChange={(e) => setSendAmount(e.target.value.trim())}
-                  disabled={!canSignCosmos || actionBusy !== null}
-                  fullWidth
-                />
-                <TextField
-                  label="Denom"
-                  size="small"
-                  value={sendDenom}
-                  onChange={(e) => setSendDenom(e.target.value.trim())}
-                  disabled={!canSignCosmos || actionBusy !== null}
-                  sx={{ minWidth: 140 }}
-                />
-              </Stack>
-              {sendEntry.confirmation}
-              <Button
-                variant="contained"
-                color="info"
-                onClick={() => void onSend()}
-                disabled={!canSignCosmos || !sendEntry.ready || actionBusy !== null}
-              >
-                Send Tx
-              </Button>
-            </Stack>
-          ) : null}
+          {activeAction === "send" && <SendForm key={getActiveChainConfig().key} />}
+          <SavedTransactions chainKey={getActiveChainConfig().key} />
           {activeAction === "delegate" ? (
             <Stack spacing={1} sx={{ mt: 2 }}>
               <Typography variant="subtitle2">DELEGATE</Typography>
