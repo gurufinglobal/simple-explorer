@@ -176,6 +176,7 @@ describe("W03 connection and session lifecycle", () => {
   });
   it("missing amino approval leaves the selected account read-only", async () => {
     boundary.connect.mockResolvedValue({ approval: async () => session(undefined, []) });
+    boundary.sessionGet.mockReturnValue(session(undefined, []));
     await connectQr(() => {}); expect(store.getState().writeReason).toContain("승인"); expect(boundary.request).not.toHaveBeenCalled();
   });
   it("empty accounts never report connected", async () => {
@@ -294,5 +295,121 @@ describe("W03 connection and session lifecycle", () => {
     expect(screen.getByText("Keplr").closest('[role="menuitem"]')?.getAttribute("aria-disabled")).toBe("true");
     fireEvent.click(screen.getByText("Cancel connection")); await act(async () => { pending.resolve(); });
     expect(store.getState().status).toBe("disconnected"); expect(screen.getByText("Disconnected")).toBeTruthy();
+  });
+});
+
+describe("W03 pending WalletConnect session invalidation", () => {
+  function invalidateLiveSession(change: string) {
+    if (change === "session_delete") boundary.sessionGet.mockImplementation(() => { throw new Error("No matching key"); });
+    else if (change === "session_expire") boundary.sessionGet.mockReturnValue({ ...session(), expiry: 1 });
+    else if (change === "approval_removed") boundary.sessionGet.mockReturnValue(session(undefined, []));
+    else boundary.sessionGet.mockReturnValue(session([`cosmos:a-1:${addressB}`]));
+  }
+  async function expectInvalidated() {
+    expect(store.getState()).toMatchObject({ status: "error", bech32Address: null, sessionTopic: null, pubkey: null, writeStatus: "blocked" });
+    expect(store.getState().writeReason).toContain("다시 연결");
+    expect(screen.getByText("Error")).toBeTruthy();
+    expect(portfolio.getState()).toMatchObject({ balance: "—", staking: "—", reward: "—", unbonding: "—" });
+    expect(portfolio.getState().result.data).toBeNull();
+    expect((screen.getByRole("button", { name: "제안 전송" }) as HTMLButtonElement).disabled).toBe(true);
+    await expect(submitSendTx({ ...base, walletType: "walletconnect", sessionTopic: "topic", toAddress: addressB, amount: "1", denom: "agxn" })).rejects.toThrow();
+    expect(boundary.request).not.toHaveBeenCalled();
+    expect(boundary.broadcast).not.toHaveBeenCalled();
+  }
+  it.each(["session_update", "session_delete", "session_expire"])("%s during public key lookup clears the pending approval and allows explicit reconnect", async event => {
+    render(<><HeaderWalletMenu /><GovernanceNewProposalForm defaultDenom="agxn" /></>);
+    await waitFor(() => expect(boundary.on).toHaveBeenCalledWith(event, expect.any(Function)));
+    await act(async () => { await portfolio.getState().refresh(address); });
+    expect(portfolio.getState().balance).toBe("1 gxn");
+    const pendingKey = deferred<Response>();
+    http.mockImplementation(async input => String(input).includes("/auth/") ? pendingKey.promise.then(value => value.clone()) : Response.json(response(String(input))));
+    boundary.connect.mockResolvedValue({ approval: async () => session() });
+    let pending!: Promise<void>;
+    act(() => { pending = connectQr(() => {}); });
+    await waitFor(() => expect(http.mock.calls.some(([url]) => String(url).includes("/auth/"))).toBe(true));
+    const generation = store.getState().generation;
+    expect(store.getState().status).toBe("connecting");
+    invalidateLiveSession(event);
+    act(() => boundary.on.mock.calls.find(([name]) => name === event)![1]({ topic: "topic" }));
+    expect(store.getState().generation).toBeGreaterThan(generation);
+    await expectInvalidated();
+    await act(async () => {
+      pendingKey.resolve(Response.json(response("https://a.test:1317/cosmos/auth/v1beta1/accounts/test")));
+      await pending;
+    });
+    await expectInvalidated();
+    const next = { ...session([`cosmos:a-1:${addressB}`]), topic: "next-topic" };
+    boundary.sessionGet.mockReturnValue(next);
+    boundary.connect.mockResolvedValue({ approval: async () => next });
+    await act(async () => { await connectQr(() => {}); });
+    expect(store.getState()).toMatchObject({ status: "connected", bech32Address: addressB, sessionTopic: "next-topic", writeStatus: "ready" });
+    expect((screen.getByRole("button", { name: "제안 전송" }) as HTMLButtonElement).disabled).toBe(false);
+    expect(boundary.request).not.toHaveBeenCalled();
+    expect(boundary.broadcast).not.toHaveBeenCalled();
+  });
+  it.each(["session_update", "session_delete", "session_expire", "approval_removed"])("rechecks %s after public key lookup even without an SDK event", async change => {
+    render(<><HeaderWalletMenu /><GovernanceNewProposalForm defaultDenom="agxn" /></>);
+    const pendingKey = deferred<Response>();
+    http.mockImplementation(async input => String(input).includes("/auth/") ? pendingKey.promise.then(value => value.clone()) : Response.json(response(String(input))));
+    boundary.connect.mockResolvedValue({ approval: async () => session() });
+    let pending!: Promise<void>;
+    act(() => { pending = connectQr(() => {}); });
+    await waitFor(() => expect(http.mock.calls.some(([url]) => String(url).includes("/auth/"))).toBe(true));
+    invalidateLiveSession(change);
+    await act(async () => {
+      pendingKey.resolve(Response.json(response("https://a.test:1317/cosmos/auth/v1beta1/accounts/test")));
+      await pending;
+    });
+    await expectInvalidated();
+  });
+  it.each(["session_update", "session_delete", "session_expire", "approval_removed"])("rechecks %s after endpoint verification before enabling writes", async change => {
+    render(<><HeaderWalletMenu /><GovernanceNewProposalForm defaultDenom="agxn" /></>);
+    const pendingRpc = deferred<Response>();
+    http.mockImplementation(async input => String(input).includes(":26657") ? pendingRpc.promise.then(value => value.clone()) : Response.json(response(String(input))));
+    act(() => connected("walletconnect"));
+    let pending!: Promise<void>;
+    act(() => { pending = refreshWriteEligibility(); });
+    await waitFor(() => expect(http.mock.calls.some(([url]) => String(url).includes(":26657"))).toBe(true));
+    invalidateLiveSession(change);
+    await act(async () => {
+      pendingRpc.resolve(Response.json(response("https://a.test:26657/status")));
+      await pending;
+    });
+    await expectInvalidated();
+  });
+  it("finishing an old approval cannot clear a newer pending topic or invalidate it with an unrelated event", async () => {
+    render(<><HeaderWalletMenu /><GovernanceNewProposalForm defaultDenom="agxn" /></>);
+    await waitFor(() => expect(boundary.on).toHaveBeenCalledWith("session_delete", expect.any(Function)));
+    const onDelete = boundary.on.mock.calls.find(([name]) => name === "session_delete")![1];
+    const oldKey = deferred<Response>(); const newKey = deferred<Response>();
+    http.mockImplementation(async input => {
+      const url = String(input);
+      if (url.includes("/auth/")) return (url.includes(addressB) ? newKey.promise : oldKey.promise).then(value => value.clone());
+      return Response.json(response(url));
+    });
+    boundary.connect.mockResolvedValue({ approval: async () => session() });
+    let old!: Promise<void>; let current!: Promise<void>;
+    act(() => { old = connectQr(() => {}); });
+    await waitFor(() => expect(http.mock.calls.some(([url]) => String(url).includes(`/accounts/${address}`))).toBe(true));
+    act(() => onDelete({ topic: "topic" }));
+    const next = { ...session([`cosmos:a-1:${addressB}`]), topic: "next-topic" };
+    boundary.sessionGet.mockReturnValue(next);
+    boundary.connect.mockResolvedValue({ approval: async () => next });
+    act(() => { current = connectQr(() => {}); });
+    await waitFor(() => expect(http.mock.calls.some(([url]) => String(url).includes(`/accounts/${addressB}`))).toBe(true));
+    const generation = store.getState().generation;
+    await act(async () => {
+      oldKey.resolve(Response.json(response("https://a.test:1317/cosmos/auth/v1beta1/accounts/test")));
+      await old;
+    });
+    act(() => onDelete({ topic: "topic" }));
+    expect(store.getState()).toMatchObject({ status: "connecting", generation });
+    act(() => onDelete({ topic: "next-topic" }));
+    await expectInvalidated();
+    await act(async () => {
+      newKey.resolve(Response.json(response("https://a.test:1317/cosmos/auth/v1beta1/accounts/test")));
+      await current;
+    });
+    await expectInvalidated();
   });
 });
