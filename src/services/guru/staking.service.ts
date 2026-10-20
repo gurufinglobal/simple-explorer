@@ -222,7 +222,7 @@ export async function getValidatorDetail(operatorAddress: string, apiClients: Qu
   const metadata = await getAmountMetadata(apiClients);
   const params = await getStakingParams(apiClients).catch(() => null);
   const amountCoins: Record<string, Coin[]> = {};
-  const capture = (name: string, coins: Coin[]) => { const values = sumCoins(coins); amountCoins[name] = coins; return values.map(c => c.amount).join(", ") || "0"; };
+  const capture = (name: string, coins: Coin[]) => { const values = sumCoins(coins); amountCoins[name] = name === "totalDelegationAmount" ? values : coins; return values.map(c => c.amount).join(", ") || "0"; };
   const summary = { metadata, amountCoins, bondDenom: params?.bondDenom, unbondingDuration: params?.unbondingTime, ...toValidatorSummary(validator), operatorAccountAddress, delegatorShares: validator.delegator_shares ?? "-" };
   const defaults = { totalDelegationAmount: "-", selfDelegationAmount: "-", outstandingRewardsAmount: "-", commissionRewardsAmount: "-" };
   try {
