@@ -40,8 +40,8 @@ function mapCoins(raw: unknown): GovCoin[] {
     return [];
   }
   return raw.map((c) => {
-    const o = c as { denom?: string; amount?: string };
-    return { denom: o.denom ?? "", amount: o.amount ?? "0" };
+    const o = c as { denom?: string; amount?: string } | null;
+    return { denom: o?.denom ?? "denom 미확인", amount: o?.amount ?? "미확인" };
   });
 }
 

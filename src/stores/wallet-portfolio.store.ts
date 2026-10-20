@@ -11,7 +11,7 @@ export type WalletPortfolioState = WalletPortfolioSnapshot & {
   clear: () => void;
   refresh: (cosmosAddress: string) => Promise<void>;
 };
-const empty = { balance: '—', staking: '—', reward: '—', unbonding: '—' };
+const empty = { details: undefined, balance: '—', staking: '—', reward: '—', unbonding: '—' };
 export const useWalletPortfolioStore = create<WalletPortfolioState>((set, get) => {
   let generation = 0;
   let active: AbortController | null = null;

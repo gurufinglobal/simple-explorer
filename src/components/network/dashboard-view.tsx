@@ -1,5 +1,8 @@
 "use client";
 
+import { useAmountEntry } from "@/components/amount/amount-entry";
+import { CoinAmount } from "@/components/amount/coin-amount";
+import { UnbondingDetails } from "@/components/amount/unbonding-details";
 import Link from "next/link";
 import { getActiveChainConfig } from "@/lib/chain-selection";
 import { useMemo, useState } from "react";
@@ -43,23 +46,7 @@ function formatIntegerDisplay(value: string | null): string {
   return value.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
-function formatCompactAmount(value: string | null | undefined): string {
-  if (!value) {
-    return "-";
-  }
-  const trimmed = value.trim();
-  const [numPart, ...unitParts] = trimmed.split(/\s+/);
-  const unit = unitParts.join(" ");
-  const numeric = Number(numPart.replace(/,/g, ""));
-  if (!Number.isFinite(numeric)) {
-    return trimmed;
-  }
-  const compact = new Intl.NumberFormat("en", {
-    notation: "compact",
-    maximumFractionDigits: 2,
-  }).format(numeric);
-  return unit ? `${compact} ${unit}` : compact;
-}
+function formatCompactAmount(value: string | null | undefined): string { return value ?? "-"; }
 
 export function DashboardView() {
   const summary = useQuery("dashboard-summary", client => getNetworkSummary(client));
@@ -73,20 +60,23 @@ export function DashboardView() {
   const effectiveCosmos = useEffectiveCosmosAddress();
   const storedPortfolio = useWalletPortfolioStore();
   const portfolio = storedPortfolio.result.context.chain === getActiveChainConfig().key && storedPortfolio.result.context.target === `portfolio:${effectiveCosmos}`
-    ? storedPortfolio : { ...storedPortfolio, balance: "—", staking: "—", reward: "—", unbonding: "—", error: null, loading: false };
+    ? storedPortfolio : { ...storedPortfolio, details: undefined, balance: "—", staking: "—", reward: "—", unbonding: "—", error: null, loading: false };
   const loading = summary.busy && !state;
   const canSignCosmos = useWalletSessionStore(s => s.status === "connected" && s.writeStatus === "ready");
   const isMetamask = wallet.status === "connected" && wallet.walletType === "metamask";
   const [activeAction, setActiveAction] = useState<"send" | "delegate" | null>(null);
   const [sendToAddress, setSendToAddress] = useState("");
   const [sendAmount, setSendAmount] = useState("");
-  const [sendDenom, setSendDenom] = useState("agxn");
+  const [sendDenom, setSendDenom] = useState(getActiveChainConfig().nativeDenom ?? "");
   const [delegateValidatorAddress, setDelegateValidatorAddress] = useState("");
   const [delegateAmount, setDelegateAmount] = useState("");
-  const [delegateDenom, setDelegateDenom] = useState("agxn");
+  const delegateDenom = getActiveChainConfig().bondDenom ?? "";
   const [actionBusy, setActionBusy] = useState<"send" | "delegate" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  const sendEntry = useAmountEntry(sendAmount, sendDenom);
+  const delegateEntry = useAmountEntry(delegateAmount, delegateDenom);
 
   const walletTitle = useMemo(
     () => (wallet.status === "connected" ? `Connected (${wallet.walletType ?? "wallet"})` : "Not Connected"),
@@ -102,8 +92,8 @@ export function DashboardView() {
       setActionError("수신 주소를 입력해주세요.");
       return;
     }
-    if (!/^[0-9]+$/.test(sendAmount.trim()) || sendAmount.trim() === "0") {
-      setActionError("전송 수량은 0보다 큰 정수 문자열이어야 합니다.");
+    if (!sendEntry.ready) {
+      setActionError("표시 수량과 전송 원본을 확인하세요.");
       return;
     }
     setActionError(null);
@@ -115,8 +105,8 @@ export function DashboardView() {
         sessionTopic: wallet.sessionTopic,
         bech32Address: wallet.bech32Address,
         toAddress: sendToAddress.trim(),
-        amount: sendAmount.trim(),
-        denom: sendDenom.trim() || "agxn",
+        amount: sendEntry.requireBase(),
+        denom: sendDenom,
       });
       setActionSuccess(`SEND 트랜잭션이 전송되었습니다. Tx: ${txHash}`);
     } catch (e) {
@@ -135,8 +125,8 @@ export function DashboardView() {
       setActionError("위임할 validator를 선택해주세요.");
       return;
     }
-    if (!/^[0-9]+$/.test(delegateAmount.trim()) || delegateAmount.trim() === "0") {
-      setActionError("위임 수량은 0보다 큰 정수 문자열이어야 합니다.");
+    if (!delegateEntry.ready) {
+      setActionError("표시 수량과 전송 원본을 확인하세요.");
       return;
     }
     setActionError(null);
@@ -148,8 +138,8 @@ export function DashboardView() {
         sessionTopic: wallet.sessionTopic,
         bech32Address: wallet.bech32Address,
         validatorAddress: delegateValidatorAddress.trim(),
-        amount: delegateAmount.trim(),
-        denom: delegateDenom.trim() || "agxn",
+        amount: delegateEntry.requireBase(),
+        denom: delegateDenom,
       });
       setActionSuccess(`DELEGATE 트랜잭션이 전송되었습니다. Tx: ${txHash}`);
     } catch (e) {
@@ -161,6 +151,7 @@ export function DashboardView() {
 
   return (
     <Stack spacing={2}>
+      {state && <details><summary>공급·bond 원본</summary>{state.supplyRaw ?? "공급 미확인"}<br />{state.bondedRaw ?? "bond 미확인"}</details>}
       <QueryStatus {...summary} /><QueryStatus {...validators} /><QueryStatus {...versions} /><QueryStatus {...accounts} />
 
       <Card variant="outlined">
@@ -296,6 +287,10 @@ export function DashboardView() {
             </Typography>
           ) : null}
           {wallet.status === "connected" && portfolio.result.context.chain === getActiveChainConfig().key && portfolio.result.context.target === `portfolio:${effectiveCosmos}` ? <QueryStatus result={portfolio.result} busy={portfolio.loading} refresh={() => { if (effectiveCosmos) void portfolio.refresh(effectiveCosmos); }} /> : null}
+          {wallet.status === "connected" && portfolio.details && <details><summary>자산 원본·언본딩 상세</summary>
+            {(["balance", "staking", "reward"] as const).map(kind => <div key={kind}>{kind}{portfolio.details?.[kind]?.map(coin => <CoinAmount key={coin.denom} coin={coin} metadata={portfolio.details?.metadata} />)}</div>)}
+            {portfolio.details.unbonding && <UnbondingDetails snapshot={portfolio.details.unbonding} duration={portfolio.details.unbondingTime} metadata={portfolio.details.metadata} />}
+          </details>}
           {portfolio.error ? (
             <Alert severity="warning" sx={{ mb: 1 }}>
               {portfolio.error}
@@ -375,7 +370,7 @@ export function DashboardView() {
               />
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                 <TextField
-                  label="수량 (base denom)"
+                  label="수량 (표시 단위)"
                   size="small"
                   value={sendAmount}
                   onChange={(e) => setSendAmount(e.target.value.trim())}
@@ -391,11 +386,12 @@ export function DashboardView() {
                   sx={{ minWidth: 140 }}
                 />
               </Stack>
+              {sendEntry.confirmation}
               <Button
                 variant="contained"
                 color="info"
                 onClick={() => void onSend()}
-                disabled={!canSignCosmos || actionBusy !== null}
+                disabled={!canSignCosmos || !sendEntry.ready || actionBusy !== null}
               >
                 Send Tx
               </Button>
@@ -420,7 +416,7 @@ export function DashboardView() {
               </TextField>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
                 <TextField
-                  label="수량 (base denom)"
+                  label="수량 (표시 단위)"
                   size="small"
                   value={delegateAmount}
                   onChange={(e) => setDelegateAmount(e.target.value.trim())}
@@ -431,12 +427,13 @@ export function DashboardView() {
                   label="Denom"
                   size="small"
                   value={delegateDenom}
-                  onChange={(e) => setDelegateDenom(e.target.value.trim())}
+                  slotProps={{ input: { readOnly: true } }}
                   disabled={!canSignCosmos || actionBusy !== null}
                   sx={{ minWidth: 140 }}
                 />
               </Stack>
-              <Button variant="contained" onClick={() => void onDelegate()} disabled={!canSignCosmos || actionBusy !== null}>
+              {delegateEntry.confirmation}
+              <Button variant="contained" onClick={() => void onDelegate()} disabled={!canSignCosmos || !delegateEntry.ready || actionBusy !== null}>
                 Delegate Tx
               </Button>
             </Stack>

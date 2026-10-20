@@ -53,14 +53,22 @@ function readDeepStringField(target: unknown, fieldName: string): string | null 
 
 export async function getAddressBalances(address: string, apiClients: QueryClient = defaultClients): Promise<AddressBalance[]> {
 
-  const response = await apiClients.lcdGet<LcdBalancesResponse>(
-    `/cosmos/bank/v1beta1/balances/${encodeURIComponent(address)}`,
-  );
-  const balances = response.balances ?? [];
-  return balances.map((item) => ({
-    denom: item.denom ?? "unknown",
-    amount: item.amount ?? "0",
-  }));
+  const balances: AddressBalance[] = [];
+  let cursor: string | null = null;
+  const seen = new Set<string>();
+  do {
+    const response: LcdBalancesResponse & { pagination?: { next_key?: string | null } } = await apiClients.lcdGet(
+      `/cosmos/bank/v1beta1/balances/${encodeURIComponent(address)}${cursor ? `?pagination.key=${encodeURIComponent(cursor)}` : ""}`,
+    );
+    for (const item of response.balances ?? schemaError()) {
+      if (!item.denom || !item.amount || !/^\d+$/.test(item.amount)) schemaError();
+      balances.push({ denom: item.denom, amount: item.amount });
+    }
+    cursor = response.pagination?.next_key ?? null;
+    if (cursor && seen.has(cursor)) schemaError("잔액 페이지가 반복됩니다.");
+    if (cursor) seen.add(cursor);
+  } while (cursor);
+  return balances;
 }
 
 export async function getAddressAccountInfo(address: string, apiClients: QueryClient = defaultClients): Promise<AddressAccountInfo> {

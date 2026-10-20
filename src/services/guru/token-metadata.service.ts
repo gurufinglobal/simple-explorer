@@ -5,7 +5,7 @@ export type TokenMetadata = {
   tokenType: "native" | "ibc" | "evm";
   name: string;
   symbol: string;
-  decimals: number;
+  decimals: number | null;
   sourceChain: string | null;
   sourceChannel: string | null;
 };
@@ -16,7 +16,7 @@ export type TokenDenomMetadata = {
   name: string;
   symbol: string;
   description: string;
-  decimals: number;
+  decimals: number | null;
 };
 
 type DenomMetadataResponse = {
@@ -68,8 +68,8 @@ async function fetchNativeTokenMetadata(tokenRef: string, apiClients: QueryClien
   return {
     tokenType: "native",
     name: response.metadata.name ?? tokenRef,
-    symbol: response.metadata.symbol ?? response.metadata.display ?? tokenRef.toUpperCase(),
-    decimals: 6,
+    symbol: response.metadata.symbol ?? response.metadata.display ?? tokenRef,
+    decimals: getDisplayDecimals(response.metadata),
     sourceChain: null,
     sourceChannel: null,
   };
@@ -90,8 +90,8 @@ async function fetchIbcTokenMetadata(tokenRef: string, apiClients: QueryClient =
   return {
     tokenType: "ibc",
     name: response.denom_trace.base_denom ?? tokenRef,
-    symbol: (response.denom_trace.base_denom ?? "IBC").toUpperCase(),
-    decimals: 6,
+    symbol: response.denom_trace.base_denom ?? tokenRef,
+    decimals: null,
     sourceChain: "unknown",
     sourceChannel: channelId,
   };
@@ -100,22 +100,11 @@ async function fetchIbcTokenMetadata(tokenRef: string, apiClients: QueryClient =
 function getDisplayDecimals(metadata: {
   display?: string;
   denom_units?: Array<{ denom?: string; exponent?: number }>;
-}): number {
-  const units = metadata.denom_units ?? [];
-  const display = metadata.display;
-  if (display) {
-    const matched = units.find((unit) => unit.denom === display);
-    if (typeof matched?.exponent === "number") {
-      return matched.exponent;
-    }
-  }
-  const numericExponents = units
-    .map((unit) => unit.exponent)
-    .filter((value): value is number => typeof value === "number");
-  if (numericExponents.length === 0) {
-    return 0;
-  }
-  return Math.max(...numericExponents);
+}): number | null {
+  if (!metadata.display) return null;
+  const matches = metadata.denom_units?.filter(unit => unit.denom === metadata.display) ?? [];
+  const exponent = matches.length === 1 ? matches[0].exponent : undefined;
+  return typeof exponent === "number" && Number.isInteger(exponent) && exponent >= 0 && exponent <= 255 ? exponent : null;
 }
 
 function normalizeDenomMetadata(metadata: {
@@ -138,7 +127,7 @@ function normalizeDenomMetadata(metadata: {
     baseDenom,
     displayDenom,
     name: metadata.name?.trim() || baseDenom,
-    symbol: metadata.symbol?.trim() || displayDenom.toUpperCase(),
+    symbol: metadata.symbol?.trim() || displayDenom,
     description: metadata.description?.trim() || "-",
     decimals: getDisplayDecimals(metadata),
   };

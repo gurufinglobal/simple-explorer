@@ -1,3 +1,4 @@
+import { amountResponse } from "../helpers/amounts";
 import { afterEach, describe, expect, it } from 'vitest';
 import { useWalletPortfolioStore } from '@/stores/wallet-portfolio.store';
 import { mockQueryHttp } from '../helpers/query-http';
@@ -5,9 +6,9 @@ import { restoreHttpBoundary } from '../helpers/network-summary';
 afterEach(() => { useWalletPortfolioStore.getState().clear(); restoreHttpBoundary(); });
 describe('portfolio context through the HTTP boundary', () => {
   it('clears previous account data and discards late responses after clear', async () => {
-    const http = mockQueryHttp(url => url.pathname.includes('/balances/') ? { balances: [{ denom: 'agxn', amount: '1000000000000000000' }] } : url.pathname.includes('/rewards') ? { total: [] } : url.pathname.includes('/unbonding') ? { unbonding_responses: [] } : { delegation_responses: [] });
+    const http = mockQueryHttp(url => amountResponse(url) ?? (url.pathname.includes('/balances/') ? { balances: [{ denom: 'agxn', amount: '1000000000000000000' }] } : url.pathname.includes('/rewards') ? { total: [] } : url.pathname.includes('/unbonding') ? { unbonding_responses: [] } : { delegation_responses: [] }));
     await useWalletPortfolioStore.getState().refresh('a');
-    expect(useWalletPortfolioStore.getState().balance).toBe('1 gxn');
+    expect(useWalletPortfolioStore.getState().balance).toBe('1 GXN');
     const resolvers: ((response: Response) => void)[] = [];
     http.mockImplementation(() => new Promise(resolve => { resolvers.push(resolve); }));
     const pending = useWalletPortfolioStore.getState().refresh('b');
@@ -18,11 +19,11 @@ describe('portfolio context through the HTTP boundary', () => {
     expect(useWalletPortfolioStore.getState()).toMatchObject({ balance: '—', result: { status: 'idle', data: null } });
   });
   it('keeps last success after a refresh fails', async () => {
-    const http = mockQueryHttp(url => url.pathname.includes('/balances/') ? { balances: [] } : url.pathname.includes('/rewards') ? { total: [] } : url.pathname.includes('/unbonding') ? { unbonding_responses: [] } : { delegation_responses: [] });
+    const http = mockQueryHttp(url => amountResponse(url) ?? (url.pathname.includes('/balances/') ? { balances: [] } : url.pathname.includes('/rewards') ? { total: [] } : url.pathname.includes('/unbonding') ? { unbonding_responses: [] } : { delegation_responses: [] }));
     await useWalletPortfolioStore.getState().refresh('a');
     const observedAt = useWalletPortfolioStore.getState().result.observedAt;
     http.mockResolvedValue(new Response('', { status: 500 }));
     await useWalletPortfolioStore.getState().refresh('a');
-    expect(useWalletPortfolioStore.getState()).toMatchObject({ balance: '0 gxn', result: { status: 'stale', observedAt, error: { status: 500 } } });
+    expect(useWalletPortfolioStore.getState()).toMatchObject({ balance: '0 GXN', result: { status: 'stale', observedAt, error: { status: 500 } } });
   });
 });

@@ -1,5 +1,6 @@
 "use client";
 
+import { assertBaseAmount } from "@/lib/cosmos-amount";
 import { calculateFee, GasPrice } from "@cosmjs/stargate";
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
 
@@ -27,14 +28,6 @@ function assertBrowser(): void {
   }
 }
 
-function assertAmount(value: string): void {
-  if (!/^[0-9]+$/.test(value)) {
-    throw new Error("Amount must be an integer string in base denom.");
-  }
-  if (value === "0") {
-    throw new Error("Amount must be greater than zero.");
-  }
-}
 
 export async function submitSendTx(params: SendTxInput): Promise<{ txHash: string }> {
   assertBrowser();
@@ -42,7 +35,7 @@ export async function submitSendTx(params: SendTxInput): Promise<{ txHash: strin
   if (!toAddress) {
     throw new Error("Recipient address is required.");
   }
-  assertAmount(params.amount);
+  assertBaseAmount(params.amount);
 
   const denom = params.denom.trim();
   if (!denom) {

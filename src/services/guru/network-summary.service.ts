@@ -1,6 +1,8 @@
 import { PartialQueryError, combinedError, schemaError } from "@/lib/query-result";
-import { formatBaseAmount } from "@/lib/cosmos-amount";
+import { formatCoin } from "@/lib/cosmos-amount";
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
+
+import { getAmountMetadata, getStakingParams } from "./amount-context.service";
 
 export type NetworkSummary = {
   chainId: string;
@@ -9,6 +11,8 @@ export type NetworkSummary = {
   supply: string;
   bonded: string;
   inflation: string;
+  supplyRaw?: string;
+  bondedRaw?: string;
 };
 
 type LcdBlockResponse = {
@@ -67,12 +71,6 @@ export type ApplicationVersionItem = {
   version: string;
 };
 
-const DEFAULT_BASE_DENOM = "agxn";
-
-function toDisplayDenom(baseDenom: string): string {
-  return baseDenom.startsWith("a") && baseDenom.length > 1 ? baseDenom.slice(1) : baseDenom;
-}
-
 function formatInflation(raw: string): string {
   const numeric = Number(raw);
   if (Number.isNaN(numeric)) {
@@ -123,8 +121,8 @@ async function fetchAverageBlockTimeRecent(latestHeight: number, sampleBlocks = 
 
 export async function getNetworkSummary(apiClients: QueryClient = defaultClients): Promise<NetworkSummary> {
   const activeChain = apiClients.chain;
-  const baseDenom = activeChain.denom ?? DEFAULT_BASE_DENOM;
-  const displayDenom = toDisplayDenom(baseDenom);
+  const baseDenom = activeChain.nativeDenom;
+  const metadata = await getAmountMetadata(apiClients);
 
   const summary: NetworkSummary = { chainId: activeChain.key, blockHeight: null, averageBlockTimeSec: null, supply: "-", bonded: "-", inflation: "-" };
   const results = await Promise.allSettled([
@@ -135,14 +133,20 @@ export async function getNetworkSummary(apiClients: QueryClient = defaultClients
       summary.chainId = latest.block.header.chain_id;
       summary.averageBlockTimeSec = await fetchAverageBlockTimeRecent(height, 10, apiClients);
     }),
-    apiClients.lcdGet<SupplyResponse>(`/cosmos/bank/v1beta1/supply/by_denom?denom=${encodeURIComponent(baseDenom)}`).then(res => {
-      if (!res.amount?.amount || !/^\d+$/.test(res.amount.amount)) schemaError();
-      summary.supply = formatBaseAmount(res.amount.amount, displayDenom);
-    }),
-    apiClients.lcdGet<PoolResponse>("/cosmos/staking/v1beta1/pool").then(res => {
+    (async () => {
+      if (!baseDenom) schemaError("native denom 미확인");
+      const res = await apiClients.lcdGet<SupplyResponse>(`/cosmos/bank/v1beta1/supply/by_denom?denom=${encodeURIComponent(baseDenom)}`);
+      if (!res.amount?.amount || !/^\d+$/.test(res.amount.amount) || res.amount.denom !== baseDenom) schemaError();
+      summary.supply = formatCoin({ amount: res.amount.amount, denom: baseDenom }, metadata.find(m => m.baseDenom === baseDenom));
+      summary.supplyRaw = `${res.amount.amount} ${baseDenom}`;
+    })(),
+    (async () => {
+      const params = await getStakingParams(apiClients);
+      const res = await apiClients.lcdGet<PoolResponse>("/cosmos/staking/v1beta1/pool");
       if (!res.pool?.bonded_tokens || !/^\d+$/.test(res.pool.bonded_tokens)) schemaError();
-      summary.bonded = formatBaseAmount(res.pool.bonded_tokens, displayDenom);
-    }),
+      summary.bonded = formatCoin({ amount: res.pool.bonded_tokens, denom: params.bondDenom }, metadata.find(m => m.baseDenom === params.bondDenom));
+      summary.bondedRaw = `${res.pool.bonded_tokens} ${params.bondDenom}`;
+    })(),
     apiClients.lcdGet<InflationResponse>("/cosmos/mint/v1beta1/inflation").then(res => {
       if (typeof res.inflation !== "string" || !/^\d+(?:\.\d+)?$/.test(res.inflation)) schemaError();
       summary.inflation = formatInflation(res.inflation);

@@ -1,3 +1,6 @@
+import { sumCoins, type Coin, type AmountMetadata } from "@/lib/cosmos-amount";
+import { getAmountMetadata, getStakingParams } from "./amount-context.service";
+import { getUnbonding, type UnbondingSnapshot } from "./unbonding.service";
 import { PartialQueryError, QueryError, readFields, schemaError } from "@/lib/query-result";
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 import { readPublicEnv } from "@/lib/env";
@@ -5,6 +8,8 @@ import { bech32 } from "bech32";
 import { getActiveChainConfig } from "@/lib/chain-selection";
 
 export type ValidatorSummary = {
+  bondDenom?: string;
+  metadata?: AmountMetadata[];
   operatorAddress: string;
   moniker: string;
   votingPower: string;
@@ -20,6 +25,8 @@ export type ValidatorSummary = {
 };
 
 export type ValidatorDetail = ValidatorSummary & {
+  amountCoins?: Record<string, Coin[]>;
+  unbondingDuration?: string;
   delegatorShares: string;
   totalDelegationAmount: string;
   selfDelegationAmount: string;
@@ -29,6 +36,10 @@ export type ValidatorDetail = ValidatorSummary & {
 };
 
 export type DelegatorValidatorPosition = {
+  amountCoins?: Record<string, Coin[]>;
+  unbondingSnapshot?: UnbondingSnapshot;
+  unbondingDuration?: string;
+  metadata?: AmountMetadata[];
   delegationAmount: string;
   unbondingAmount: string;
   rewardAmount: string;
@@ -138,52 +149,21 @@ type DelegationRewardsResponse = {
   }>;
 };
 
-type UnbondingByValidatorResponse = {
-  unbond?: {
-    entries?: Array<{
-      balance?: string;
-    }>;
-  };
-};
-
-const PRIMARY_DENOM = "agxn";
-
 function toValidatorSummary(validator: NonNullable<ValidatorsResponse["validators"]>[number]): ValidatorSummary {
   return {
     operatorAddress: validator.operator_address ?? "-",
     moniker: validator.description?.moniker ?? "unknown",
-    votingPower: validator.tokens ?? "0",
+    votingPower: validator.tokens ?? "-",
     commission: validator.commission?.commission_rates?.rate ?? "0",
     jailed: validator.jailed ?? false,
     status: validator.status ?? "BOND_STATUS_UNSPECIFIED",
     details: validator.description?.details ?? "",
     website: validator.description?.website ?? "",
     identity: validator.description?.identity ?? "",
-    minSelfDelegation: validator.min_self_delegation ?? "0",
+    minSelfDelegation: validator.min_self_delegation ?? "-",
     unbondingHeight: validator.unbonding_height ?? "0",
     unbondingTime: validator.unbonding_time ?? "",
   };
-}
-
-function extractPrimaryDenomAmount(
-  coins: Array<{
-    denom?: string;
-    amount?: string;
-  }>,
-): string {
-  const target = coins.find((coin) => coin.denom === PRIMARY_DENOM)?.amount;
-  return target && /^-?[0-9]+(\.[0-9]+)?$/.test(target) ? target : "0";
-}
-
-function sumUnbonding(entries: Array<{ balance?: string }> | undefined): string {
-  let total = BigInt(0);
-  for (const entry of entries ?? []) {
-    const amount = entry.balance;
-    if (amount && /^[0-9]+$/.test(amount)) {
-      total += BigInt(amount);
-    }
-  }
-  return total.toString();
 }
 
 async function operatorToAccountAddress(operatorAddress: string): Promise<string | null> {
@@ -200,9 +180,10 @@ async function operatorToAccountAddress(operatorAddress: string): Promise<string
   }
 }
 
-async function fetchValidatorDelegationTotal(operatorAddress: string, apiClients: QueryClient = defaultClients): Promise<string> {
+async function fetchValidatorDelegationTotal(operatorAddress: string, apiClients: QueryClient = defaultClients): Promise<Coin[]> {
   let nextKey: string | null | undefined;
-  let total = BigInt(0);
+  const coins: Coin[] = [];
+  const seen = new Set<string>();
 
   do {
     const path =
@@ -211,16 +192,16 @@ async function fetchValidatorDelegationTotal(operatorAddress: string, apiClients
         : `/cosmos/staking/v1beta1/validators/${encodeURIComponent(operatorAddress)}/delegations?pagination.limit=100&pagination.key=${encodeURIComponent(nextKey)}`;
     const page = await apiClients.lcdGet<ValidatorDelegationsPage>(path);
     for (const delegation of page.delegation_responses ?? schemaError()) {
-      const amount = delegation.balance?.amount;
-      const denom = delegation.balance?.denom;
-      if (amount && denom === PRIMARY_DENOM && /^[0-9]+$/.test(amount)) {
-        total += BigInt(amount);
-      }
+      const balance = delegation.balance ?? schemaError();
+      if (!balance.amount || !balance.denom || !/^\d+$/.test(balance.amount)) schemaError();
+      coins.push({ amount: balance.amount, denom: balance.denom });
     }
     nextKey = page.pagination?.next_key ?? null;
+    if (nextKey && seen.has(nextKey)) schemaError("위임 페이지가 반복됩니다.");
+    if (nextKey) seen.add(nextKey);
   } while (nextKey);
 
-  return total.toString();
+  return sumCoins(coins);
 }
 
 export async function getTopValidators(limit = 20, apiClients: QueryClient = defaultClients): Promise<ValidatorSummary[]> {
@@ -228,7 +209,9 @@ export async function getTopValidators(limit = 20, apiClients: QueryClient = def
   const response = await apiClients.lcdGet<ValidatorsResponse>(
     `/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=${limit}`,
   );
-  return (response.validators ?? []).map(toValidatorSummary);
+  const metadata = await getAmountMetadata(apiClients);
+  const params = await getStakingParams(apiClients).catch(() => null);
+  return (response.validators ?? schemaError()).map(v => ({ ...toValidatorSummary(v), metadata, bondDenom: params?.bondDenom }));
 }
 
 export async function getValidatorDetail(operatorAddress: string, apiClients: QueryClient = defaultClients): Promise<ValidatorDetail | null> {
@@ -236,14 +219,18 @@ export async function getValidatorDetail(operatorAddress: string, apiClients: Qu
   const validator = response.validator;
   if (!validator) schemaError();
   const operatorAccountAddress = (await operatorToAccountAddress(operatorAddress)) ?? "-";
-  const summary = { ...toValidatorSummary(validator), operatorAccountAddress, delegatorShares: validator.delegator_shares ?? "-" };
+  const metadata = await getAmountMetadata(apiClients);
+  const params = await getStakingParams(apiClients).catch(() => null);
+  const amountCoins: Record<string, Coin[]> = {};
+  const capture = (name: string, coins: Coin[]) => { const values = sumCoins(coins); amountCoins[name] = coins; return values.map(c => c.amount).join(", ") || "0"; };
+  const summary = { metadata, amountCoins, bondDenom: params?.bondDenom, unbondingDuration: params?.unbondingTime, ...toValidatorSummary(validator), operatorAccountAddress, delegatorShares: validator.delegator_shares ?? "-" };
   const defaults = { totalDelegationAmount: "-", selfDelegationAmount: "-", outstandingRewardsAmount: "-", commissionRewardsAmount: "-" };
   try {
     const fields = await readFields(defaults, {
-      totalDelegationAmount: fetchValidatorDelegationTotal(operatorAddress, apiClients),
-      selfDelegationAmount: operatorAccountAddress === "-" ? Promise.resolve("-") : apiClients.lcdGet<DelegationResponse>(`/cosmos/staking/v1beta1/validators/${encodeURIComponent(operatorAddress)}/delegations/${encodeURIComponent(operatorAccountAddress)}`).then(res => res.delegation_response?.balance?.amount ?? schemaError()),
-      outstandingRewardsAmount: apiClients.lcdGet<ValidatorOutstandingRewardsResponse>(`/cosmos/distribution/v1beta1/validators/${encodeURIComponent(operatorAddress)}/outstanding_rewards`).then(res => extractPrimaryDenomAmount(res.rewards?.rewards ?? schemaError())),
-      commissionRewardsAmount: apiClients.lcdGet<ValidatorCommissionResponse>(`/cosmos/distribution/v1beta1/validators/${encodeURIComponent(operatorAddress)}/commission`).then(res => extractPrimaryDenomAmount(res.commission?.commission ?? schemaError())),
+      totalDelegationAmount: fetchValidatorDelegationTotal(operatorAddress, apiClients).then(coins => capture("totalDelegationAmount", coins)),
+      selfDelegationAmount: operatorAccountAddress === "-" ? Promise.resolve("-") : apiClients.lcdGet<DelegationResponse>(`/cosmos/staking/v1beta1/validators/${encodeURIComponent(operatorAddress)}/delegations/${encodeURIComponent(operatorAccountAddress)}`).then(res => capture("selfDelegationAmount", [res.delegation_response?.balance as Coin ?? schemaError()])),
+      outstandingRewardsAmount: apiClients.lcdGet<ValidatorOutstandingRewardsResponse>(`/cosmos/distribution/v1beta1/validators/${encodeURIComponent(operatorAddress)}/outstanding_rewards`).then(res => capture("outstandingRewardsAmount", (res.rewards?.rewards ?? schemaError()) as Coin[])),
+      commissionRewardsAmount: apiClients.lcdGet<ValidatorCommissionResponse>(`/cosmos/distribution/v1beta1/validators/${encodeURIComponent(operatorAddress)}/commission`).then(res => capture("commissionRewardsAmount", (res.commission?.commission ?? schemaError()) as Coin[])),
     });
     return { ...summary, ...fields };
   } catch (error) {
@@ -261,13 +248,21 @@ export async function getDelegatorValidatorPosition(
   const operatorAccountAddress = await operatorToAccountAddress(operatorAddress);
   const isOperator = Boolean(operatorAccountAddress && operatorAccountAddress === delegatorAddress);
 
+  const metadata = await getAmountMetadata(apiClients);
+  const amountCoins: Record<string, Coin[]> = {};
+  const extra: Pick<DelegatorValidatorPosition, "amountCoins" | "metadata" | "unbondingSnapshot" | "unbondingDuration" | "isOperator"> = { amountCoins, metadata, isOperator };
+  const capture = (name: string, coins: Coin[]) => { const values = sumCoins(coins); amountCoins[name] = coins; return values.map(c => c.amount).join(", ") || "0"; };
   const amounts = await readFields({ delegationAmount: "-", rewardAmount: "-", unbondingAmount: "-" }, {
-    delegationAmount: apiClients.lcdGet<DelegationResponse>(`/cosmos/staking/v1beta1/validators/${encodeURIComponent(operatorAddress)}/delegations/${encodeURIComponent(delegatorAddress)}`).then(res => res.delegation_response?.balance?.amount ?? schemaError()),
-    rewardAmount: apiClients.lcdGet<DelegationRewardsResponse>(`/cosmos/distribution/v1beta1/delegators/${encodeURIComponent(delegatorAddress)}/rewards/${encodeURIComponent(operatorAddress)}`).then(res => extractPrimaryDenomAmount(res.rewards ?? schemaError())),
-    unbondingAmount: apiClients.lcdGet<UnbondingByValidatorResponse>(`/cosmos/staking/v1beta1/delegators/${encodeURIComponent(delegatorAddress)}/unbonding_delegations/${encodeURIComponent(operatorAddress)}`).then(res => sumUnbonding(res.unbond?.entries ?? schemaError())),
+    delegationAmount: apiClients.lcdGet<DelegationResponse>(`/cosmos/staking/v1beta1/validators/${encodeURIComponent(operatorAddress)}/delegations/${encodeURIComponent(delegatorAddress)}`).then(res => capture("delegationAmount", [res.delegation_response?.balance as Coin ?? schemaError()])),
+    rewardAmount: apiClients.lcdGet<DelegationRewardsResponse>(`/cosmos/distribution/v1beta1/delegators/${encodeURIComponent(delegatorAddress)}/rewards/${encodeURIComponent(operatorAddress)}`).then(res => capture("rewardAmount", (res.rewards ?? schemaError()) as Coin[])),
+    unbondingAmount: getStakingParams(apiClients).then(async params => {
+      extra.unbondingDuration = params.unbondingTime;
+      extra.unbondingSnapshot = await getUnbonding(delegatorAddress, params.bondDenom, apiClients, operatorAddress);
+      return capture("unbondingAmount", [extra.unbondingSnapshot.total]);
+    }),
   }).catch(error => {
-    if (error instanceof PartialQueryError) throw new PartialQueryError({ ...error.data, isOperator }, error.info);
+    if (error instanceof PartialQueryError) throw new PartialQueryError({ ...error.data, ...extra }, error.info);
     throw error;
   });
-  return { ...amounts, isOperator };
+  return { ...amounts, ...extra };
 }

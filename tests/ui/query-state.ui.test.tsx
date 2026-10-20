@@ -67,7 +67,7 @@ describe('real service and query DOM', () => {
     http.mockImplementation((input, init) => String(input).endsWith('/inflation') ? Promise.resolve(new Response('', { status: 500 })) : respond(input, init));
     render(<NetworkSummaryPanel />);
     expect(await screen.findByText('일부 조회 실패')).toBeTruthy();
-    expect(screen.getByText('123456789.0123 gxn')).toBeTruthy();
+    expect(screen.getByText('123456789.012345 GXN')).toBeTruthy();
     expect(screen.queryByText('0.00%')).toBeNull();
   });
   it('keeps metadata first page with a later page error', async () => {

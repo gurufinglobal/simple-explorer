@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { amountResponse } from "../helpers/amounts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { bech32 } from "bech32";
@@ -60,6 +61,7 @@ function connected(wallet: "keplr" | "walletconnect" = "keplr") {
 function deferred<T>() { let resolve!: (value: T) => void; const promise = new Promise<T>(r => { resolve = r; }); return { promise, resolve }; }
 function response(input: string) {
   const url = new URL(input); const chainId = url.hostname === "b.test" ? "b-1" : "a-1";
+  if (amountResponse(url)) return amountResponse(url);
   if (url.pathname.includes("node_info")) return { default_node_info: { network: chainId } };
   if (url.port === "26657") return { result: { node_info: { network: chainId } } };
   if (url.pathname.includes("/auth/")) return { account: { pub_key: { key: Buffer.from(pubkey).toString("base64") } } };
@@ -138,7 +140,7 @@ describe("W03 chain configuration and signing boundaries", () => {
   ] as const)("%s keeps LCD portfolio readable and blocks writes", async (_name, override, reason) => {
     configure([{ ...a, ...override }]); connected();
     await refreshWriteEligibility(); await portfolio.getState().refresh(address);
-    expect(portfolio.getState().balance).toBe("1 gxn"); expect(store.getState().writeReason).toContain(reason);
+    expect(portfolio.getState().balance).toBe("1 GXN"); expect(store.getState().writeReason).toContain(reason);
     await expect(send()).rejects.toThrow(reason); expect(sign).not.toHaveBeenCalled();
   });
   it("RPC failure retains connected read-only session with a reason", async () => {
@@ -243,6 +245,9 @@ describe("W03 connection and session lifecycle", () => {
     const button = screen.getByRole("button", { name: "제안 전송" }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
     await act(async () => { await connectExtension("keplr"); });
+    fireEvent.change(screen.getByLabelText("초기 예치 (표시 단위)"), { target: { value: "1" } });
+    await screen.findByText(/전송 원본 1000000000000000000 agxn/);
+    fireEvent.click(screen.getByRole("checkbox", { name: "표시 수량과 전송 원본을 확인했습니다" }));
     expect(button.disabled).toBe(false);
     act(() => window.dispatchEvent(new Event("keplr_keystorechange")));
     expect(button.disabled).toBe(true);
@@ -320,7 +325,7 @@ describe("W03 pending WalletConnect session invalidation", () => {
     render(<><HeaderWalletMenu /><GovernanceNewProposalForm defaultDenom="agxn" /></>);
     await waitFor(() => expect(boundary.on).toHaveBeenCalledWith(event, expect.any(Function)));
     await act(async () => { await portfolio.getState().refresh(address); });
-    expect(portfolio.getState().balance).toBe("1 gxn");
+    expect(portfolio.getState().balance).toBe("1 GXN");
     const pendingKey = deferred<Response>();
     http.mockImplementation(async input => String(input).includes("/auth/") ? pendingKey.promise.then(value => value.clone()) : Response.json(response(String(input))));
     boundary.connect.mockResolvedValue({ approval: async () => session() });
@@ -343,6 +348,10 @@ describe("W03 pending WalletConnect session invalidation", () => {
     boundary.connect.mockResolvedValue({ approval: async () => next });
     await act(async () => { await connectQr(() => {}); });
     expect(store.getState()).toMatchObject({ status: "connected", bech32Address: addressB, sessionTopic: "next-topic", writeStatus: "ready" });
+    expect((screen.getByRole("button", { name: "제안 전송" }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText("초기 예치 (표시 단위)"), { target: { value: "1" } });
+    await screen.findByText(/전송 원본 1000000000000000000 agxn/);
+    fireEvent.click(screen.getByRole("checkbox", { name: "표시 수량과 전송 원본을 확인했습니다" }));
     expect((screen.getByRole("button", { name: "제안 전송" }) as HTMLButtonElement).disabled).toBe(false);
     expect(boundary.request).not.toHaveBeenCalled();
     expect(boundary.broadcast).not.toHaveBeenCalled();

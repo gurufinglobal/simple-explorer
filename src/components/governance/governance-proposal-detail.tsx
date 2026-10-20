@@ -1,5 +1,8 @@
 "use client";
 
+import { useAmountEntry } from "@/components/amount/amount-entry";
+import { CoinAmount } from "@/components/amount/coin-amount";
+import { getDenomsMetadata } from "@/services/guru/token-metadata.service";
 import Link from "next/link";
 import { useQuery } from "@/hooks/use-query";
 import { QueryStatus } from "@/components/query/query-status";
@@ -93,7 +96,9 @@ export function GovernanceProposalDetail({
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const denom = proposal.totalDeposit[0]?.denom ?? "agxn";
+  const denom = govParams.deposit?.minDeposit[0]?.denom ?? "";
+  const amountEntry = useAmountEntry(depositAmount, denom);
+  const metadata = useQuery("gov-metadata", client => getDenomsMetadata(client));
 
   const canSignCosmos = useWalletSessionStore(s => s.status === "connected" && s.writeStatus === "ready");
   const metamaskReadonly = walletStatus === "connected" && walletType === "metamask";
@@ -128,8 +133,8 @@ export function GovernanceProposalDetail({
       setError("Keplr 또는 WalletConnect로 Cosmos 주소를 연결하세요.");
       return;
     }
-    if (!/^[0-9]+$/.test(depositAmount.trim())) {
-      setError("예치 수량은 정수 문자열이어야 합니다.");
+    if (!amountEntry.ready) {
+      setError("표시 수량과 전송 원본을 확인하세요.");
       return;
     }
     setError(null);
@@ -141,7 +146,7 @@ export function GovernanceProposalDetail({
         sessionTopic,
         bech32Address,
         proposalId: proposal.id,
-        amount: depositAmount.trim(),
+        amount: amountEntry.requireBase(),
         denom,
       });
       setSuccess(`예치 트랜잭션이 전송되었습니다. Tx: ${txHash}`);
@@ -202,7 +207,7 @@ export function GovernanceProposalDetail({
             </Typography>
             <Typography variant="body2">
               총 예치:{" "}
-              {proposal.totalDeposit.map((c) => `${c.amount} ${c.denom}`).join(", ") || "—"}
+              {proposal.totalDeposit.map(c => <CoinAmount key={c.denom} coin={c} metadata={metadata.result.data ?? []} />)}
             </Typography>
             {bech32Address ? (
               <Typography variant="body2">내 투표: {myVote ?? "—"}</Typography>
@@ -306,7 +311,7 @@ export function GovernanceProposalDetail({
                       </TableCell>
                       <TableCell sx={{ borderBottom: 1, borderColor: "divider" }}>
                         {govParams.deposit.minDeposit.length > 0
-                          ? govParams.deposit.minDeposit.map((c) => `${c.amount} ${c.denom}`).join(", ")
+                          ? govParams.deposit.minDeposit.map(c => <CoinAmount key={c.denom} coin={c} metadata={metadata.result.data ?? []} />)
                           : "—"}
                       </TableCell>
                     </TableRow>
@@ -365,15 +370,16 @@ export function GovernanceProposalDetail({
             <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
               예치하기 ({denom})
             </Typography>
+            {amountEntry.confirmation}
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
               <TextField
                 size="small"
-                label="수량 (최소 단위)"
+                label="수량 (표시 단위)"
                 value={depositAmount}
                 onChange={(e) => setDepositAmount(e.target.value)}
                 disabled={!canSignCosmos || depositBusy}
               />
-              <Button disabled={!canSignCosmos || depositBusy} variant="contained" onClick={() => void onDeposit()}>
+              <Button disabled={!canSignCosmos || !amountEntry.ready || depositBusy} variant="contained" onClick={() => void onDeposit()}>
                 예치 전송
               </Button>
             </Stack>
@@ -450,7 +456,7 @@ export function GovernanceProposalDetail({
                     deposits.map((row, i) => (
                       <TableRow key={`${row.depositor}-${i}`}>
                         <TableCell sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>{row.depositor}</TableCell>
-                        <TableCell>{row.amountDisplay}</TableCell>
+                        <TableCell>{row.coins ? row.coins.map(c => <CoinAmount key={c.denom} coin={c} metadata={metadata.result.data ?? []} />) : row.amountDisplay}</TableCell>
                       </TableRow>
                     ))
                   )}

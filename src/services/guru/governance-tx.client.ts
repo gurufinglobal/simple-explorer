@@ -1,5 +1,6 @@
 "use client";
 
+import { assertBaseAmount } from "@/lib/cosmos-amount";
 import { calculateFee, GasPrice } from "@cosmjs/stargate";
 import { MsgDeposit, MsgExecLegacyContent, MsgSubmitProposal, MsgVote } from "cosmjs-types/cosmos/gov/v1/tx";
 import { TextProposal } from "cosmjs-types/cosmos/gov/v1beta1/gov";
@@ -72,6 +73,8 @@ export async function submitGovernanceDepositTx(params: {
   denom: string;
 }): Promise<{ txHash: string }> {
   assertBrowser();
+  assertBaseAmount(params.amount);
+  if (!params.denom) throw new Error("Denom 미확인");
   const { client, signerAddress: address } = await createBoundSigningClient(params, gasPrice());
 
   const msg = {
@@ -102,6 +105,8 @@ export async function submitTextProposalTx(params: {
   denom: string;
 }): Promise<{ txHash: string }> {
   assertBrowser();
+  assertBaseAmount(params.initialDepositAmount);
+  if (!params.denom) throw new Error("Denom 미확인");
   const { client, signerAddress: address, queryClient } = await createBoundSigningClient(params, gasPrice());
   const govAddr = await getGovModuleAddress(queryClient);
   if (!govAddr) throw new Error("Could not resolve governance module address.");

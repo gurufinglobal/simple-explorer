@@ -1,3 +1,4 @@
+import { amountResponse } from "../helpers/amounts";
 import { afterEach, describe, expect, it } from 'vitest';
 import { getBexExchangeById, listBexExchanges } from '@/services/guru/bex.service';
 import { getOracleParams, listOracleRequests } from '@/services/guru/oracle.service';
@@ -43,7 +44,7 @@ describe('module query states via real HTTP transforms', () => {
     expect(await readQuery(context, () => getValidatorDetail('invalid-fixture-operator'))).toMatchObject({ status: 'partial', data: { moniker: 'Fixture validator', totalDelegationAmount: '0', outstandingRewardsAmount: '-' }, error: { status: 500 } });
   });
   it('preserves portfolio zero balance and marks failed reward as unavailable', async () => {
-    mockQueryHttp(url => url.pathname.includes('/balances/') ? { balances: [] } : url.pathname.endsWith('/rewards') ? new Response('', { status: 500 }) : url.pathname.includes('/unbonding_delegations') ? { unbonding_responses: [] } : { delegation_responses: [] });
-    expect(await readQuery(context, () => getWalletPortfolio('a'))).toMatchObject({ status: 'partial', data: { balance: '0 gxn', staking: '0 gxn', reward: '—' }, error: { status: 500 } });
+    mockQueryHttp(url => amountResponse(url) ?? (url.pathname.includes('/balances/') ? { balances: [] } : url.pathname.endsWith('/rewards') ? new Response('', { status: 500 }) : url.pathname.includes('/unbonding_delegations') ? { unbonding_responses: [] } : { delegation_responses: [] }));
+    expect(await readQuery(context, () => getWalletPortfolio('a'))).toMatchObject({ status: 'partial', data: { balance: '0 GXN', staking: '0 GXN', reward: '—' }, error: { status: 500 } });
   });
 });

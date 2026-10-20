@@ -35,6 +35,7 @@ export type GovernanceVoteRow = {
 export type GovernanceDepositRow = {
   depositor: string;
   amountDisplay: string;
+  coins?: GovCoin[];
 };
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -79,7 +80,8 @@ function normalizeDepositEntry(raw: unknown): GovernanceDepositRow | null {
     amountDisplay = coins
       .map((c) => {
         const o = c as { denom?: string; amount?: string };
-        return `${o.amount ?? "0"} ${o.denom ?? ""}`.trim();
+        if (!o.denom || !o.amount || !/^\d+$/.test(o.amount)) return "금액 미확인";
+        return `${o.amount} ${o.denom}`;
       })
       .filter(Boolean)
       .join(", ");
@@ -87,6 +89,7 @@ function normalizeDepositEntry(raw: unknown): GovernanceDepositRow | null {
   return {
     depositor,
     amountDisplay: amountDisplay || "—",
+    ...(Array.isArray(coins) && coins.every(c => typeof c?.denom === "string" && typeof c?.amount === "string" && /^\d+$/.test(c.amount)) ? { coins: coins as GovCoin[] } : {}),
   };
 }
 

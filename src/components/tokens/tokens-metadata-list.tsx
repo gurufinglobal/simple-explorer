@@ -85,7 +85,7 @@ export function TokensMetadataList() {
                     <TableCell>{item.name}</TableCell>
                     <TableCell>{item.displayDenom}</TableCell>
                     <TableCell>{item.baseDenom}</TableCell>
-                    <TableCell align="right">{item.decimals}</TableCell>
+                    <TableCell align="right">{item.decimals ?? "정밀도 미확인"}</TableCell>
                     <TableCell>{item.description}</TableCell>
                   </TableRow>
                 ))}

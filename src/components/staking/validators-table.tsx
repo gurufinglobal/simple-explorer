@@ -1,5 +1,6 @@
 "use client";
 
+import { CoinAmount } from "@/components/amount/coin-amount";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -28,14 +29,6 @@ function parseUnsignedBigInt(value: string): bigint | null {
   } catch {
     return null;
   }
-}
-
-function formatIntegerString(value: string): string {
-  if (!/^[0-9]+$/.test(value)) {
-    return value;
-  }
-
-  return value.replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 }
 
 function formatCommissionPercent(rate: string): string {
@@ -105,7 +98,7 @@ export function ValidatorsTable({ validators }: ValidatorsTableProps) {
                 </TableCell>
                 <TableCell>{validator.operatorAddress}</TableCell>
                 <TableCell align="right">
-                  {formatIntegerString(validator.votingPower)} (
+                  <CoinAmount coin={{ amount: validator.votingPower, denom: validator.bondDenom ?? "bond denom 미확인" }} metadata={validator.metadata} /> (
                   {formatVotingPowerShare(validator.votingPower, totalVotingPower)})
                 </TableCell>
                 <TableCell align="right">{formatCommissionPercent(validator.commission)}</TableCell>
