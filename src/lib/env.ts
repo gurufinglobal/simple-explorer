@@ -1,5 +1,28 @@
 import { z } from "zod";
 
+const FeePolicySchema = z.discriminatedUnion("mode", [
+    z.object({
+      mode: z.literal("simulate"),
+      gasPrice: z.string().min(1),
+      gasMultiplierBps: z.number().int().min(10000).max(100000),
+      evidence: z.string().min(1),
+      fallback: z.object({ gas: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), evidence: z.string().min(1) }).optional(),
+    }),
+    z.object({
+      mode: z.literal("fixed"),
+      gasPrice: z.string().min(1),
+      gas: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+      evidence: z.string().min(1),
+      limitation: z.string().min(1),
+    }),
+  ]);
+const StakingCapabilitySchema = z.object({
+  typeUrl: z.string().min(1),
+  signing: z.array(z.object({ wallet: z.enum(["keplr", "walletconnect"]), method: z.enum(["direct", "amino"]), evidence: z.string().min(1) })).min(1),
+  fee: FeePolicySchema,
+  evidence: z.string().min(1),
+});
+
 export const ChainConfigSchema = z.object({
   key: z.string().min(1),
   name: z.string().min(1),
@@ -15,22 +38,11 @@ export const ChainConfigSchema = z.object({
   bondDenom: z.string().min(1).optional(),
   feeDenom: z.string().min(1).optional(),
   // A policy is evidence for MsgSend fees only; it never grants wallet/RPC support.
-  sendFeePolicy: z.discriminatedUnion("mode", [
-    z.object({
-      mode: z.literal("simulate"),
-      gasPrice: z.string().min(1),
-      gasMultiplierBps: z.number().int().min(10000).max(100000),
-      evidence: z.string().min(1),
-      fallback: z.object({ gas: z.number().int().positive().max(Number.MAX_SAFE_INTEGER), evidence: z.string().min(1) }).optional(),
-    }),
-    z.object({
-      mode: z.literal("fixed"),
-      gasPrice: z.string().min(1),
-      gas: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
-      evidence: z.string().min(1),
-      limitation: z.string().min(1),
-    }),
-  ]).optional(),
+  sendFeePolicy: FeePolicySchema.optional(),
+  stakingCapabilities: z.object({
+    delegate: StakingCapabilitySchema.optional(), undelegate: StakingCapabilitySchema.optional(),
+    reward: StakingCapabilitySchema.optional(), commission: StakingCapabilitySchema.optional(),
+  }).optional(),
   decimals: z.number().int().min(0).max(30).optional(),
   signing: z.array(z.object({
     wallet: z.enum(["keplr", "walletconnect"]),

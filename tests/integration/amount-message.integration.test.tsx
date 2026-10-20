@@ -8,16 +8,19 @@ import { useWalletSessionStore as store } from '@/stores/wallet-session.store';
 import { connectExtension } from '@/services/wallet/wallet-lifecycle';
 import { displayToBase } from '@/lib/cosmos-amount';
 import { prepareSendTx, submitSendTx as executeSend, type SendTxInput } from '@/services/guru/bank-tx.client';
-import { submitDelegateTx, submitUndelegateTx } from '@/services/guru/staking-tx.client';
+import { stakingMessages, prepareStakingTx } from "@/services/guru/staking-tx.client";
 import { submitGovernanceDepositTx, submitTextProposalTx } from '@/services/guru/governance-tx.client';
 const submitSendTx = async (input: SendTxInput) => executeSend(await prepareSendTx(input));
 const boundary = vi.hoisted(() => ({ connect: vi.fn(), sign: vi.fn(), broadcast: vi.fn() }));
 vi.mock('@cosmjs/stargate', async original => ({ ...await original<typeof import('@cosmjs/stargate')>(), SigningStargateClient: { connectWithSigner: boundary.connect } }));
 const address = bech32.encode('guru', bech32.toWords(new Uint8Array(20).fill(1)));
+const validatorAddress = bech32.encode('guruvaloper', bech32.toWords(new Uint8Array(20).fill(1)));
 const pubkey = new Uint8Array(33).fill(3);
 const base = { walletType: 'keplr' as const, sessionTopic: null, bech32Address: address };
 function configure(decimals = 6) {
   vi.stubEnv('NEXT_PUBLIC_CHAINS', JSON.stringify([{ key: 'a', name: 'A', chainId: 'a-1', lcdUrl: 'https://a.test:1317', rpcUrl: 'https://a.test:26657', bech32Prefix: 'guru', nativeDenom: 'agxn', bondDenom: 'agxn', feeDenom: 'agxn', decimals,
+    features: { staking: true, distribution: true },
+    stakingCapabilities: Object.fromEntries(Object.entries(stakingMessages).map(([action, definition]) => [action, { typeUrl: definition.typeUrl, evidence: 'synthetic only', signing: [{ wallet: 'keplr', method: 'direct', evidence: 'synthetic' }], fee: { mode: 'fixed', gasPrice: '0.001agxn', gas: 220000, evidence: 'synthetic', limitation: 'synthetic only' } }])),
     sendFeePolicy: { mode: 'fixed', gasPrice: '0.001agxn', gas: 220000, evidence: 'synthetic fee policy', limitation: 'synthetic only' },
     signing: [{ wallet: 'keplr', method: 'direct', evidence: 'synthetic boundary' }], rpcAccess: { origin: 'http://localhost:3000', get: true, post: true, options: true, observedAt: '2026-10-20', evidence: 'synthetic boundary' } }]));
   vi.stubEnv('NEXT_PUBLIC_DEFAULT_CHAIN_KEY', 'a');
@@ -26,10 +29,12 @@ function configure(decimals = 6) {
     if (url.port === '26657') return Response.json({ result: { node_info: { network: 'a-1' } } });
     if (url.pathname.endsWith('/node_info')) return Response.json({ default_node_info: { network: 'a-1' }, application_version: {} });
     if (url.pathname.endsWith('/denoms_metadata')) return Response.json({ metadatas: [{ base: 'agxn', display: 'gxn', symbol: 'GXN', denom_units: [{ denom: 'agxn', exponent: 0 }, { denom: 'gxn', exponent: decimals }] }] });
-    if (url.pathname.includes('/balances/')) return Response.json({ balances: [{ denom: 'agxn', amount: '999999999999999999999999999999999999999999999999' }] });
+    if ((url.pathname.includes('/balances/') || url.pathname.includes('/spendable_balances/'))) return Response.json({ balances: [{ denom: 'agxn', amount: '999999999999999999999999999999999999999999999999' }] });
     if (url.pathname.endsWith('/module_accounts')) return Response.json({ accounts: [{ name: 'gov', base_account: { address } }] });
-    if (url.pathname.includes('/auth/')) return Response.json({ account: { pub_key: { key: Buffer.from(pubkey).toString('base64') } }, pagination: { total: '1' } });
+    if (url.pathname.includes('/auth/')) return Response.json({ account: { account_number: '1', sequence: '0', pub_key: { key: Buffer.from(pubkey).toString('base64') } }, pagination: { total: '1' } });
     if (url.pathname.endsWith('/staking/v1beta1/params')) return Response.json({ params: { bond_denom: 'agxn', unbonding_time: '86400s' } });
+    if (url.pathname.endsWith(`/validators/${validatorAddress}`)) return Response.json({ validator: { operator_address: validatorAddress, jailed: false, status: 'BOND_STATUS_BONDED' } });
+    if (url.pathname.includes(`/validators/${validatorAddress}/delegations/`)) return Response.json({ delegation_response: { delegation: { delegator_address: address, validator_address: validatorAddress }, balance: { amount: '999999999999999999999999999999999999999999999999', denom: 'agxn' } } });
     if (url.pathname.endsWith('/validators')) return Response.json({ validators: [] });
     if (url.pathname.endsWith('/blocks/latest')) return Response.json({ block: { header: { height: '1', time: '2026-01-01T00:00:00Z', chain_id: 'a-1' } } });
     if (url.pathname.endsWith('/supply/by_denom')) return Response.json({ amount: { amount: '1000000', denom: 'agxn' } });
@@ -49,8 +54,8 @@ beforeEach(() => {
 afterEach(() => { cleanup(); store.getState().disconnect(); delete window.keplr; delete window.getOfflineSigner; vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 const actions = [
   ['send', (amount: string) => submitSendTx({ ...base, toAddress: address, denom: 'agxn', amount })],
-  ['delegate', (amount: string) => submitDelegateTx({ ...base, validatorAddress: 'v', denom: 'agxn', amount })],
-  ['undelegate', (amount: string) => submitUndelegateTx({ ...base, validatorAddress: 'v', denom: 'agxn', amount })],
+  ['delegate', (amount: string) => prepareStakingTx({ action: "delegate", ...base, validatorAddress, denom: 'agxn', amount }).then(tx => tx.execute(() => {}))],
+  ['undelegate', (amount: string) => prepareStakingTx({ action: "undelegate", ...base, validatorAddress, denom: 'agxn', amount }).then(tx => tx.execute(() => {}))],
   ['deposit', (amount: string) => submitGovernanceDepositTx({ ...base, proposalId: '1', denom: 'agxn', amount })],
   ['proposal', (amount: string) => submitTextProposalTx({ ...base, title: 'Title', summary: 'Summary', description: 'Details', denom: 'agxn', initialDepositAmount: amount })],
 ] as const;

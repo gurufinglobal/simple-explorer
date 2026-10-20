@@ -2,7 +2,7 @@
 import { SigningStargateClient, type GasPrice } from "@cosmjs/stargate";
 import type { StdFee } from "@cosmjs/amino";
 import { isOfflineDirectSigner, type EncodeObject, type OfflineSigner } from "@cosmjs/proto-signing";
-import { TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
+import { AuthInfo, TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import { sha256 } from "@cosmjs/crypto";
 import { bech32 } from "bech32";
 import { getActiveChainConfig } from "@/lib/chain-selection";
@@ -16,6 +16,8 @@ import { createQueryClient } from "@/services/clients";
 export type SigningInput = { walletType: WalletConnectorKind; sessionTopic: string | null; bech32Address: string | null };
 export type SigningGuard = {
   assertCurrent: () => void;
+  beforeSign?: () => Promise<void>;
+  allowedSigning?: readonly { wallet: string; method: string }[];
   onBroadcast?: (hash: string) => void;
 };
 export async function createBoundSigningClient(params: SigningInput, gasPrice: GasPrice, guard?: SigningGuard) {
@@ -63,14 +65,25 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
   await getAccounts();
   const signingMethod = isOfflineDirectSigner(signer) ? "direct" : "amino";
   if (!chain.signing?.some(s => s.wallet === state.walletType && s.method === signingMethod)) throw new Error("실제 signer 방식이 검증된 서명 방식과 다릅니다.");
+  if (guard?.allowedSigning && !guard.allowedSigning.some(s => s.wallet === state.walletType && s.method === signingMethod)) throw new Error("이 메시지의 실제 지갑 서명 방식은 검증되지 않았습니다.");
   const guarded: OfflineSigner = isOfflineDirectSigner(signer) ? {
     getAccounts,
     signDirect: async (who, doc) => {
       await getAccounts();
+      await guard?.beforeSign?.();
+      assertCurrent();
       if (who !== address || doc.chainId !== chain.chainId) throw new Error("서명 대상 체인·계정 불일치");
       const bodyBeforeSigning = doc.bodyBytes.slice();
+      const accountBeforeSigning = doc.accountNumber;
+      const signerInfoBytes = (bytes: Uint8Array) => AuthInfo.encode(AuthInfo.fromPartial({ signerInfos: AuthInfo.decode(bytes).signerInfos })).finish();
+      const signersBeforeSigning = guard ? signerInfoBytes(doc.authInfoBytes) : null;
       const response = await signer.signDirect(who, doc);
       assertCurrent();
+      if (signersBeforeSigning) {
+        const signersAfterSigning = signerInfoBytes(response.signed.authInfoBytes);
+        if (signersBeforeSigning.length !== signersAfterSigning.length || signersBeforeSigning.some((b, i) => b !== signersAfterSigning[i])) throw new Error("지갑이 확인한 signer·sequence를 변경했습니다.");
+      }
+      if (guard && response.signed.accountNumber !== accountBeforeSigning) throw new Error("지갑이 확인한 서명 계정 번호를 변경했습니다.");
       if (response.signed.chainId !== chain.chainId) throw new Error("반환된 서명의 체인이 다릅니다.");
       if (guard && (response.signed.bodyBytes.length !== bodyBeforeSigning.length || response.signed.bodyBytes.some((byte, i) => byte !== bodyBeforeSigning[i]))) {
         throw new Error("지갑이 확인한 거래 본문을 변경했습니다. 다시 확인하세요.");
@@ -81,11 +94,16 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
     getAccounts,
     signAmino: async (who, doc) => {
       await getAccounts();
+      await guard?.beforeSign?.();
+      assertCurrent();
       if (who !== address || doc.chain_id !== chain.chainId) throw new Error("서명 대상 체인·계정 불일치");
       const messagesBeforeSigning = JSON.stringify(doc.msgs);
       const memoBeforeSigning = doc.memo;
+      const accountBeforeSigning = doc.account_number;
+      const sequenceBeforeSigning = doc.sequence;
       const response = await signer.signAmino(who, doc);
       assertCurrent();
+      if (guard && (response.signed.account_number !== accountBeforeSigning || response.signed.sequence !== sequenceBeforeSigning)) throw new Error("지갑이 확인한 서명 계정 번호·sequence를 변경했습니다.");
       if (response.signed.chain_id !== chain.chainId) throw new Error("반환된 서명의 체인이 다릅니다.");
       if (guard && (JSON.stringify(response.signed.msgs) !== messagesBeforeSigning || response.signed.memo !== memoBeforeSigning)) {
         throw new Error("지갑이 확인한 거래 본문을 변경했습니다. 다시 확인하세요.");
