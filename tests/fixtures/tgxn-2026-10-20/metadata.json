@@ -1,0 +1,193 @@
+{
+  "name": "metadata",
+  "url": "https://tgxn.gurufin.io:1317/cosmos/bank/v1beta1/denoms_metadata?pagination.limit=10",
+  "method": "GET",
+  "observedAt": "2026-10-20T04:43:48.440637+00:00",
+  "curlExit": 0,
+  "httpStatus": "200",
+  "error": "",
+  "origin": "https://exp.gurufin.io",
+  "headers": {
+    "date": "Tue, 20 Oct 2026 04:43:48 GMT",
+    "content-type": "application/json",
+    "access-control-allow-origin": "*",
+    "grpc-metadata-content-type": "application/grpc+cosmos-sdk-grpc-codec",
+    "grpc-metadata-x-cosmos-block-height": "19624455",
+    "x-cosmos-block-height": "19624455",
+    "x-server-time": "1792471428"
+  },
+  "blockHeight": "19624455",
+  "response": {
+    "metadatas": [
+      {
+        "description": "Guru Token",
+        "denom_units": [
+          {
+            "denom": "agxn",
+            "exponent": 0,
+            "aliases": []
+          },
+          {
+            "denom": "gxn",
+            "exponent": 18,
+            "aliases": []
+          }
+        ],
+        "base": "agxn",
+        "display": "gxn",
+        "name": "Guru Token",
+        "symbol": "GXN",
+        "uri": "",
+        "uri_hash": ""
+      },
+      {
+        "description": "IBC token from transwap/channel-8/atgxphp",
+        "denom_units": [
+          {
+            "denom": "atgxphp",
+            "exponent": 0,
+            "aliases": []
+          }
+        ],
+        "base": "ibc/0B50409F40E730DBE32FC813A2966214BF325DCA31E9A3D2D71E3965392D7F36",
+        "display": "transwap/channel-8/atgxphp",
+        "name": "transwap/channel-8/atgxphp IBC token",
+        "symbol": "ATGXPHP",
+        "uri": "",
+        "uri_hash": ""
+      },
+      {
+        "description": "IBC token from transwap/channel-10/atgxjpy",
+        "denom_units": [
+          {
+            "denom": "atgxjpy",
+            "exponent": 0,
+            "aliases": []
+          }
+        ],
+        "base": "ibc/491EC7EA46DD6492AD489A5DC75833236FB6D7D616D156BA2CAE718E53531FD7",
+        "display": "transwap/channel-10/atgxjpy",
+        "name": "transwap/channel-10/atgxjpy IBC token",
+        "symbol": "ATGXJPY",
+        "uri": "",
+        "uri_hash": ""
+      },
+      {
+        "description": "IBC token from transwap/channel-9/atgxeur",
+        "denom_units": [
+          {
+            "denom": "atgxeur",
+            "exponent": 0,
+            "aliases": []
+          }
+        ],
+        "base": "ibc/59D050D39F22518CACEE523D154B1466961FF783FEC276266B61320DA6E21899",
+        "display": "transwap/channel-9/atgxeur",
+        "name": "transwap/channel-9/atgxeur IBC token",
+        "symbol": "ATGXEUR",
+        "uri": "",
+        "uri_hash": ""
+      },
+      {
+        "description": "IBC token from transwap/channel-5/atgxidr",
+        "denom_units": [
+          {
+            "denom": "atgxidr",
+            "exponent": 0,
+            "aliases": []
+          }
+        ],
+        "base": "ibc/691100CD74DE895DBD0D4D7A48C99B08022655E0279299FB34FEFB469823E498",
+        "display": "transwap/channel-5/atgxidr",
+        "name": "transwap/channel-5/atgxidr IBC token",
+        "symbol": "ATGXIDR",
+        "uri": "",
+        "uri_hash": ""
+      },
+      {
+        "description": "IBC token from transwap/channel-4/atgxjpy",
+        "denom_units": [
+          {
+            "denom": "atgxjpy",
+            "exponent": 0,
+            "aliases": []
+          }
+        ],
+        "base": "ibc/77C326B053C58E136FE43F3D874484284BF0A1E02471AF1BA0E9DE07C30BEDDD",
+        "display": "transwap/channel-4/atgxjpy",
+        "name": "transwap/channel-4/atgxjpy IBC token",
+        "symbol": "ATGXJPY",
+        "uri": "",
+        "uri_hash": ""
+      },
+      {
+        "description": "IBC token from transwap/channel-6/atgxusd",
+        "denom_units": [
+          {
+            "denom": "atgxusd",
+            "exponent": 0,
+            "aliases": []
+          }
+        ],
+        "base": "ibc/7FBACDD457A41D072F2D7174DD81197D649770733218194621A5A1ABBB357377",
+        "display": "transwap/channel-6/atgxusd",
+        "name": "transwap/channel-6/atgxusd IBC token",
+        "symbol": "ATGXUSD",
+        "uri": "",
+        "uri_hash": ""
+      },
+      {
+        "description": "IBC token from transwap/channel-2/atgxphp",
+        "denom_units": [
+          {
+            "denom": "atgxphp",
+            "exponent": 0,
+            "aliases": []
+          }
+        ],
+        "base": "ibc/867CBBF2FB3E1F8347692DA67791901B99DC4D2532AA649D20FD35363BCD1BDB",
+        "display": "transwap/channel-2/atgxphp",
+        "name": "transwap/channel-2/atgxphp IBC token",
+        "symbol": "ATGXPHP",
+        "uri": "",
+        "uri_hash": ""
+      },
+      {
+        "description": "IBC token from transwap/channel-1/atgxkrw",
+        "denom_units": [
+          {
+            "denom": "atgxkrw",
+            "exponent": 0,
+            "aliases": []
+          }
+        ],
+        "base": "ibc/87C1E2CFA75CAF11DE80EFFF64BD76377B3910B7CF5A1D6576AB7DDFCB3DFBF4",
+        "display": "transwap/channel-1/atgxkrw",
+        "name": "transwap/channel-1/atgxkrw IBC token",
+        "symbol": "ATGXKRW",
+        "uri": "",
+        "uri_hash": ""
+      },
+      {
+        "description": "IBC token from transwap/channel-3/atgxeur",
+        "denom_units": [
+          {
+            "denom": "atgxeur",
+            "exponent": 0,
+            "aliases": []
+          }
+        ],
+        "base": "ibc/A87FBE6646971D7D24DEDCC25EC1742DECBDF9226432FD353F6E3F747BC9BE31",
+        "display": "transwap/channel-3/atgxeur",
+        "name": "transwap/channel-3/atgxeur IBC token",
+        "symbol": "ATGXEUR",
+        "uri": "",
+        "uri_hash": ""
+      }
+    ],
+    "pagination": {
+      "next_key": "aWJjL0JDQzMxMEM0RDdENzM2QzBDNjBBMDJFQ0NFQ0ZDOEQ0NkNDOTEwRDAxQUZENzY4MEI1MzQyMjkwRjkxMzA2OTQ=",
+      "total": "0"
+    }
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "source": "Synthetic boundary responses for regression tests, not chain observations",
+  "latest": { "block": { "header": { "chain_id": "fixture-chain-1", "height": "3", "time": "2026-01-01T00:00:03Z" } } },
+  "supply": { "amount": { "denom": "agxn", "amount": "123456789012345678900000000" } },
+  "pool": { "pool": { "bonded_tokens": "4500000000000000000" } },
+  "inflation": { "inflation": "0.042" },
+  "accounts": { "pagination": { "total": "9007199254740993" } }
+}

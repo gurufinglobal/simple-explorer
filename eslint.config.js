@@ -1,4 +1,10 @@
+import { FlatCompat } from "@eslint/eslintrc";
 import { defineConfig, globalIgnores } from "eslint/config";
+import { fileURLToPath } from "node:url";
+
+const compat = new FlatCompat({
+  baseDirectory: fileURLToPath(new URL(".", import.meta.url)),
+});
 
 export default defineConfig([
   globalIgnores([
@@ -7,8 +13,7 @@ export default defineConfig([
     "build/**",
     "coverage/**",
     "node_modules/**",
-    "src/**",
-    "tests/**",
     "next-env.d.ts",
   ]),
+  ...compat.extends("next/core-web-vitals", "next/typescript"),
 ]);

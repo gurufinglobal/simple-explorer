@@ -7,7 +7,6 @@ import { MsgDelegate, MsgUndelegate } from "cosmjs-types/cosmos/staking/v1beta1/
 import { getNetworkSummary } from "./network-summary.service";
 import { getAccountPubkeyBytes } from "./governance-query.service";
 import { createWalletConnectOfflineSigner } from "@/services/wallet/walletconnect-cosmos-signer";
-import { readPublicEnv } from "@/lib/env";
 import { getActiveChainRpcUrl } from "@/services/clients";
 
 type SupportedWallet = "keplr" | "metamask" | "walletconnect";

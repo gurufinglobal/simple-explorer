@@ -208,10 +208,6 @@ export async function getTokenMetadata(tokenRef: string): Promise<TokenMetadata 
 }
 
 export async function getDenomsMetadata(): Promise<TokenDenomMetadata[]> {
-  if (process.env.NODE_ENV === "test") {
-    return [];
-  }
-
   try {
     const metadatas: TokenDenomMetadata[] = [];
     let nextKey: string | null | undefined = undefined;

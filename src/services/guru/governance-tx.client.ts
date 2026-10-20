@@ -5,7 +5,6 @@ import type { OfflineSigner } from "@cosmjs/proto-signing";
 import { MsgDeposit, MsgExecLegacyContent, MsgSubmitProposal, MsgVote } from "cosmjs-types/cosmos/gov/v1/tx";
 import { TextProposal } from "cosmjs-types/cosmos/gov/v1beta1/gov";
 import { Any } from "cosmjs-types/google/protobuf/any";
-import { readPublicEnv } from "@/lib/env";
 import { getActiveChainRpcUrl } from "@/services/clients";
 import type { VoteOption } from "@/lib/gov-types";
 import {

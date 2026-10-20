@@ -1,7 +1,4 @@
 import {
-  getChainByKey,
-  getConfiguredChains,
-  getDefaultChainKey,
   readPublicEnv,
   type ChainConfig,
 } from "@/lib/env";
@@ -38,14 +35,6 @@ async function postJson<T>(url: string, body: JsonObject): Promise<T> {
     throw new Error(`request failed: ${response.status}`);
   }
   return (await response.json()) as T;
-}
-
-function resolveFallbackChain(): ChainConfig {
-  const fromDefaultKey = getChainByKey(getDefaultChainKey());
-  if (fromDefaultKey) {
-    return fromDefaultKey;
-  }
-  return getConfiguredChains()[0];
 }
 
 function resolveRpcBaseUrl(chain: ChainConfig): string {
