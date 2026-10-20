@@ -1,0 +1,61 @@
+{
+  "name": "ibc",
+  "url": "https://tgxn.gurufin.io:1317/ibc/core/channel/v1/channels?pagination.limit=2",
+  "method": "GET",
+  "observedAt": "2026-10-20T04:43:48.601875+00:00",
+  "curlExit": 0,
+  "httpStatus": "200",
+  "error": "",
+  "origin": "https://exp.gurufin.io",
+  "headers": {
+    "date": "Tue, 20 Oct 2026 04:43:48 GMT",
+    "content-type": "application/json",
+    "content-length": "591",
+    "access-control-allow-origin": "*",
+    "grpc-metadata-content-type": "application/grpc+cosmos-sdk-grpc-codec",
+    "grpc-metadata-x-cosmos-block-height": "19624455",
+    "x-cosmos-block-height": "19624455",
+    "x-server-time": "1792471428"
+  },
+  "blockHeight": "19624455",
+  "response": {
+    "channels": [
+      {
+        "state": "STATE_OPEN",
+        "ordering": "ORDER_UNORDERED",
+        "counterparty": {
+          "port_id": "xswap",
+          "channel_id": "channel-0"
+        },
+        "connection_hops": [
+          "connection-0"
+        ],
+        "version": "ics20-1",
+        "port_id": "transwap",
+        "channel_id": "channel-0"
+      },
+      {
+        "state": "STATE_OPEN",
+        "ordering": "ORDER_UNORDERED",
+        "counterparty": {
+          "port_id": "xswap",
+          "channel_id": "channel-0"
+        },
+        "connection_hops": [
+          "connection-1"
+        ],
+        "version": "ics20-1",
+        "port_id": "transwap",
+        "channel_id": "channel-1"
+      }
+    ],
+    "pagination": {
+      "next_key": "L3BvcnRzL3RyYW5zd2FwL2NoYW5uZWxzL2NoYW5uZWwtMTA=",
+      "total": "0"
+    },
+    "height": {
+      "revision_number": "1",
+      "revision_height": "19624455"
+    }
+  }
+}

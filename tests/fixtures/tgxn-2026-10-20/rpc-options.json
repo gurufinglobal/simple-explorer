@@ -1,0 +1,20 @@
+{
+  "name": "rpc-options",
+  "url": "https://tgxn.gurufin.io:26657",
+  "method": "OPTIONS",
+  "observedAt": "2026-10-20T04:43:48.900112+00:00",
+  "curlExit": 0,
+  "httpStatus": "200",
+  "error": "",
+  "origin": "https://exp.gurufin.io",
+  "headers": {
+    "date": "Tue, 20 Oct 2026 04:43:48 GMT",
+    "content-type": "text/html",
+    "x-server-time": "1792471428"
+  },
+  "blockHeight": null,
+  "response": {
+    "contentType": "text/html",
+    "bodyKind": "HTML endpoint index; not a CORS approval"
+  }
+}

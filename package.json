@@ -10,18 +10,19 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@cosmjs/proto-signing": "^0.37.0",
     "@cosmjs/stargate": "^0.37.0",
-    "cosmjs-types": "^0.9.0",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^7.3.9",
     "@mui/material": "^7.3.9",
     "@walletconnect/sign-client": "^2.23.9",
     "bech32": "^2.0.0",
+    "cosmjs-types": "^0.9.0",
     "next": "^15.5.14",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
@@ -30,6 +31,7 @@
     "zustand": "^5.0.12"
   },
   "devDependencies": {
+    "@eslint/eslintrc": "^3.3.5",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -41,7 +43,7 @@
     "@vitest/coverage-v8": "^2.1.9",
     "eslint": "^9",
     "eslint-config-next": "^15.5.14",
-    "jsdom": "^28.1.0",
+    "jsdom": "26.1.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^2.1.9"

@@ -1,0 +1,103 @@
+{
+  "observedAt": "2026-10-20T04:47:23.961723+00:00",
+  "source": "https://exp.gurufin.io/_next/static/chunks/app/layout-78bf8b6c27d2b036.js",
+  "htmlSource": "https://exp.gurufin.io/",
+  "buildId": "YlgEfida6DoOb8vKqvmSF",
+  "gitCommit": null,
+  "evidence": "Terminal public HTML and embedded chain config only; no browser execution",
+  "chains": [
+    {
+      "key": "guru-testnet-v2",
+      "name": "GURU-TESTNET-V2",
+      "lcdUrl": "https://tguru.gurufin.com:1317",
+      "rpcUrl": "https://tguru.gurufin.com:26657",
+      "bech32Prefix": "guru",
+      "denom": "agxn"
+    },
+    {
+      "key": "guru-testnet-v1",
+      "name": "GURU-TESTNET-V1",
+      "lcdUrl": "https://trpc.gurufin.io:1317",
+      "rpcUrl": "https://trpc.gurufin.io:26657",
+      "bech32Prefix": "guru",
+      "denom": "aguru"
+    },
+    {
+      "key": "zeta-chain",
+      "name": "Zeta-chain",
+      "lcdUrl": "https://zetachain.blockpi.network/lcd/v1/public",
+      "denom": "azeta"
+    },
+    {
+      "key": "tgxn",
+      "name": "tgxn",
+      "lcdUrl": "https://tgxn.gurufin.io:1317",
+      "denom": "atgxn",
+      "features": {
+        "bex": true,
+        "feepolicy": true,
+        "oracle": true
+      }
+    },
+    {
+      "key": "tgxusd",
+      "name": "tgxusd",
+      "lcdUrl": "https://tgxusd.gurufin.io:1317",
+      "denom": "atgxusd",
+      "features": {
+        "bex": false,
+        "feepolicy": true
+      }
+    },
+    {
+      "key": "tgxkrw",
+      "name": "tgxkrw",
+      "lcdUrl": "https://tgxkrw.gurufin.io:1317",
+      "denom": "atgxkrw",
+      "features": {
+        "bex": true,
+        "feepolicy": true
+      }
+    },
+    {
+      "key": "tgxidr",
+      "name": "tgxidr",
+      "lcdUrl": "https://tgxidr.gurufin.io:1317",
+      "denom": "atgxidr",
+      "features": {
+        "bex": true,
+        "feepolicy": true
+      }
+    },
+    {
+      "key": "tgxeur",
+      "name": "tgxeur",
+      "lcdUrl": "https://tgxeur.gurufin.io:1317",
+      "denom": "atgxeur",
+      "features": {
+        "bex": true,
+        "feepolicy": true
+      }
+    },
+    {
+      "key": "tgxphp",
+      "name": "tgxphp",
+      "lcdUrl": "https://tgxphp.gurufin.io:1317",
+      "denom": "atgxphp",
+      "features": {
+        "bex": true,
+        "feepolicy": true
+      }
+    },
+    {
+      "key": "tgxjpy",
+      "name": "tgxjpy",
+      "lcdUrl": "https://tgxjpy.gurufin.io:1317",
+      "denom": "atgxjpy",
+      "features": {
+        "bex": true,
+        "feepolicy": true
+      }
+    }
+  ]
+}

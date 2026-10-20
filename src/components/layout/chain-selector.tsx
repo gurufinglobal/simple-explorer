@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FormControl, InputLabel, MenuItem, Select, Stack, Typography } from "@mui/material";
+import { FormControl, InputLabel, MenuItem, Select, Stack } from "@mui/material";
 import { setActiveChainKeyCookie, getActiveChainKeyFromClientCookie } from "@/lib/chain-selection";
 import { getChainByKey, getConfiguredChains, getDefaultChainKey } from "@/lib/env";
 

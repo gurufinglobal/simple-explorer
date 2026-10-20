@@ -1,0 +1,56 @@
+{
+  "name": "gov",
+  "url": "https://tgxn.gurufin.io:1317/cosmos/gov/v1/params/voting",
+  "method": "GET",
+  "observedAt": "2026-10-20T04:43:48.519145+00:00",
+  "curlExit": 0,
+  "httpStatus": "200",
+  "error": "",
+  "origin": "https://exp.gurufin.io",
+  "headers": {
+    "date": "Tue, 20 Oct 2026 04:43:48 GMT",
+    "content-type": "application/json",
+    "content-length": "733",
+    "access-control-allow-origin": "*",
+    "grpc-metadata-content-type": "application/grpc+cosmos-sdk-grpc-codec",
+    "grpc-metadata-x-cosmos-block-height": "19624455",
+    "x-cosmos-block-height": "19624455",
+    "x-server-time": "1792471428"
+  },
+  "blockHeight": "19624455",
+  "response": {
+    "voting_params": {
+      "voting_period": "172800s"
+    },
+    "deposit_params": null,
+    "tally_params": null,
+    "params": {
+      "min_deposit": [
+        {
+          "denom": "agxn",
+          "amount": "10000000000000000000"
+        }
+      ],
+      "max_deposit_period": "172800s",
+      "voting_period": "172800s",
+      "quorum": "0.334000000000000000",
+      "threshold": "0.500000000000000000",
+      "veto_threshold": "0.334000000000000000",
+      "min_initial_deposit_ratio": "0.000000000000000000",
+      "proposal_cancel_ratio": "0.500000000000000000",
+      "proposal_cancel_dest": "",
+      "expedited_voting_period": "3600s",
+      "expedited_threshold": "0.667000000000000000",
+      "expedited_min_deposit": [
+        {
+          "denom": "agxn",
+          "amount": "50000000000000000000"
+        }
+      ],
+      "burn_vote_quorum": false,
+      "burn_proposal_deposit_prevote": false,
+      "burn_vote_veto": true,
+      "min_deposit_ratio": "0.010000000000000000"
+    }
+  }
+}

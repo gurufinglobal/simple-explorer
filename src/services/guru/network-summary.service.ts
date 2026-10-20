@@ -122,17 +122,6 @@ async function fetchAverageBlockTimeRecent(latestHeight: number, sampleBlocks = 
 }
 
 export async function getNetworkSummary(): Promise<NetworkSummary> {
-  if (process.env.NODE_ENV === "test") {
-    return {
-      chainId: "guru-testnet-1",
-      blockHeight: 123456,
-      averageBlockTimeSec: 5.9,
-      supply: "125065091389.4634 gxn",
-      bonded: "121787549.2258 gxn",
-      inflation: "4.20%",
-    };
-  }
-
   const activeChain = getActiveChainConfig();
   const baseDenom = activeChain.denom ?? DEFAULT_BASE_DENOM;
   const displayDenom = toDisplayDenom(baseDenom);
@@ -190,14 +179,6 @@ export async function getNetworkSummary(): Promise<NetworkSummary> {
 }
 
 export async function getApplicationVersions(): Promise<ApplicationVersionItem[]> {
-  if (process.env.NODE_ENV === "test") {
-    return [
-      { name: "network", version: "guru-testnet-1" },
-      { name: "app_name", version: "gurud" },
-      { name: "version", version: "v0.0.0" },
-    ];
-  }
-
   try {
     const nodeInfo = await apiClients.lcdGet<NodeInfoResponse>(
       "/cosmos/base/tendermint/v1beta1/node_info",
@@ -226,10 +207,6 @@ export async function getApplicationVersions(): Promise<ApplicationVersionItem[]
 }
 
 export async function getAccountsTotal(): Promise<string | null> {
-  if (process.env.NODE_ENV === "test") {
-    return "123456";
-  }
-
   try {
     const response = await apiClients.lcdGet<AuthAccountsTotalResponse>(
       "/cosmos/auth/v1beta1/accounts?pagination.limit=1&pagination.count_total=true",

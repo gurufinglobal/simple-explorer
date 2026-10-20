@@ -1,0 +1,448 @@
+{
+  "name": "feepolicy",
+  "url": "https://tgxn.gurufin.io:1317/guru/feepolicy/v1/discounts",
+  "method": "GET",
+  "observedAt": "2026-10-20T04:43:48.735814+00:00",
+  "curlExit": 0,
+  "httpStatus": "200",
+  "error": "",
+  "origin": "https://exp.gurufin.io",
+  "headers": {
+    "date": "Tue, 20 Oct 2026 04:43:48 GMT",
+    "content-type": "application/json",
+    "access-control-allow-origin": "*",
+    "grpc-metadata-content-type": "application/grpc+cosmos-sdk-grpc-codec",
+    "grpc-metadata-x-cosmos-block-height": "19624455",
+    "x-cosmos-block-height": "19624455",
+    "x-server-time": "1792471428"
+  },
+  "blockHeight": "19624455",
+  "response": {
+    "discounts": [
+      {
+        "address": "guru18nzssdz6nn6wylcyva6837jlvnxchjlxaja5kn",
+        "modules": [
+          {
+            "module": "ibc",
+            "discounts": [
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgCreateClient",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgUpdateClient",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgUpgradeClient",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgSubmitMisbehaviour",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenInit",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenTry",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenAck",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenConfirm",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenInit",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenTry",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenAck",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenConfirm",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgRecvPacket",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgAcknowledgement",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgTimeout",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgTimeoutOnClose",
+                "amount": "100.000000000000000000"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "address": "guru18xhskykw2x8kntyqvqns925m0a56utn53mgqjx",
+        "modules": [
+          {
+            "module": "oracle",
+            "discounts": [
+              {
+                "discount_type": "percent",
+                "msg_type": "/guru.oracle.v2.MsgSubmitOracleReport",
+                "amount": "100.000000000000000000"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "address": "guru1cvyyx303sxxzvzs7yq02nz9stvlwfs7lc330ux",
+        "modules": [
+          {
+            "module": "oracle",
+            "discounts": [
+              {
+                "discount_type": "percent",
+                "msg_type": "/guru.oracle.v2.MsgSubmitOracleReport",
+                "amount": "100.000000000000000000"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "address": "guru1nn277d8c0qg33kfmycatyfhp98mzayycegns78",
+        "modules": [
+          {
+            "module": "ibc",
+            "discounts": [
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgCreateClient",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgUpdateClient",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgUpgradeClient",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgSubmitMisbehaviour",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenInit",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenTry",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenAck",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenConfirm",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenInit",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenTry",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenAck",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenConfirm",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgRecvPacket",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgAcknowledgement",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgTimeout",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgTimeoutOnClose",
+                "amount": "100.000000000000000000"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "address": "guru1v3wv23z6p843n3fx8lh5vk9c437m66m03vev2z",
+        "modules": [
+          {
+            "module": "oracle",
+            "discounts": [
+              {
+                "discount_type": "percent",
+                "msg_type": "/guru.oracle.v2.MsgSubmitOracleReport",
+                "amount": "100.000000000000000000"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "address": "guru1ww9xsvwn03unelyxls29qhrrhypxns2763p0a5",
+        "modules": [
+          {
+            "module": "oracle",
+            "discounts": [
+              {
+                "discount_type": "percent",
+                "msg_type": "/guru.oracle.v2.MsgSubmitOracleReport",
+                "amount": "100.000000000000000000"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "address": "guru1y353j6fj5v293ns79s9d68znxwmx93rd4n27sm",
+        "modules": [
+          {
+            "module": "ibc",
+            "discounts": [
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgCreateClient",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgUpdateClient",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgUpgradeClient",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgSubmitMisbehaviour",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenInit",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenTry",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenAck",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenConfirm",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenInit",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenTry",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenAck",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenConfirm",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgRecvPacket",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgAcknowledgement",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgTimeout",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgTimeoutOnClose",
+                "amount": "100.000000000000000000"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "address": "guru1z8c0wtdg7geqx7unmhl3z4nlu43rm4kyexj8kx",
+        "modules": [
+          {
+            "module": "ibc",
+            "discounts": [
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgCreateClient",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgUpdateClient",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgUpgradeClient",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.client.v1.MsgSubmitMisbehaviour",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenInit",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenTry",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenAck",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.connection.v1.MsgConnectionOpenConfirm",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenInit",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenTry",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenAck",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgChannelOpenConfirm",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgRecvPacket",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgAcknowledgement",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgTimeout",
+                "amount": "100.000000000000000000"
+              },
+              {
+                "discount_type": "percent",
+                "msg_type": "/ibc.core.channel.v1.MsgTimeoutOnClose",
+                "amount": "100.000000000000000000"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "pagination": {
+      "next_key": null,
+      "total": "8"
+    }
+  }
+}

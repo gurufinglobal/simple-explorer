@@ -1,0 +1,38 @@
+{
+  "name": "rpc-post",
+  "url": "https://tgxn.gurufin.io:26657",
+  "method": "POST",
+  "observedAt": "2026-10-20T04:43:48.778718+00:00",
+  "curlExit": 0,
+  "httpStatus": "200",
+  "error": "",
+  "origin": "https://exp.gurufin.io",
+  "headers": {
+    "date": "Tue, 20 Oct 2026 04:43:48 GMT",
+    "content-type": "application/json",
+    "content-length": "1091",
+    "x-server-time": "1792471428"
+  },
+  "blockHeight": "19624455",
+  "response": {
+    "jsonrpc": "2.0",
+    "id": 1,
+    "result": {
+      "node_info": {
+        "network": "guru_631-1",
+        "version": "0.38.19"
+      },
+      "sync_info": {
+        "latest_block_hash": "44077F966E3B9CFD08AAA457FBEF0953787715D00C8A8B3E13C829C9FCE9CAD1",
+        "latest_app_hash": "89BCB5E05F6AF3022BA7367850EA80FC96D2DA84AE288E16610D39C965A4A81F",
+        "latest_block_height": "19624455",
+        "latest_block_time": "2026-10-20T04:43:47.496092397Z",
+        "earliest_block_hash": "6A4DC9D56AF3C24A7E59170A627AE77BF08FDB7190BDA2A763A486FE55A3A105",
+        "earliest_app_hash": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+        "earliest_block_height": "1",
+        "earliest_block_time": "2026-04-17T05:37:05.999766023Z",
+        "catching_up": false
+      }
+    }
+  }
+}

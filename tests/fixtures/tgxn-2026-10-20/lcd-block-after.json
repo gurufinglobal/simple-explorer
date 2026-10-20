@@ -1,0 +1,29 @@
+{
+  "name": "lcd-block-after",
+  "url": "https://tgxn.gurufin.io:1317/cosmos/base/tendermint/v1beta1/blocks/latest",
+  "method": "GET",
+  "observedAt": "2026-10-20T04:43:48.937040+00:00",
+  "curlExit": 0,
+  "httpStatus": "200",
+  "error": "",
+  "origin": "https://exp.gurufin.io",
+  "headers": {
+    "date": "Tue, 20 Oct 2026 04:43:48 GMT",
+    "content-type": "application/json",
+    "access-control-allow-origin": "*",
+    "grpc-metadata-content-type": "application/grpc+cosmos-sdk-grpc-codec",
+    "grpc-metadata-x-cosmos-block-height": "19624455",
+    "x-cosmos-block-height": "19624455",
+    "x-server-time": "1792471428"
+  },
+  "blockHeight": "19624455",
+  "response": {
+    "block": {
+      "header": {
+        "chain_id": "guru_631-1",
+        "height": "19624455",
+        "time": "2026-10-20T04:43:47.496092397Z"
+      }
+    }
+  }
+}

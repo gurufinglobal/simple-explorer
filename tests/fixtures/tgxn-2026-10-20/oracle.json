@@ -1,0 +1,28 @@
+{
+  "name": "oracle",
+  "url": "https://tgxn.gurufin.io:1317/guru/oracle/v2/params",
+  "method": "GET",
+  "observedAt": "2026-10-20T04:43:48.684449+00:00",
+  "curlExit": 0,
+  "httpStatus": "200",
+  "error": "",
+  "origin": "https://exp.gurufin.io",
+  "headers": {
+    "date": "Tue, 20 Oct 2026 04:43:48 GMT",
+    "content-type": "application/json",
+    "content-length": "95",
+    "access-control-allow-origin": "*",
+    "grpc-metadata-content-type": "application/grpc+cosmos-sdk-grpc-codec",
+    "grpc-metadata-x-cosmos-block-height": "19624455",
+    "x-cosmos-block-height": "19624455",
+    "x-server-time": "1792471428"
+  },
+  "blockHeight": "19624455",
+  "response": {
+    "params": {
+      "enable": true,
+      "quorum_ratio": "0.666666666666666667",
+      "report_retention_blocks": "10"
+    }
+  }
+}
