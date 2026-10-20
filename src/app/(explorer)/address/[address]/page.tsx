@@ -93,6 +93,9 @@ export default function AddressDetailPage() {
 
       <QueryStatus {...portfolio} />
       <Typography>위임: {portfolio.result.data?.staking ?? "미확인"} · 보상: {portfolio.result.data?.reward ?? "미확인"}</Typography>
+      <Stack component="section" aria-label="위임 원본 금액">
+        {portfolio.result.data?.details?.staking?.map(coin => <CoinAmount key={coin.denom} coin={coin} metadata={portfolio.result.data?.details?.metadata} />)}
+      </Stack>
       {portfolio.result.data?.details?.reward?.map(coin => <CoinAmount key={coin.denom} coin={coin} metadata={metadata.result.data ?? []} />)}
       {portfolio.result.data?.details?.unbonding && <UnbondingDetails snapshot={portfolio.result.data.details.unbonding} duration={portfolio.result.data.details.unbondingTime} metadata={metadata.result.data ?? []} />}
       <Card variant="outlined">

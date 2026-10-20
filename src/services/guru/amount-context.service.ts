@@ -1,4 +1,4 @@
-import { PartialQueryError, schemaError } from "@/lib/query-result";
+import { PartialQueryError, QueryError, combinedError, queryError, schemaError } from "@/lib/query-result";
 import { apiClients, type QueryClient } from "@/services/clients";
 import { getDenomsMetadata, type TokenDenomMetadata } from "./token-metadata.service";
 
@@ -7,8 +7,23 @@ export async function getStakingParams(client: QueryClient = apiClients) {
   if (!response.params?.bond_denom || !response.params.unbonding_time) schemaError("bond denom·unbonding params 미확인");
   return { bondDenom: response.params.bond_denom, unbondingTime: response.params.unbonding_time };
 }
-/** A failed metadata lookup never supplies invented decimals or signing capabilities. */
-export async function getAmountMetadata(client: QueryClient = apiClients) {
-  try { return await getDenomsMetadata(client); }
-  catch (error) { return error instanceof PartialQueryError ? error.data as TokenDenomMetadata[] : []; }
+/** Keep raw amounts and successful metadata pages without hiding lookup failures. */
+export async function withAmountMetadata<T>(client: QueryClient, load: (metadata: TokenDenomMetadata[]) => Promise<T>): Promise<T> {
+  let metadata: TokenDenomMetadata[] = [];
+  let metadataError: QueryError | undefined;
+  try { metadata = await getDenomsMetadata(client); }
+  catch (error) {
+    const info = queryError(error);
+    if (info.kind === "cancelled") throw error;
+    if (error instanceof PartialQueryError) metadata = error.data as TokenDenomMetadata[];
+    metadataError = new QueryError({ ...info, message: `Metadata 조회 실패: ${info.message}` });
+  }
+  const data = await load(metadata).catch(error => {
+    if (!metadataError || queryError(error).kind === "cancelled") throw error;
+    const info = combinedError([metadataError, error]);
+    if (error instanceof PartialQueryError) throw new PartialQueryError(error.data, info);
+    throw new QueryError(info);
+  });
+  if (metadataError) throw new PartialQueryError(data, metadataError.info);
+  return data;
 }
