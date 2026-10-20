@@ -3,10 +3,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { getActiveChainConfig } from '@/lib/chain-selection';
 import { initialResult, readQuery, type QueryResult } from '@/lib/query-result';
 import { createQueryClient, type QueryClient } from '@/services/clients';
+import type { ChainConfig } from '@/lib/env';
 
-export function useQuery<T>(target: string, load: (client: QueryClient, previous: T | null) => Promise<T>, pollMs?: number, enabled = true) {
+export function useQuery<T>(target: string, load: (client: QueryClient, previous: T | null) => Promise<T>, pollMs?: number, enabled = true, pinnedChain?: ChainConfig) {
   const [, chainChanged] = useState(0);
-  const chain = getActiveChainConfig();
+  const chain = pinnedChain ?? getActiveChainConfig();
   const key = JSON.stringify([chain.key, target]);
   const context = { chain: chain.key, target };
   const [result, setResult] = useState<QueryResult<T>>(() => initialResult(context));
@@ -19,6 +20,8 @@ export function useQuery<T>(target: string, load: (client: QueryClient, previous
   const active = useRef<{ key: string; controller: AbortController } | null>(null);
   const chainRef = useRef(chain);
   chainRef.current = chain;
+  const pinned = useRef(!!pinnedChain);
+  pinned.current = !!pinnedChain;
 
   const refresh = useCallback(async () => {
     if (!enabled || active.current?.key === key) return;
@@ -40,6 +43,7 @@ export function useQuery<T>(target: string, load: (client: QueryClient, previous
 
   useEffect(() => {
     const change = () => {
+      if (pinned.current) return;
       // Initial cookie hydration may announce the already selected default chain.
       if (getActiveChainConfig().key === chainRef.current.key) return;
       active.current?.controller.abort();
@@ -49,6 +53,18 @@ export function useQuery<T>(target: string, load: (client: QueryClient, previous
     window.addEventListener('explorer:chain-changed', change);
     return () => window.removeEventListener('explorer:chain-changed', change);
   }, []);
+  useEffect(() => {
+    const invalidate = (event: Event) => {
+      const detail = (event as CustomEvent<{ chain: string; targets: string[] }>).detail;
+      if (detail.chain !== chainRef.current.key || !detail.targets.includes(target)) return;
+      active.current?.controller.abort(); active.current = null;
+      // Explicit transaction invalidation must not reuse a pre-inclusion response.
+      state.current = initialResult({ chain: chainRef.current.key, target });
+      void refresh();
+    };
+    window.addEventListener('explorer:queries-invalidated', invalidate);
+    return () => window.removeEventListener('explorer:queries-invalidated', invalidate);
+  }, [refresh, target]);
   useEffect(() => {
     void refresh();
     const interval = pollMs ? window.setInterval(() => {

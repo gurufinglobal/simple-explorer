@@ -4,7 +4,10 @@ import Link from "next/link";
 import { useQuery } from "@/hooks/use-query";
 import { QueryStatus } from "@/components/query/query-status";
 
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
+import { Suspense } from "react";
+import { getChainByKey, type ChainConfig } from "@/lib/env";
+import { Alert } from "@mui/material";
 import {
   Card,
   CardContent,
@@ -19,9 +22,19 @@ import {
 import { getTxDetail } from "@/services/guru/tx-details.service";
 
 export default function TxDetailPage() {
+  return <Suspense fallback={<Typography>거래 체인 확인 중</Typography>}><TxRoute /></Suspense>;
+}
+function TxRoute() {
+  const search = useSearchParams();
+  const key = search.get("chain");
+  const chain = key ? getChainByKey(key) : null;
+  if (key && !chain) return <Alert severity="error">거래 링크의 체인 설정이 없습니다: {key}</Alert>;
+  return <TxDetailContent pinnedChain={chain ?? undefined} />;
+}
+function TxDetailContent({ pinnedChain }: { pinnedChain?: ChainConfig }) {
   const params = useParams<{ hash: string }>();
   const hash = params.hash ?? "";
-  const query = useQuery(`transaction:${hash}`, client => getTxDetail(hash, client));
+  const query = useQuery(`transaction:${hash}`, client => getTxDetail(hash, client), undefined, true, pinnedChain);
   const tx = query.result.data;
   if (!tx) return <QueryStatus {...query} />;
 
@@ -39,6 +52,7 @@ export default function TxDetailPage() {
 
   return (
     <Stack spacing={2}>
+      {pinnedChain && <Alert severity="info">거래 링크 체인: {pinnedChain.key} / {pinnedChain.chainId} · 지갑 선택과 독립적으로 조회합니다.</Alert>}
       <QueryStatus {...query} />
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ md: "center" }}>
         <Typography variant="h5" fontWeight={700}>

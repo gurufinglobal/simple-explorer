@@ -7,9 +7,10 @@ import { DashboardView } from '@/components/network/dashboard-view';
 import { useWalletSessionStore as store } from '@/stores/wallet-session.store';
 import { connectExtension } from '@/services/wallet/wallet-lifecycle';
 import { displayToBase } from '@/lib/cosmos-amount';
-import { submitSendTx } from '@/services/guru/bank-tx.client';
+import { prepareSendTx, submitSendTx as executeSend, type SendTxInput } from '@/services/guru/bank-tx.client';
 import { submitDelegateTx, submitUndelegateTx } from '@/services/guru/staking-tx.client';
 import { submitGovernanceDepositTx, submitTextProposalTx } from '@/services/guru/governance-tx.client';
+const submitSendTx = async (input: SendTxInput) => executeSend(await prepareSendTx(input));
 const boundary = vi.hoisted(() => ({ connect: vi.fn(), sign: vi.fn(), broadcast: vi.fn() }));
 vi.mock('@cosmjs/stargate', async original => ({ ...await original<typeof import('@cosmjs/stargate')>(), SigningStargateClient: { connectWithSigner: boundary.connect } }));
 const address = bech32.encode('guru', bech32.toWords(new Uint8Array(20).fill(1)));
@@ -17,6 +18,7 @@ const pubkey = new Uint8Array(33).fill(3);
 const base = { walletType: 'keplr' as const, sessionTopic: null, bech32Address: address };
 function configure(decimals = 6) {
   vi.stubEnv('NEXT_PUBLIC_CHAINS', JSON.stringify([{ key: 'a', name: 'A', chainId: 'a-1', lcdUrl: 'https://a.test:1317', rpcUrl: 'https://a.test:26657', bech32Prefix: 'guru', nativeDenom: 'agxn', bondDenom: 'agxn', feeDenom: 'agxn', decimals,
+    sendFeePolicy: { mode: 'fixed', gasPrice: '0.001agxn', gas: 220000, evidence: 'synthetic fee policy', limitation: 'synthetic only' },
     signing: [{ wallet: 'keplr', method: 'direct', evidence: 'synthetic boundary' }], rpcAccess: { origin: 'http://localhost:3000', get: true, post: true, options: true, observedAt: '2026-10-20', evidence: 'synthetic boundary' } }]));
   vi.stubEnv('NEXT_PUBLIC_DEFAULT_CHAIN_KEY', 'a');
   vi.stubGlobal('fetch', vi.fn<typeof fetch>(async input => {
@@ -24,6 +26,7 @@ function configure(decimals = 6) {
     if (url.port === '26657') return Response.json({ result: { node_info: { network: 'a-1' } } });
     if (url.pathname.endsWith('/node_info')) return Response.json({ default_node_info: { network: 'a-1' }, application_version: {} });
     if (url.pathname.endsWith('/denoms_metadata')) return Response.json({ metadatas: [{ base: 'agxn', display: 'gxn', symbol: 'GXN', denom_units: [{ denom: 'agxn', exponent: 0 }, { denom: 'gxn', exponent: decimals }] }] });
+    if (url.pathname.includes('/balances/')) return Response.json({ balances: [{ denom: 'agxn', amount: '999999999999999999999999999999999999999999999999' }] });
     if (url.pathname.endsWith('/module_accounts')) return Response.json({ accounts: [{ name: 'gov', base_account: { address } }] });
     if (url.pathname.includes('/auth/')) return Response.json({ account: { pub_key: { key: Buffer.from(pubkey).toString('base64') } }, pagination: { total: '1' } });
     if (url.pathname.endsWith('/staking/v1beta1/params')) return Response.json({ params: { bond_denom: 'agxn', unbonding_time: '86400s' } });
@@ -101,6 +104,7 @@ describe('AC02-4 real message generation with only SDK/network/wallet boundaries
     expect((screen.getByRole('button', { name: 'Send Tx' }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: 'Send Tx' }));
+    fireEvent.click(await screen.findByRole('button', { name: '확인하고 지갑 서명' }));
     await waitFor(() => expect(boundary.sign).toHaveBeenCalled());
     expect(boundary.sign.mock.calls[0][1][0].value.amount).toEqual([{ amount: '1234567', denom: 'agxn' }]);
   });

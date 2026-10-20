@@ -67,6 +67,26 @@ JSON의 `key`, `name`, `lcdUrl`은 필수입니다. `rpcUrl`, `evmRpcUrl`, `wsUr
 
 ## 검증
 
+### 송금 확인·수수료·결과 (W05)
+
+Dashboard의 **SEND → Send Tx**는 잔액·주소·정밀 수량·수수료를 조회한 뒤 앱 확인 창을 엽니다. 전체 송신/수신 주소, 체인 key/ID, 표시/최소 단위 수량, 예상 수수료와 근거를 확인한 후 **확인하고 지갑 서명**을 누릅니다. 확인 창의 취소 또는 Escape는 지갑 서명·전송을 실행하지 않습니다. 입력·체인·계정 변경 또는 2분 경과 시 새 확인이 필요합니다.
+
+`NEXT_PUBLIC_CHAINS`의 체인별 `sendFeePolicy`는 **MsgSend에만** 적용됩니다. 종전 송금의 `NEXT_PUBLIC_GAS_PRICE`/`0.001agxn` fallback과 고정 gas 220000은 제거했습니다. 실제 근거가 없는 정책을 임의로 추가하지 마세요. 기존 체인·signing·RPC origin 검증도 모두 충족해야 하며, TGXN 개발 프리셋은 계속 조회 전용입니다.
+
+| 정책 | 필수 필드 | 동작 |
+| --- | --- | --- |
+| `mode: "simulate"` | `gasPrice`, `gasMultiplierBps` (10000~100000 정수), `evidence` | 서명 요청 없이 공개키로 simulate 후 gas를 정수 올림 계산 |
+| simulate의 선택 `fallback` | `gas` (양의 안전 정수), `evidence` | simulate 실패 시에만 해당 체인에서 검증한 고정 gas 사용, 실패 이유와 한계 표시 |
+| `mode: "fixed"` | `gasPrice`, `gas`, `evidence`, `limitation` | simulate를 사용할 수 없는 체인의 검증된 정책과 한계 표시 |
+
+`gasPrice`의 denom은 검증된 `feeDenom`과 같아야 하며 가격은 양수여야 합니다. 송금 자산과 수수료 자산을 각각 조회하고, 같으면 합산 잔액을 확인합니다. 확인 창을 연 뒤에도 서명 직전 잔액을 다시 조회합니다. 수수료 정책은 다른 위임/거버넌스 작업을 변경하지 않습니다.
+
+전송 시 서명 bytes의 해시를 먼저 보관합니다. timeout·전송 응답 불명확은 **확인 중**으로 남기고 자동 재전송하지 않습니다. Dashboard의 **보관된 거래 결과**는 지갑 재연결 없이 사용할 수 있으며 최근 20개 결과를 브라우저 localStorage에 저장합니다(서명 bytes·지갑 세션·비밀값 제외). 저장소를 삭제하면 이 목록도 지워지므로 필요한 거래 링크를 별도로 보관하세요.
+
+거래 결과의 `/tx/<hash>?chain=<key>` 링크는 쿠키의 체인과 달라도 링크 체인으로 조회하며 지갑 체인을 자동 변경하지 않습니다. **거래 상태·관련 조회 다시 읽기**는 전송 없이 체인 상태, 실제 수수료 원문, 송신자 잔액과 주소 거래를 다시 읽습니다. 실제 fee 미조회/예상과 불일치 및 거래 성공 후 화면 갱신 실패를 각각 표시합니다. 이 체인 파라미터 지원은 거래 결과 링크 범위이며 전체 검색·공유 링크 개편은 W08 범위입니다.
+
+합성 HTTP/RPC/지갑 경계에서 실제 컴포넌트·서비스를 실행하는 검사는 `tests/integration/send-transaction.integration.test.tsx`에 있습니다. 실체인 서명·자금 전송을 수행하는 테스트가 아닙니다.
+
 ```bash
 npm test
 npm run lint

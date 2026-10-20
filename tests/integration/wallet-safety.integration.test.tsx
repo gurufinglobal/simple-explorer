@@ -13,7 +13,7 @@ import { useWalletPortfolioStore as portfolio } from "@/stores/wallet-portfolio.
 import { attachWalletLifecycle, connectExtension, connectQr, disconnectWallet, refreshWriteEligibility } from "@/services/wallet/wallet-lifecycle";
 import { normalizeWalletConnectSession } from "@/services/wallet/walletconnect-session";
 import { resetWalletConnectClientForTests } from "@/services/wallet/walletconnect-client";
-import { submitSendTx } from "@/services/guru/bank-tx.client";
+import { prepareSendTx, submitSendTx as executeSend, type SendTxInput } from "@/services/guru/bank-tx.client";
 import { submitDelegateTx, submitUndelegateTx, submitWithdrawDelegatorRewardTx, submitWithdrawValidatorCommissionTx } from "@/services/guru/staking-tx.client";
 import { submitGovernanceVoteTx, submitGovernanceDepositTx, submitTextProposalTx } from "@/services/guru/governance-tx.client";
 import { GovernanceNewProposalForm } from "@/components/governance/governance-new-proposal-form";
@@ -21,6 +21,7 @@ import { HeaderWalletMenu } from "@/components/wallet/header-wallet-menu";
 import { ChainSelector } from "@/components/layout/chain-selector";
 import { WalletPortfolioHydrator } from "@/components/wallet/wallet-portfolio-hydrator";
 
+const submitSendTx = async (input: SendTxInput) => executeSend(await prepareSendTx(input));
 const boundary = vi.hoisted(() => ({
   connect: vi.fn(), disconnect: vi.fn(), request: vi.fn(), sessionGet: vi.fn(),
   on: vi.fn(), off: vi.fn(), connectSigner: vi.fn(), broadcast: vi.fn(), close: vi.fn(),
@@ -39,6 +40,7 @@ const pubkey = new Uint8Array(33).fill(3);
 const a: ChainConfig = {
   key: "a", name: "Chain A", chainId: "a-1", lcdUrl: "https://a.test:1317", rpcUrl: "https://a.test:26657",
   bech32Prefix: "guru", denom: "agxn", nativeDenom: "agxn", bondDenom: "agxn", feeDenom: "agxn", decimals: 18,
+  sendFeePolicy: { mode: "fixed", gasPrice: "0.001agxn", gas: 220000, evidence: "synthetic fee policy", limitation: "synthetic only" },
   signing: [{ wallet: "keplr", method: "direct", evidence: "synthetic wallet boundary" }, { wallet: "walletconnect", method: "amino", evidence: "synthetic wallet boundary" }],
   rpcAccess: { origin: "http://localhost:3000", get: true, post: true, options: true, observedAt: "2026-10-20", evidence: "synthetic browser boundary" },
 };
@@ -120,7 +122,7 @@ describe("W03 chain configuration and signing boundaries", () => {
     expect(sign).not.toHaveBeenCalled(); expect(boundary.connectSigner).not.toHaveBeenCalled(); expect(boundary.broadcast).not.toHaveBeenCalled();
   });
   it("a valid scoped signer reaches broadcast through the real transaction service", async () => {
-    connected(); await expect(send()).resolves.toEqual({ txHash: "TX" }); expect(sign).toHaveBeenCalledTimes(1); expect(boundary.broadcast).toHaveBeenCalledTimes(1);
+    connected(); await expect(send()).resolves.toMatchObject({ status: "success", hash: "TX" }); expect(sign).toHaveBeenCalledTimes(1); expect(boundary.broadcast).toHaveBeenCalledTimes(1);
   });
   it("rejects an actual signer different from the displayed account", async () => {
     connected(); window.getOfflineSigner = () => ({ getAccounts: async () => [{ address: addressB, pubkey }] });
