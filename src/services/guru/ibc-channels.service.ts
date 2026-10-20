@@ -1,4 +1,4 @@
-import { apiClients } from "@/services/clients";
+import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
 /** Parsed IBC channel (IdentifiedChannel + nested Channel fields). */
 export type IbcChannel = {
@@ -96,44 +96,21 @@ function mapChannelEntry(entry: Record<string, unknown>): IbcChannel | null {
   };
 }
 
-function fallbackChannels(): IbcChannel[] {
-  return [
-    {
-      portId: "transfer",
-      channelId: "channel-0",
-      state: "OPEN",
-      stateRaw: "STATE_OPEN",
-      ordering: "UNORDERED",
-      version: "ics20-1",
-      connectionHops: ["connection-0"],
-      counterpartyPortId: "transfer",
-      counterpartyChannelId: "channel-141",
-    },
-  ];
-}
+export async function getIbcChannels(apiClients: QueryClient = defaultClients): Promise<IbcChannel[]> {
 
-export async function getIbcChannels(): Promise<IbcChannel[]> {
-  if (process.env.NODE_ENV === "test") {
-    return fallbackChannels();
-  }
-
-  try {
-    const response = await apiClients.lcdGet<IbcChannelsResponse>(
-      "/ibc/core/channel/v1/channels?pagination.limit=100",
-    );
-    const raw = response.channels ?? [];
-    const mapped: IbcChannel[] = [];
-    for (const item of raw) {
-      if (!item || typeof item !== "object") {
-        continue;
-      }
-      const row = mapChannelEntry(item as Record<string, unknown>);
-      if (row) {
-        mapped.push(row);
-      }
+  const response = await apiClients.lcdGet<IbcChannelsResponse>(
+    "/ibc/core/channel/v1/channels?pagination.limit=100",
+  );
+  const raw = response.channels ?? [];
+  const mapped: IbcChannel[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== "object") {
+      continue;
     }
-    return mapped;
-  } catch {
-    return [];
+    const row = mapChannelEntry(item as Record<string, unknown>);
+    if (row) {
+      mapped.push(row);
+    }
   }
+  return mapped;
 }

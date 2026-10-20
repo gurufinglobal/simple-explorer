@@ -1,4 +1,5 @@
-import { apiClients } from "@/services/clients";
+import { PartialQueryError, QueryError, queryError, schemaError } from "@/lib/query-result";
+import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
 export type TokenMetadata = {
   tokenType: "native" | "ibc" | "evm";
@@ -16,33 +17,6 @@ export type TokenDenomMetadata = {
   symbol: string;
   description: string;
   decimals: number;
-};
-
-const fallbackMetadataMap: Record<string, TokenMetadata> = {
-  uguru: {
-    tokenType: "native",
-    name: "Guru",
-    symbol: "GURU",
-    decimals: 6,
-    sourceChain: null,
-    sourceChannel: null,
-  },
-  "ibc/ABCDEF": {
-    tokenType: "ibc",
-    name: "IBC Guru",
-    symbol: "ibcGURU",
-    decimals: 6,
-    sourceChain: "cosmoshub-4",
-    sourceChannel: "channel-0",
-  },
-  "evm:0x0000000000000000000000000000000000000002": {
-    tokenType: "evm",
-    name: "Wrapped Guru",
-    symbol: "wGURU",
-    decimals: 18,
-    sourceChain: "guru-evm-testnet",
-    sourceChannel: null,
-  },
 };
 
 type DenomMetadataResponse = {
@@ -83,26 +57,7 @@ type DenomTraceResponse = {
   };
 };
 
-function readFallback(tokenRef: string): TokenMetadata | null {
-  return fallbackMetadataMap[tokenRef] ?? null;
-}
-
-function inferEvmToken(tokenRef: string): TokenMetadata | null {
-  if (!tokenRef.startsWith("evm:")) {
-    return null;
-  }
-  const contract = tokenRef.slice(4);
-  return {
-    tokenType: "evm",
-    name: `EVM Token ${contract.slice(0, 8)}`,
-    symbol: "EVM",
-    decimals: 18,
-    sourceChain: "guru-evm",
-    sourceChannel: null,
-  };
-}
-
-async function fetchNativeTokenMetadata(tokenRef: string): Promise<TokenMetadata | null> {
+async function fetchNativeTokenMetadata(tokenRef: string, apiClients: QueryClient = defaultClients): Promise<TokenMetadata | null> {
   const response = await apiClients.lcdGet<DenomMetadataResponse>(
     `/cosmos/bank/v1beta1/denoms_metadata/${encodeURIComponent(tokenRef)}`,
   );
@@ -120,7 +75,7 @@ async function fetchNativeTokenMetadata(tokenRef: string): Promise<TokenMetadata
   };
 }
 
-async function fetchIbcTokenMetadata(tokenRef: string): Promise<TokenMetadata | null> {
+async function fetchIbcTokenMetadata(tokenRef: string, apiClients: QueryClient = defaultClients): Promise<TokenMetadata | null> {
   const hash = tokenRef.replace("ibc/", "");
   const response = await apiClients.lcdGet<DenomTraceResponse>(
     `/ibc/apps/transfer/v1/denom_traces/${encodeURIComponent(hash)}`,
@@ -189,27 +144,14 @@ function normalizeDenomMetadata(metadata: {
   };
 }
 
-export async function getTokenMetadata(tokenRef: string): Promise<TokenMetadata | null> {
-  if (process.env.NODE_ENV === "test") {
-    return readFallback(tokenRef);
-  }
-
-  try {
-    if (tokenRef.startsWith("ibc/")) {
-      return (await fetchIbcTokenMetadata(tokenRef)) ?? readFallback(tokenRef);
-    }
-    if (tokenRef.startsWith("evm:")) {
-      return inferEvmToken(tokenRef) ?? readFallback(tokenRef);
-    }
-    return (await fetchNativeTokenMetadata(tokenRef)) ?? readFallback(tokenRef);
-  } catch {
-    return inferEvmToken(tokenRef) ?? readFallback(tokenRef);
-  }
+export async function getTokenMetadata(tokenRef: string, apiClients: QueryClient = defaultClients): Promise<TokenMetadata | null> {
+  if (tokenRef.startsWith("evm:")) throw new QueryError({ kind: "unsupported", message: "EVM 토큰 metadata 조회는 구현되지 않았습니다." });
+  return tokenRef.startsWith("ibc:") || tokenRef.startsWith("ibc/") ? fetchIbcTokenMetadata(tokenRef, apiClients) : fetchNativeTokenMetadata(tokenRef, apiClients);
 }
 
-export async function getDenomsMetadata(): Promise<TokenDenomMetadata[]> {
+export async function getDenomsMetadata(apiClients: QueryClient = defaultClients): Promise<TokenDenomMetadata[]> {
+  const metadatas: TokenDenomMetadata[] = [];
   try {
-    const metadatas: TokenDenomMetadata[] = [];
     let nextKey: string | null | undefined = undefined;
     let pageCount = 0;
 
@@ -220,20 +162,21 @@ export async function getDenomsMetadata(): Promise<TokenDenomMetadata[]> {
       const response = await apiClients.lcdGet<DenomsMetadataListResponse>(
         `/cosmos/bank/v1beta1/denoms_metadata${query}`,
       );
-      const normalized = (response.metadatas ?? [])
+      const normalized = (response.metadatas ?? schemaError())
         .map((item) => normalizeDenomMetadata(item))
         .filter((item): item is TokenDenomMetadata => item !== null);
       metadatas.push(...normalized);
 
       nextKey = response.pagination?.next_key;
       pageCount += 1;
-      if (pageCount >= 50) {
-        break;
+      if (pageCount >= 50 && nextKey) {
+        throw new QueryError({ kind: "incomplete", message: "Metadata 조회 한도(50페이지)에 도달했습니다. 현재 결과는 일부입니다." });
       }
     } while (nextKey);
 
     return metadatas.sort((a, b) => a.symbol.localeCompare(b.symbol) || a.baseDenom.localeCompare(b.baseDenom));
-  } catch {
-    return [];
+  } catch (error) {
+    if (metadatas.length) throw new PartialQueryError(metadatas, queryError(error));
+    throw error;
   }
 }

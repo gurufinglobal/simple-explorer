@@ -1,9 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
 import { useRouter } from "next/navigation";
 import {
-  Alert,
   Card,
   CardContent,
   Skeleton,
@@ -15,8 +16,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import type { BexExchange } from "@/services/guru/bex.service";
-import { isBexAvailable, listBexExchanges } from "@/services/guru/bex.service";
+import { listBexExchanges } from "@/services/guru/bex.service";
 
 function parseNumericId(id: string): number | null {
   if (!/^[0-9]+$/.test(id)) {
@@ -46,59 +46,27 @@ function isActiveStatus(status: string): boolean {
 
 export function BexList() {
   const router = useRouter();
-  const [items, setItems] = useState<BexExchange[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [supported, setSupported] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      try {
-        const available = await isBexAvailable();
-        if (!mounted) return;
-        setSupported(available);
-        if (!available) {
-          setItems([]);
-          setError(null);
-          return;
-        }
-        const response = await listBexExchanges();
-        if (!mounted) return;
-        const sorted = [...response].sort((a, b) => {
-          const activeDelta = Number(isActiveStatus(b.status)) - Number(isActiveStatus(a.status));
-          if (activeDelta !== 0) {
-            return activeDelta;
-          }
-          const left = parseNumericId(a.id);
-          const right = parseNumericId(b.id);
-          if (left === null && right === null) {
-            return a.id.localeCompare(b.id);
-          }
-          if (left === null) {
-            return 1;
-          }
-          if (right === null) {
-            return -1;
-          }
-          return left - right;
-        });
-        setItems(sorted);
-        setError(null);
-      } catch {
-        if (!mounted) return;
-        setItems([]);
-        setError("BEX 목록을 불러오지 못했습니다.");
-      } finally {
-        if (!mounted) return;
-        setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
+  const query = useQuery("bex-exchanges", client => listBexExchanges(client));
+  const loading = query.busy && !query.result.data;
+  const supported = query.result.data !== null;
+  const items = [...(query.result.data ?? [])].sort((a, b) => {
+    const activeDelta = Number(isActiveStatus(b.status)) - Number(isActiveStatus(a.status));
+    if (activeDelta !== 0) {
+      return activeDelta;
+    }
+    const left = parseNumericId(a.id);
+    const right = parseNumericId(b.id);
+    if (left === null && right === null) {
+      return a.id.localeCompare(b.id);
+    }
+    if (left === null) {
+      return 1;
+    }
+    if (right === null) {
+      return -1;
+    }
+    return left - right;
+  });
   return (
     <Stack spacing={2}>
       <Typography variant="h5" fontWeight={700}>
@@ -108,10 +76,7 @@ export function BexList() {
         `/guru/bex/v1/exchanges` 결과를 기반으로 표시합니다.
       </Typography>
 
-      {error ? <Alert severity="error">{error}</Alert> : null}
-      {!supported && !loading ? (
-        <Alert severity="info">현재 선택한 체인은 BEX 모듈을 지원하지 않거나 조회 API가 비활성화되어 있습니다.</Alert>
-      ) : null}
+      <QueryStatus {...query} />
 
       {loading ? (
         <Card variant="outlined">

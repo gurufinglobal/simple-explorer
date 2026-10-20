@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
 import {
   Card,
   CardContent,
@@ -19,65 +20,16 @@ import type { TxDetail } from "@/services/guru/tx-details.service";
 import { getRecentTransactions } from "@/services/guru/transactions.service";
 
 const POLL_MS = 3000;
-const FETCH_LIMIT = 30;
 const MAX_TXS = 150;
 
-type Props = {
-  initialTxs?: TxDetail[];
-};
-
-export function TransactionsLiveList({ initialTxs = [] }: Props) {
-  const [txs, setTxs] = useState<TxDetail[]>(initialTxs);
-  const [liveError, setLiveError] = useState<string | null>(null);
+export function TransactionsLiveList() {
+  const query = useQuery<TxDetail[]>("transactions", async (client, previous) => {
+    const fresh = await getRecentTransactions(30, client);
+    const seen = new Set((previous ?? []).map(tx => tx.hash));
+    return [...fresh.filter(tx => !seen.has(tx.hash)), ...(previous ?? [])].slice(0, MAX_TXS);
+  }, POLL_MS);
+  const txs = query.result.data ?? [];
   const nowMs = useNowTick(POLL_MS);
-  const pathname = usePathname();
-
-  useEffect(() => {
-    if (!pathname.startsWith("/transactions")) {
-      return;
-    }
-
-    let mounted = true;
-
-    const syncLatest = async () => {
-      if (document.visibilityState !== "visible") {
-        return;
-      }
-      try {
-        const fresh = await getRecentTransactions(FETCH_LIMIT);
-        if (!mounted) return;
-        setTxs((prev) => {
-          const seen = new Set(prev.map((t) => t.hash));
-          const newOnes = fresh.filter((t) => !seen.has(t.hash));
-          if (newOnes.length === 0) {
-            return prev;
-          }
-          return [...newOnes, ...prev].slice(0, MAX_TXS);
-        });
-        setLiveError(null);
-      } catch {
-        if (!mounted) return;
-        setLiveError("실시간 트랜잭션 갱신 중 오류가 발생했습니다.");
-      }
-    };
-
-    void syncLatest();
-    const onVisibilityChange = () => {
-      if (document.visibilityState === "visible") {
-        void syncLatest();
-      }
-    };
-    const id = window.setInterval(() => {
-      void syncLatest();
-    }, POLL_MS);
-    document.addEventListener("visibilitychange", onVisibilityChange);
-
-    return () => {
-      mounted = false;
-      window.clearInterval(id);
-      document.removeEventListener("visibilitychange", onVisibilityChange);
-    };
-  }, [pathname]);
 
   return (
     <Stack spacing={2}>
@@ -87,19 +39,15 @@ export function TransactionsLiveList({ initialTxs = [] }: Props) {
         </Typography>
         <Chip
           size="small"
-          color={liveError ? "warning" : "success"}
-          label={liveError ? "Live paused" : "Live (3s)"}
+          color={query.result.status === "success" || query.result.status === "empty" ? "success" : "warning"}
+          label={query.result.status === "success" || query.result.status === "empty" ? "Live (3s)" : query.busy ? "불러오는 중" : "Live paused"}
         />
       </Stack>
-      {liveError ? (
-        <Typography variant="body2" color="warning.main">
-          {liveError}
-        </Typography>
-      ) : null}
+      <QueryStatus {...query} />
       <Card variant="outlined">
         <CardContent>
           {txs.length === 0 ? (
-            <Typography variant="body2">트랜잭션 데이터를 불러오지 못했습니다.</Typography>
+            query.result.status === "empty" ? <Typography variant="body2">최근 조회 범위에서 트랜잭션이 없습니다.</Typography> : null
           ) : (
             <List disablePadding>
               {txs.map((tx) => {
@@ -117,9 +65,8 @@ export function TransactionsLiveList({ initialTxs = [] }: Props) {
                   >
                     <ListItemText
                       primary={tx.hash}
-                      secondary={`${relative} · Code: ${tx.code} | Gas: ${tx.gasUsed}/${tx.gasWanted} | Memo: ${
-                        tx.memo || "-"
-                      }`}
+                      secondary={`${relative} · Code: ${tx.code} | Gas: ${tx.gasUsed}/${tx.gasWanted} | Memo: ${tx.memo || "-"
+                        }`}
                     />
                     <Chip
                       label={tx.code === 0 ? "Success" : "Failed"}

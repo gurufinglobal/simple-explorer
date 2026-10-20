@@ -1,3 +1,4 @@
+import { QueryError, readFields, schemaError } from "@/lib/query-result";
 import { normalizeGovV1Beta1Proposal, normalizeGovV1Proposal } from "@/lib/gov-mapper";
 import type {
   GovCoin,
@@ -6,7 +7,7 @@ import type {
   NormalizedProposal,
   VoteOption,
 } from "@/lib/gov-types";
-import { apiClients } from "@/services/clients";
+import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
 type ProposalsV1Response = {
   proposals?: Record<string, unknown>[];
@@ -100,77 +101,50 @@ type ParamsDeposit = {
   };
 };
 
-async function safeLcdGet<T>(path: string): Promise<T | null> {
-  if (process.env.NODE_ENV === "test") {
-    return null;
-  }
+async function safeLcdGet<T>(path: string, apiClients: QueryClient = defaultClients): Promise<T | null> {
+
   try {
     return await apiClients.lcdGet<T>(path);
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof QueryError && error.info.status === 404 && path.startsWith("/cosmos/gov/v1/")) return apiClients.lcdGet<T>(path.replace("/v1/", "/v1beta1/"));
+    throw error;
   }
 }
 
-export async function listProposals(limit = 100): Promise<NormalizedProposal[]> {
-  if (process.env.NODE_ENV === "test") {
-    return [
-      {
-        id: "1",
-        title: "Test proposal",
-        summary: "Summary",
-        status: "voting_period",
-        statusRaw: "PROPOSAL_STATUS_VOTING_PERIOD",
-        submitTime: new Date().toISOString(),
-        depositEndTime: new Date().toISOString(),
-        votingStartTime: new Date().toISOString(),
-        votingEndTime: new Date(Date.now() + 86400000).toISOString(),
-        totalDeposit: [{ denom: "agxn", amount: "1000000" }],
-        finalTally: { yes: "0", abstain: "0", no: "0", noWithVeto: "0" },
-      },
-    ];
-  }
+export async function listProposals(limit = 100, apiClients: QueryClient = defaultClients): Promise<NormalizedProposal[]> {
 
-  const v1 = await safeLcdGet<ProposalsV1Response>(
-    `/cosmos/gov/v1/proposals?pagination.limit=${limit}&pagination.reverse=true`,
+  const v1 = await safeLcdGet<ProposalsV1Response>(`/cosmos/gov/v1/proposals?pagination.limit=${limit}&pagination.reverse=true`, apiClients
   );
-  if (v1?.proposals?.length) {
+  if (v1?.proposals) {
     return v1.proposals.map((p) => normalizeGovV1Proposal(p));
   }
 
-  const legacy = await safeLcdGet<ProposalsV1Beta1Response>(
-    `/cosmos/gov/v1beta1/proposals?pagination.limit=${limit}&pagination.reverse=true`,
+  const legacy = await safeLcdGet<ProposalsV1Beta1Response>(`/cosmos/gov/v1beta1/proposals?pagination.limit=${limit}&pagination.reverse=true`, apiClients
   );
-  if (legacy?.proposals?.length) {
+  if (legacy?.proposals) {
     return legacy.proposals.map((p) => normalizeGovV1Beta1Proposal(p));
   }
 
   return [];
 }
 
-export async function getProposalRaw(proposalId: string): Promise<unknown | null> {
-  if (process.env.NODE_ENV === "test") {
-    return { proposal: { id: proposalId } };
-  }
-  const v1 = await safeLcdGet<unknown>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}`);
+export async function getProposalRaw(proposalId: string, apiClients: QueryClient = defaultClients): Promise<unknown | null> {
+
+  const v1 = await safeLcdGet<unknown>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}`, apiClients);
   if (v1) {
     return v1;
   }
-  return safeLcdGet<unknown>(`/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}`);
+  return safeLcdGet<unknown>(`/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}`, apiClients);
 }
 
-export async function getProposal(proposalId: string): Promise<NormalizedProposal | null> {
-  if (process.env.NODE_ENV === "test") {
-    const list = await listProposals();
-    return list.find((p) => p.id === proposalId) ?? null;
-  }
+export async function getProposal(proposalId: string, apiClients: QueryClient = defaultClients): Promise<NormalizedProposal | null> {
 
-  const v1 = await safeLcdGet<ProposalOneV1>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}`);
+  const v1 = await safeLcdGet<ProposalOneV1>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}`, apiClients);
   if (v1?.proposal) {
     return normalizeGovV1Proposal(v1.proposal);
   }
 
-  const legacy = await safeLcdGet<ProposalOneV1Beta1>(
-    `/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}`,
+  const legacy = await safeLcdGet<ProposalOneV1Beta1>(`/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}`, apiClients
   );
   if (legacy?.proposal) {
     return normalizeGovV1Beta1Proposal(legacy.proposal);
@@ -180,74 +154,42 @@ export async function getProposal(proposalId: string): Promise<NormalizedProposa
 }
 
 /** Current tally (useful during voting period). */
-export async function getProposalTally(proposalId: string): Promise<GovTally | null> {
-  if (process.env.NODE_ENV === "test") {
-    return { yes: "1", abstain: "0", no: "0", noWithVeto: "0" };
-  }
+export async function getProposalTally(proposalId: string, apiClients: QueryClient = defaultClients): Promise<GovTally | null> {
 
-  const v1 = await safeLcdGet<TallyResponse>(
-    `/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/tally`,
+  const v1 = await safeLcdGet<TallyResponse>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/tally`, apiClients
   );
   if (v1?.tally) {
     const t = v1.tally as Record<string, string>;
     return {
-      yes: t.yes_count ?? "0",
-      abstain: t.abstain_count ?? "0",
-      no: t.no_count ?? "0",
-      noWithVeto: t.no_with_veto_count ?? "0",
+      yes: t.yes_count ?? t.yes ?? schemaError(),
+      abstain: t.abstain_count ?? t.abstain ?? schemaError(),
+      no: t.no_count ?? t.no ?? schemaError(),
+      noWithVeto: t.no_with_veto_count ?? t.no_with_veto ?? schemaError(),
     };
   }
 
   return null;
 }
 
-export async function getGovParams(): Promise<GovParamsBundle> {
-  if (process.env.NODE_ENV === "test") {
-    return {
-      voting: { votingPeriod: "120h" },
-      tallying: { quorum: "0.333", threshold: "0.5", vetoThreshold: "0.334" },
-      deposit: { minDeposit: [{ denom: "agxn", amount: "1000000" }], maxDepositPeriod: "120h" },
-    };
-  }
+export async function getGovParams(apiClients: QueryClient = defaultClients): Promise<GovParamsBundle> {
 
-  const [voting, tallying, deposit] = await Promise.all([
-    safeLcdGet<ParamsVoting>("/cosmos/gov/v1/params/voting"),
-    safeLcdGet<ParamsTally>("/cosmos/gov/v1/params/tallying"),
-    safeLcdGet<ParamsDeposit>("/cosmos/gov/v1/params/deposit"),
-  ]);
-
-  const votingLegacy = !voting?.voting_params
-    ? await safeLcdGet<ParamsVoting>("/cosmos/gov/v1beta1/params/voting")
-    : null;
-  const tallyLegacy = !tallying?.tally_params
-    ? await safeLcdGet<ParamsTally>("/cosmos/gov/v1beta1/params/tallying")
-    : null;
-  const depositLegacy = !deposit?.deposit_params
-    ? await safeLcdGet<ParamsDeposit>("/cosmos/gov/v1beta1/params/deposit")
-    : null;
-
-  const v = voting?.voting_params ?? votingLegacy?.voting_params;
-  const t = tallying?.tally_params ?? tallyLegacy?.tally_params;
-  const d = deposit?.deposit_params ?? depositLegacy?.deposit_params;
-
-  return {
-    voting: v?.voting_period ? { votingPeriod: v.voting_period } : null,
-    tallying:
-      t?.quorum && t?.threshold && t?.veto_threshold
-        ? {
-            quorum: t.quorum,
-            threshold: t.threshold,
-            vetoThreshold: t.veto_threshold,
-          }
-        : null,
-    deposit:
-      d?.min_deposit || d?.max_deposit_period
-        ? {
-            minDeposit: d.min_deposit ?? [],
-            maxDepositPeriod: d.max_deposit_period ?? "",
-          }
-        : null,
-  };
+  return readFields<GovParamsBundle>({ voting: null, tallying: null, deposit: null }, {
+    voting: safeLcdGet<ParamsVoting>("/cosmos/gov/v1/params/voting", apiClients).then(response => {
+      const value = response?.voting_params;
+      if (!value?.voting_period) schemaError("Voting params 응답이 올바르지 않습니다.");
+      return { votingPeriod: value.voting_period };
+    }),
+    tallying: safeLcdGet<ParamsTally>("/cosmos/gov/v1/params/tallying", apiClients).then(response => {
+      const value = response?.tally_params;
+      if (!value?.quorum || !value.threshold || !value.veto_threshold) schemaError("Tally params 응답이 올바르지 않습니다.");
+      return { quorum: value.quorum, threshold: value.threshold, vetoThreshold: value.veto_threshold };
+    }),
+    deposit: safeLcdGet<ParamsDeposit>("/cosmos/gov/v1/params/deposit", apiClients).then(response => {
+      const value = response?.deposit_params;
+      if (!value || !Array.isArray(value.min_deposit)) schemaError("Deposit params 응답이 올바르지 않습니다.");
+      return { minDeposit: value.min_deposit, maxDepositPeriod: value.max_deposit_period ?? "" };
+    }),
+  });
 }
 
 function mapVoteRows(res: VotesResponse | null): GovernanceVoteRow[] {
@@ -268,21 +210,16 @@ function mapVoteRows(res: VotesResponse | null): GovernanceVoteRow[] {
   return rows;
 }
 
-export async function listVotes(proposalId: string): Promise<GovernanceVoteRow[]> {
-  if (process.env.NODE_ENV === "test") {
-    return [];
-  }
+export async function listVotes(proposalId: string, apiClients: QueryClient = defaultClients): Promise<GovernanceVoteRow[]> {
 
-  const v1 = await safeLcdGet<VotesResponse>(
-    `/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/votes?pagination.limit=200`,
+  const v1 = await safeLcdGet<VotesResponse>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/votes?pagination.limit=200`, apiClients
   );
   const fromV1 = mapVoteRows(v1);
-  if (fromV1.length > 0) {
+  if (v1) {
     return fromV1;
   }
 
-  const legacy = await safeLcdGet<VotesResponse>(
-    `/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}/votes?pagination.limit=200`,
+  const legacy = await safeLcdGet<VotesResponse>(`/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}/votes?pagination.limit=200`, apiClients
   );
   return mapVoteRows(legacy);
 }
@@ -305,21 +242,16 @@ function mapDepositRows(res: DepositsResponse | null): GovernanceDepositRow[] {
   return rows;
 }
 
-export async function listDeposits(proposalId: string): Promise<GovernanceDepositRow[]> {
-  if (process.env.NODE_ENV === "test") {
-    return [];
-  }
+export async function listDeposits(proposalId: string, apiClients: QueryClient = defaultClients): Promise<GovernanceDepositRow[]> {
 
-  const v1 = await safeLcdGet<DepositsResponse>(
-    `/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/deposits`,
+  const v1 = await safeLcdGet<DepositsResponse>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/deposits`, apiClients
   );
   const fromV1 = mapDepositRows(v1);
-  if (fromV1.length > 0) {
+  if (v1) {
     return fromV1;
   }
 
-  const legacy = await safeLcdGet<DepositsResponse>(
-    `/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}/deposits`,
+  const legacy = await safeLcdGet<DepositsResponse>(`/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}/deposits`, apiClients
   );
   return mapDepositRows(legacy);
 }
@@ -353,12 +285,9 @@ type ModuleAccountsResponse = {
 };
 
 /** Governance module account address (for MsgExecLegacyContent authority). */
-export async function getGovModuleAddress(): Promise<string | null> {
-  if (process.env.NODE_ENV === "test") {
-    return "gov1testaddress000000000000000000000000000";
-  }
+export async function getGovModuleAddress(apiClients: QueryClient = defaultClients): Promise<string | null> {
 
-  const res = await safeLcdGet<ModuleAccountsResponse>("/cosmos/auth/v1beta1/module_accounts");
+  const res = await safeLcdGet<ModuleAccountsResponse>("/cosmos/auth/v1beta1/module_accounts", apiClients);
   if (!res?.accounts?.length) {
     return null;
   }
@@ -370,49 +299,38 @@ export async function getGovModuleAddress(): Promise<string | null> {
   return null;
 }
 
-export async function getAccountPubkeyBytes(address: string): Promise<Uint8Array | null> {
-  if (process.env.NODE_ENV === "test") {
-    return new Uint8Array(33).fill(1);
-  }
+export async function getAccountPubkeyBytes(address: string, apiClients: QueryClient = defaultClients): Promise<Uint8Array | null> {
 
   type AccountResp = {
     account?: {
       pub_key?: { key?: string };
     };
   };
-  const res = await safeLcdGet<AccountResp>(
-    `/cosmos/auth/v1beta1/accounts/${encodeURIComponent(address)}`,
+  const res = await safeLcdGet<AccountResp>(`/cosmos/auth/v1beta1/accounts/${encodeURIComponent(address)}`, apiClients
   );
   const keyB64 = res?.account?.pub_key?.key;
   if (!keyB64) {
     return null;
   }
-  try {
-    if (typeof Buffer !== "undefined") {
-      return new Uint8Array(Buffer.from(keyB64, "base64"));
-    }
-    const bin = atob(keyB64);
-    const out = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) {
-      out[i] = bin.charCodeAt(i);
-    }
-    return out;
-  } catch {
-    return null;
+  if (typeof Buffer !== "undefined") {
+    return new Uint8Array(Buffer.from(keyB64, "base64"));
   }
+  const bin = atob(keyB64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    out[i] = bin.charCodeAt(i);
+  }
+  return out;
 }
 
 export async function getVoteForVoter(
   proposalId: string,
-  voterAddress: string,
+  voterAddress: string, apiClients: QueryClient = defaultClients
 ): Promise<VoteOption | null> {
-  if (process.env.NODE_ENV === "test") {
-    return null;
-  }
 
   const v1 = await safeLcdGet<{
     vote?: { options?: Array<{ option?: string }> };
-  }>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/votes/${encodeURIComponent(voterAddress)}`);
+  }>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/votes/${encodeURIComponent(voterAddress)}`, apiClients);
 
   const opt = v1?.vote?.options?.[0]?.option;
   if (opt) {
@@ -421,7 +339,7 @@ export async function getVoteForVoter(
 
   const legacy = await safeLcdGet<{
     vote?: { option?: string };
-  }>(`/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}/votes/${encodeURIComponent(voterAddress)}`);
+  }>(`/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}/votes/${encodeURIComponent(voterAddress)}`, apiClients);
 
   const legacyOpt = legacy?.vote?.option;
   if (legacyOpt) {

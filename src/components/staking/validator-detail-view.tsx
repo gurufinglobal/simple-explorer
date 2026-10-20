@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+import { useCallback, useMemo, useState } from "react";
 import {
   Alert,
   Button,
@@ -59,9 +61,9 @@ function monospace() {
 }
 
 const EMPTY_POSITION: DelegatorValidatorPosition = {
-  delegationAmount: "0",
-  unbondingAmount: "0",
-  rewardAmount: "0",
+  delegationAmount: "-",
+  unbondingAmount: "-",
+  rewardAmount: "-",
   isOperator: false,
 };
 
@@ -72,33 +74,15 @@ export function ValidatorDetailView({ detail }: Props) {
   const canSignCosmos = status === "connected" && (walletType === "keplr" || walletType === "walletconnect");
   const isMetamask = status === "connected" && walletType === "metamask";
 
-  const [position, setPosition] = useState<DelegatorValidatorPosition>(EMPTY_POSITION);
-  const [positionLoading, setPositionLoading] = useState(false);
+  const positionQuery = useQuery(`delegator:${effectiveAddress}:${detail.operatorAddress}`, client => getDelegatorValidatorPosition(effectiveAddress!, detail.operatorAddress, client), undefined, status === "connected" && !!effectiveAddress);
+  const position = positionQuery.result.data ?? EMPTY_POSITION;
+  const positionLoading = positionQuery.busy && !positionQuery.result.data;
+  const refreshPosition = positionQuery.refresh;
   const [amount, setAmount] = useState("");
   const [denom, setDenom] = useState("agxn");
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-
-  const refreshPosition = useCallback(async () => {
-    if (!effectiveAddress) {
-      setPosition(EMPTY_POSITION);
-      return;
-    }
-    setPositionLoading(true);
-    try {
-      const next = await getDelegatorValidatorPosition(effectiveAddress, detail.operatorAddress);
-      setPosition(next);
-    } catch {
-      setPosition(EMPTY_POSITION);
-    } finally {
-      setPositionLoading(false);
-    }
-  }, [detail.operatorAddress, effectiveAddress]);
-
-  useEffect(() => {
-    void refreshPosition();
-  }, [refreshPosition]);
 
   const unbondingRelative = useMemo(
     () => (detail.unbondingTime ? formatRelativeFutureOrPast(detail.unbondingTime, nowMs) : "-"),
@@ -233,6 +217,7 @@ export function ValidatorDetailView({ detail }: Props) {
             <Typography variant="body2" color="text.secondary">
               현재 지갑: {effectiveAddress ?? "미연결"}
             </Typography>
+            <QueryStatus {...positionQuery} />
             {positionLoading ? (
               <Stack spacing={0.5}>
                 <Skeleton variant="text" width={180} />

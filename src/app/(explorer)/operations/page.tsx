@@ -1,30 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
 import { Card, CardContent, Stack, Typography } from "@mui/material";
 import { ActionConfirmModal } from "@/components/staking/action-confirm-modal";
 import { IbcChannelsPanel } from "@/components/operations/ibc-channels-panel";
-import { getIbcChannels, type IbcChannel } from "@/services/guru/ibc-channels.service";
+import { getIbcChannels } from "@/services/guru/ibc-channels.service";
 
 export default function OperationsPage() {
-  const [channels, setChannels] = useState<IbcChannel[]>([]);
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      try {
-        const next = await getIbcChannels();
-        if (!mounted) return;
-        setChannels(next);
-      } catch {
-        if (!mounted) return;
-        setChannels([]);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const query = useQuery("ibc-channels", client => getIbcChannels(client));
 
   return (
     <Stack spacing={2}>
@@ -48,7 +33,8 @@ export default function OperationsPage() {
             사용하는 connection ID 목록(connection_hops), 상대 체인 쪽 포트·채널 ID를 나타냅니다. 상대 &quot;체인
             ID&quot; 자체는 채널 API에 직접 포함되지 않고, connection·client 조회로 이어지는 식별자입니다.
           </Typography>
-          <IbcChannelsPanel channels={channels} />
+          <QueryStatus {...query} />
+          {query.result.data && <IbcChannelsPanel channels={query.result.data} />}
         </CardContent>
       </Card>
 

@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
 import { useRouter } from "next/navigation";
 import {
-  Alert,
   Card,
   CardContent,
   Grid,
@@ -24,10 +26,7 @@ import {
   getOracleModeratorAddress,
   getOracleParams,
   getOracleWhitelist,
-  isOracleAvailable,
   listOracleRequests,
-  type OracleParams,
-  type OracleRequestRow,
 } from "@/services/guru/oracle.service";
 
 const PAGE_SIZE = 20;
@@ -43,66 +42,21 @@ function parseSortKey(value: string): number {
 
 export function OracleList() {
   const router = useRouter();
-  const [requests, setRequests] = useState<OracleRequestRow[]>([]);
-  const [params, setParams] = useState<OracleParams | null>(null);
-  const [moderatorAddress, setModeratorAddress] = useState<string | null>(null);
-  const [categories, setCategories] = useState<string[]>([]);
-  const [whitelistCount, setWhitelistCount] = useState("0");
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [supported, setSupported] = useState(true);
   const [page, setPage] = useState(1);
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      setLoading(true);
-      try {
-        const available = await isOracleAvailable();
-        if (!mounted) return;
-        setSupported(available);
-        if (!available) {
-          setRequests([]);
-          setParams(null);
-          setModeratorAddress(null);
-          setCategories([]);
-          setWhitelistCount("0");
-          setError(null);
-          return;
-        }
-
-        const [nextRequests, nextParams, nextModerator, nextCategories, nextWhitelist] =
-          await Promise.all([
-            listOracleRequests({ category: categoryFilter, status: statusFilter }),
-            getOracleParams(),
-            getOracleModeratorAddress(),
-            getOracleCategories(),
-            getOracleWhitelist(),
-          ]);
-        if (!mounted) return;
-        setRequests(
-          [...nextRequests].sort((a, b) => parseSortKey(b.id) - parseSortKey(a.id)),
-        );
-        setParams(nextParams);
-        setModeratorAddress(nextModerator);
-        setCategories(nextCategories);
-        setWhitelistCount(nextWhitelist.count);
-        setError(null);
-      } catch {
-        if (!mounted) return;
-        setRequests([]);
-        setError("Oracle 데이터를 불러오지 못했습니다.");
-      } finally {
-        if (!mounted) return;
-        setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [categoryFilter, statusFilter]);
+  const query = useQuery(`oracle:${categoryFilter}:${statusFilter}`, client => listOracleRequests({ category: categoryFilter, status: statusFilter }, client));
+  const paramsQuery = useQuery("oracle-params", client => getOracleParams(client));
+  const moderator = useQuery("oracle-moderator", client => getOracleModeratorAddress(client));
+  const categoriesQuery = useQuery("oracle-categories", client => getOracleCategories(client));
+  const whitelist = useQuery("oracle-whitelist", client => getOracleWhitelist(client));
+  const requests = useMemo(() => [...(query.result.data ?? [])].sort((a, b) => parseSortKey(b.id) - parseSortKey(a.id)), [query.result.data]);
+  const params = paramsQuery.result.data;
+  const moderatorAddress = moderator.result.data;
+  const categories = categoriesQuery.result.data ?? [];
+  const whitelistCount = whitelist.result.data?.count ?? "-";
+  const loading = query.busy && !query.result.data;
+  const supported = query.result.data !== null;
 
   const pageCount = useMemo(() => Math.max(1, Math.ceil(requests.length / PAGE_SIZE)), [requests.length]);
   const pagedRequests = useMemo(() => {
@@ -123,10 +77,7 @@ export function OracleList() {
         `/guru/oracle/v2/*` 엔드포인트를 기반으로 표시합니다.
       </Typography>
 
-      {error ? <Alert severity="error">{error}</Alert> : null}
-      {!supported && !loading ? (
-        <Alert severity="info">현재 선택한 체인은 Oracle 모듈을 지원하지 않거나 조회 API가 비활성화되어 있습니다.</Alert>
-      ) : null}
+      <QueryStatus {...query} /><QueryStatus {...paramsQuery} /><QueryStatus {...moderator} /><QueryStatus {...categoriesQuery} /><QueryStatus {...whitelist} />
 
       {!loading && supported ? (
         <Grid container spacing={2}>
@@ -136,7 +87,7 @@ export function OracleList() {
                 <Typography variant="caption" color="text.secondary">
                   Enabled
                 </Typography>
-                <Typography variant="body1">{params?.enable ? "true" : "false"}</Typography>
+                <Typography variant="body1">{params ? String(params.enable) : "-"}</Typography>
               </CardContent>
             </Card>
           </Grid>

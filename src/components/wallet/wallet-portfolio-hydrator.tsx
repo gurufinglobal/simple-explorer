@@ -27,6 +27,7 @@ export function WalletPortfolioHydrator() {
       return;
     }
     void refresh(cosmos);
+    return clear;
   }, [status, bech32Address, evmAddress, clear, refresh]);
 
   useEffect(() => {
@@ -46,8 +47,8 @@ export function WalletPortfolioHydrator() {
       }
       void refresh(cosmos);
     };
-    window.addEventListener("gf-chain-changed", onChainChanged);
-    return () => window.removeEventListener("gf-chain-changed", onChainChanged);
+    window.addEventListener("explorer:chain-changed", onChainChanged);
+    return () => window.removeEventListener("explorer:chain-changed", onChainChanged);
   }, [clear, refresh]);
 
   return null;

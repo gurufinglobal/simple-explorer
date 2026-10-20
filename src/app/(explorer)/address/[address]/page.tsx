@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
 import { useParams } from "next/navigation";
 import {
   Card,
@@ -19,11 +22,8 @@ import {
 import {
   getAddressAccountInfo,
   getAddressBalances,
-  type AddressAccountInfo,
-  type AddressBalance,
 } from "@/services/guru/address-profile.service";
 import { getTransactionsByAddress } from "@/services/guru/transactions.service";
-import type { TxDetail } from "@/services/guru/tx-details.service";
 
 type AddressBalanceDisplay = {
   amount: string;
@@ -40,80 +40,19 @@ function shortenIbcHash(denom: string): string {
   return `ibc/${hash.slice(0, 6)}...${hash.slice(-6)}`;
 }
 
-async function buildBalanceDisplayRows(balances: AddressBalance[]): Promise<AddressBalanceDisplay[]> {
-  return Promise.all(
-    balances.map(async (balance) => {
-      if (!balance.denom.startsWith("ibc/")) {
-        return {
-          amount: balance.amount,
-          denomLabel: balance.denom,
-        };
-      }
-
-      return {
-        amount: balance.amount,
-        denomLabel: shortenIbcHash(balance.denom),
-      };
-    }),
-  );
-}
-
 export default function AddressDetailPage() {
   const params = useParams<{ address: string }>();
   const address = params.address ?? "";
-  const [balances, setBalances] = useState<AddressBalance[]>([]);
-  const [balanceDisplayRows, setBalanceDisplayRows] = useState<AddressBalanceDisplay[]>([]);
-  const [accountInfo, setAccountInfo] = useState<AddressAccountInfo>({
-    accountNumber: null,
-    sequence: null,
-  });
-  const [transactions, setTransactions] = useState<TxDetail[]>([]);
-  const [profileLoading, setProfileLoading] = useState(true);
-  const [transactionsLoading, setTransactionsLoading] = useState(true);
+  const bank = useQuery(`balances:${address}`, client => getAddressBalances(address, client));
+  const account = useQuery(`account:${address}`, client => getAddressAccountInfo(address, client));
+  const txQuery = useQuery(`address-transactions:${address}`, client => getTransactionsByAddress(address, 200, client));
+  const balances = bank.result.data ?? [];
+  const balanceDisplayRows: AddressBalanceDisplay[] = balances.map(balance => ({ amount: balance.amount, denomLabel: balance.denom.startsWith("ibc/") ? shortenIbcHash(balance.denom) : balance.denom }));
+  const accountInfo = account.result.data ?? { accountNumber: null, sequence: null };
+  const transactions = useMemo(() => txQuery.result.data ?? [], [txQuery.result.data]);
+  const profileLoading = bank.busy && !bank.result.data;
+  const transactionsLoading = txQuery.busy && !txQuery.result.data;
   const [txPage, setTxPage] = useState(1);
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      setProfileLoading(true);
-      try {
-        const [nextBalances, nextAccountInfo] = await Promise.all([
-          getAddressBalances(address),
-          getAddressAccountInfo(address),
-        ]);
-        const nextBalanceDisplayRows = await buildBalanceDisplayRows(nextBalances);
-        if (!mounted) return;
-        setBalances(nextBalances);
-        setBalanceDisplayRows(nextBalanceDisplayRows);
-        setAccountInfo(nextAccountInfo);
-      } finally {
-        if (!mounted) return;
-        setProfileLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [address]);
-
-  useEffect(() => {
-    let mounted = true;
-    setTransactionsLoading(true);
-    setTxPage(1);
-    void (async () => {
-      try {
-        const nextTransactions = await getTransactionsByAddress(address, 200);
-        if (!mounted) return;
-        setTransactions(nextTransactions);
-      } finally {
-        if (!mounted) return;
-        setTransactionsLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [address]);
 
   const txPageCount = useMemo(
     () => Math.max(1, Math.ceil(transactions.length / TRANSACTIONS_PAGE_SIZE)),
@@ -126,6 +65,7 @@ export default function AddressDetailPage() {
 
   return (
     <Stack spacing={2}>
+      <QueryStatus {...txQuery} />
       <Typography variant="h5" fontWeight={700}>
         Address Details
       </Typography>
@@ -133,9 +73,11 @@ export default function AddressDetailPage() {
         <CardContent>
           <Stack spacing={1}>
             <Typography>Address: {address}</Typography>
+            <QueryStatus {...account} />
             <Typography>Account Number: {accountInfo.accountNumber ?? "-"}</Typography>
             <Typography>Sequence: {accountInfo.sequence ?? "-"}</Typography>
             <Typography variant="subtitle2">Balances</Typography>
+            <QueryStatus {...bank} />
             {profileLoading ? (
               <Stack spacing={1}>
                 <Skeleton variant="text" width={180} />
@@ -143,7 +85,7 @@ export default function AddressDetailPage() {
                 <Skeleton variant="text" width={160} />
               </Stack>
             ) : balances.length === 0 ? (
-              <Typography>Could not load balance information.</Typography>
+              bank.result.status === "empty" ? <Typography>잔액 조회 완료: 보유 코인이 없습니다.</Typography> : null
             ) : (
               <List dense>
                 {balanceDisplayRows.map((row) => (
@@ -168,7 +110,7 @@ export default function AddressDetailPage() {
                 ))}
               </Stack>
             ) : transactions.length === 0 ? (
-              <Typography>No related transactions found.</Typography>
+              txQuery.result.status === "empty" ? <Typography>조회 범위에 거래가 없습니다.</Typography> : null
             ) : (
               <>
                 <List dense disablePadding>

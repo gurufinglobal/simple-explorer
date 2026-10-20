@@ -1,11 +1,11 @@
+import { PartialQueryError, combinedError, schemaError } from "@/lib/query-result";
 import { formatBaseAmount } from "@/lib/cosmos-amount";
-import { apiClients } from "@/services/clients";
-import { getActiveChainConfig } from "@/lib/chain-selection";
+import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
 export type NetworkSummary = {
   chainId: string;
-  blockHeight: number;
-  averageBlockTimeSec: number;
+  blockHeight: number | null;
+  averageBlockTimeSec: number | null;
   supply: string;
   bonded: string;
   inflation: string;
@@ -81,9 +81,9 @@ function formatInflation(raw: string): string {
   return `${(numeric * 100).toFixed(2)}%`;
 }
 
-async function fetchAverageBlockTimeRecent(latestHeight: number, sampleBlocks = 10): Promise<number> {
+async function fetchAverageBlockTimeRecent(latestHeight: number, sampleBlocks = 10, apiClients: QueryClient = defaultClients): Promise<number | null> {
   if (latestHeight <= 1) {
-    return 0;
+    return null;
   }
   const start = Math.max(1, latestHeight - sampleBlocks + 1);
   const heights: number[] = [];
@@ -103,7 +103,7 @@ async function fetchAverageBlockTimeRecent(latestHeight: number, sampleBlocks = 
     .filter((ms) => Number.isFinite(ms));
 
   if (timesMs.length < 2) {
-    return 0;
+    schemaError("블록 간격 표본이 올바르지 않습니다.");
   }
 
   let sumDiffMs = 0;
@@ -116,107 +116,73 @@ async function fetchAverageBlockTimeRecent(latestHeight: number, sampleBlocks = 
     }
   }
   if (count === 0) {
-    return 0;
+    schemaError("블록 간격 표본이 올바르지 않습니다.");
   }
   return Number(((sumDiffMs / count) / 1000).toFixed(2));
 }
 
-export async function getNetworkSummary(): Promise<NetworkSummary> {
-  const activeChain = getActiveChainConfig();
+export async function getNetworkSummary(apiClients: QueryClient = defaultClients): Promise<NetworkSummary> {
+  const activeChain = apiClients.chain;
   const baseDenom = activeChain.denom ?? DEFAULT_BASE_DENOM;
   const displayDenom = toDisplayDenom(baseDenom);
 
-  let latestHeight = 0;
-  let chainId = "unknown";
-
-  try {
-    const latestBlock = await apiClients.lcdGet<LcdBlockResponse>(
-      "/cosmos/base/tendermint/v1beta1/blocks/latest",
-    );
-    latestHeight = Number(latestBlock.block?.header?.height ?? "0");
-    chainId = latestBlock.block?.header?.chain_id ?? "unknown";
-  } catch {
-    latestHeight = 0;
-    chainId = "unknown";
-  }
-
-  let averageBlockTimeSec = 0;
-  if (latestHeight > 0) {
-    try {
-      averageBlockTimeSec = await fetchAverageBlockTimeRecent(latestHeight, 10);
-    } catch {
-      averageBlockTimeSec = 0;
-    }
-  }
-
-  const [supplyResult, poolResult, inflationResult] = await Promise.allSettled([
-    apiClients.lcdGet<SupplyResponse>(`/cosmos/bank/v1beta1/supply/by_denom?denom=${encodeURIComponent(baseDenom)}`),
-    apiClients.lcdGet<PoolResponse>("/cosmos/staking/v1beta1/pool"),
-    apiClients.lcdGet<InflationResponse>("/cosmos/mint/v1beta1/inflation"),
+  const summary: NetworkSummary = { chainId: activeChain.key, blockHeight: null, averageBlockTimeSec: null, supply: "-", bonded: "-", inflation: "-" };
+  const results = await Promise.allSettled([
+    apiClients.lcdGet<LcdBlockResponse>("/cosmos/base/tendermint/v1beta1/blocks/latest").then(async latest => {
+      const height = Number(latest.block?.header?.height);
+      if (!Number.isSafeInteger(height) || height < 1 || !latest.block?.header?.chain_id) schemaError();
+      summary.blockHeight = height;
+      summary.chainId = latest.block.header.chain_id;
+      summary.averageBlockTimeSec = await fetchAverageBlockTimeRecent(height, 10, apiClients);
+    }),
+    apiClients.lcdGet<SupplyResponse>(`/cosmos/bank/v1beta1/supply/by_denom?denom=${encodeURIComponent(baseDenom)}`).then(res => {
+      if (!res.amount?.amount || !/^\d+$/.test(res.amount.amount)) schemaError();
+      summary.supply = formatBaseAmount(res.amount.amount, displayDenom);
+    }),
+    apiClients.lcdGet<PoolResponse>("/cosmos/staking/v1beta1/pool").then(res => {
+      if (!res.pool?.bonded_tokens || !/^\d+$/.test(res.pool.bonded_tokens)) schemaError();
+      summary.bonded = formatBaseAmount(res.pool.bonded_tokens, displayDenom);
+    }),
+    apiClients.lcdGet<InflationResponse>("/cosmos/mint/v1beta1/inflation").then(res => {
+      if (typeof res.inflation !== "string" || !/^\d+(?:\.\d+)?$/.test(res.inflation)) schemaError();
+      summary.inflation = formatInflation(res.inflation);
+    }),
   ]);
-
-  const supplyAmount =
-    supplyResult.status === "fulfilled"
-      ? supplyResult.value.amount?.amount
-      : undefined;
-  const bondedAmount =
-    poolResult.status === "fulfilled"
-      ? poolResult.value.pool?.bonded_tokens
-      : undefined;
-  const inflationRaw =
-    inflationResult.status === "fulfilled"
-      ? inflationResult.value.inflation
-      : undefined;
-
-  return {
-    chainId,
-    blockHeight: latestHeight,
-    averageBlockTimeSec,
-    supply: formatBaseAmount(supplyAmount, displayDenom),
-    bonded: formatBaseAmount(bondedAmount, displayDenom),
-    inflation: formatInflation(inflationRaw ?? "0"),
-  };
+  const failed = results.find(r => r.status === "rejected");
+  if (failed?.status === "rejected") {
+    if (results.some(r => r.status === "fulfilled") || summary.blockHeight !== null) throw new PartialQueryError(summary, combinedError(results.flatMap(r => r.status === "rejected" ? [r.reason] : [])));
+    throw failed.reason;
+  }
+  return summary;
 }
 
-export async function getApplicationVersions(): Promise<ApplicationVersionItem[]> {
-  try {
-    const nodeInfo = await apiClients.lcdGet<NodeInfoResponse>(
-      "/cosmos/base/tendermint/v1beta1/node_info",
-    );
-    const defaultInfo = nodeInfo.default_node_info;
-    const app = nodeInfo.application_version;
+export async function getApplicationVersions(apiClients: QueryClient = defaultClients): Promise<ApplicationVersionItem[]> {
+  const nodeInfo = await apiClients.lcdGet<NodeInfoResponse>(
+    "/cosmos/base/tendermint/v1beta1/node_info",
+  );
+  const defaultInfo = nodeInfo.default_node_info;
+  const app = nodeInfo.application_version;
 
-    return [
-      { name: "network", version: defaultInfo?.network ?? "-" },
-      { name: "moniker", version: defaultInfo?.moniker ?? "-" },
-      { name: "tendermint", version: defaultInfo?.version ?? "-" },
-      { name: "rpc_address", version: defaultInfo?.other?.rpc_address ?? "-" },
-      { name: "app_name", version: app?.app_name ?? "-" },
-      { name: "version", version: app?.version ?? "-" },
-      { name: "git_commit", version: app?.git_commit ?? "-" },
-      { name: "cosmos_sdk_version", version: app?.cosmos_sdk_version ?? "-" },
-      { name: "go_version", version: app?.go_version ?? "-" },
-    ];
-  } catch {
-    return [
-      { name: "network", version: "-" },
-      { name: "app_name", version: "-" },
-      { name: "version", version: "-" },
-    ];
-  }
+  return [
+    { name: "network", version: defaultInfo?.network ?? "-" },
+    { name: "moniker", version: defaultInfo?.moniker ?? "-" },
+    { name: "tendermint", version: defaultInfo?.version ?? "-" },
+    { name: "rpc_address", version: defaultInfo?.other?.rpc_address ?? "-" },
+    { name: "app_name", version: app?.app_name ?? "-" },
+    { name: "version", version: app?.version ?? "-" },
+    { name: "git_commit", version: app?.git_commit ?? "-" },
+    { name: "cosmos_sdk_version", version: app?.cosmos_sdk_version ?? "-" },
+    { name: "go_version", version: app?.go_version ?? "-" },
+  ];
 }
 
-export async function getAccountsTotal(): Promise<string | null> {
-  try {
-    const response = await apiClients.lcdGet<AuthAccountsTotalResponse>(
-      "/cosmos/auth/v1beta1/accounts?pagination.limit=1&pagination.count_total=true",
-    );
-    const raw = response.pagination?.total?.trim() ?? "";
-    if (!/^[0-9]+$/.test(raw)) {
-      return null;
-    }
-    return raw;
-  } catch {
-    return null;
+export async function getAccountsTotal(apiClients: QueryClient = defaultClients): Promise<string | null> {
+  const response = await apiClients.lcdGet<AuthAccountsTotalResponse>(
+    "/cosmos/auth/v1beta1/accounts?pagination.limit=1&pagination.count_total=true",
+  );
+  const raw = response.pagination?.total?.trim() ?? "";
+  if (!/^[0-9]+$/.test(raw)) {
+    schemaError("계정 총계 응답이 올바르지 않습니다.");
   }
+  return raw;
 }

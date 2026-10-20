@@ -1,4 +1,5 @@
-import { apiClients } from "@/services/clients";
+import { PartialQueryError, collectQuery, queryError } from "@/lib/query-result";
+import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 import type { TxDetail } from "./tx-details.service";
 import { getLatestBlockHeight } from "./blocks.service";
 
@@ -43,18 +44,15 @@ function mapTxRows(response: TxsResponse): TxDetail[] {
   }));
 }
 
-export async function getRecentTransactions(limit = 10): Promise<TxDetail[]> {
-  if (process.env.NODE_ENV === "test") {
-    return [];
-  }
+export async function getRecentTransactions(limit = 10, apiClients: QueryClient = defaultClients): Promise<TxDetail[]> {
 
+  const rows: TxDetail[] = [];
   try {
-    const latestHeight = await getLatestBlockHeight();
+    const latestHeight = await getLatestBlockHeight(apiClients);
     if (latestHeight <= 0) {
       return [];
     }
 
-    const rows: TxDetail[] = [];
     for (
       let height = latestHeight, scanned = 0;
       height > 0 && scanned < MAX_SCAN_BLOCKS && rows.length < limit;
@@ -71,39 +69,23 @@ export async function getRecentTransactions(limit = 10): Promise<TxDetail[]> {
     }
 
     return rows.slice(0, limit);
-  } catch {
-    return [];
+  } catch (error) {
+    if (rows.length) throw new PartialQueryError(rows, queryError(error));
+    throw error;
   }
 }
 
-export async function getTransactionsByAddress(address: string, limit = 30): Promise<TxDetail[]> {
-  if (process.env.NODE_ENV === "test") {
-    return [];
-  }
+export async function getTransactionsByAddress(address: string, limit = 30, apiClients: QueryClient = defaultClients): Promise<TxDetail[]> {
 
+  const merge = (rows: TxDetail[]) => Array.from(new Map(rows.map(tx => [tx.hash, tx])).values()).slice(0, limit);
+  const queries = [`message.sender='${address}'`, `transfer.recipient='${address}'`];
   try {
-    const senderQuery = encodeURIComponent(`message.sender='${address}'`);
-    const senderResponse = await apiClients.lcdGet<TxsResponse>(
-      `/cosmos/tx/v1beta1/txs?query=${senderQuery}&pagination.limit=${limit}&order_by=ORDER_BY_DESC`,
-    );
-    const senderRows = mapTxRows(senderResponse);
-
-    const recipientQuery = encodeURIComponent(`transfer.recipient='${address}'`);
-    const recipientResponse = await apiClients.lcdGet<TxsResponse>(
-      `/cosmos/tx/v1beta1/txs?query=${recipientQuery}&pagination.limit=${limit}&order_by=ORDER_BY_DESC`,
-    );
-    const recipientRows = mapTxRows(recipientResponse);
-
-    const merged = [...senderRows, ...recipientRows];
-    const deduped = new Map<string, TxDetail>();
-    for (const tx of merged) {
-      if (!deduped.has(tx.hash)) {
-        deduped.set(tx.hash, tx);
-      }
-    }
-
-    return Array.from(deduped.values()).slice(0, limit);
-  } catch {
-    return [];
+    const rows = await collectQuery(queries.map(query => apiClients.lcdGet<TxsResponse>(
+      `/cosmos/tx/v1beta1/txs?query=${encodeURIComponent(query)}&pagination.limit=${limit}&order_by=ORDER_BY_DESC`,
+    ).then(mapTxRows)));
+    return merge(rows.flat());
+  } catch (error) {
+    if (error instanceof PartialQueryError) throw new PartialQueryError(merge((error.data as TxDetail[][]).flat()), error.info);
+    throw error;
   }
 }

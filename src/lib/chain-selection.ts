@@ -42,7 +42,9 @@ export function setActiveChainKeyCookie(key: string): void {
   if (typeof document === "undefined") {
     return;
   }
+  const previous = getActiveChainKeyFromClientCookie();
   document.cookie = `${ACTIVE_CHAIN_COOKIE}=${encodeURIComponent(key)}; path=/; max-age=31536000; samesite=lax`;
+  if (previous !== key) window.dispatchEvent(new Event("explorer:chain-changed"));
 }
 
 export function getActiveChainConfig(): ChainConfig {

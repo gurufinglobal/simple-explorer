@@ -1,4 +1,5 @@
-import { apiClients } from "@/services/clients";
+import { schemaError } from "@/lib/query-result";
+import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
 export type AddressBalance = {
   denom: string;
@@ -50,47 +51,28 @@ function readDeepStringField(target: unknown, fieldName: string): string | null 
   return null;
 }
 
-export async function getAddressBalances(address: string): Promise<AddressBalance[]> {
-  if (process.env.NODE_ENV === "test") {
-    return [{ denom: "uguru", amount: "0" }];
-  }
+export async function getAddressBalances(address: string, apiClients: QueryClient = defaultClients): Promise<AddressBalance[]> {
 
-  try {
-    const response = await apiClients.lcdGet<LcdBalancesResponse>(
-      `/cosmos/bank/v1beta1/balances/${encodeURIComponent(address)}`,
-    );
-    const balances = response.balances ?? [];
-    return balances.map((item) => ({
-      denom: item.denom ?? "unknown",
-      amount: item.amount ?? "0",
-    }));
-  } catch {
-    return [];
-  }
+  const response = await apiClients.lcdGet<LcdBalancesResponse>(
+    `/cosmos/bank/v1beta1/balances/${encodeURIComponent(address)}`,
+  );
+  const balances = response.balances ?? [];
+  return balances.map((item) => ({
+    denom: item.denom ?? "unknown",
+    amount: item.amount ?? "0",
+  }));
 }
 
-export async function getAddressAccountInfo(address: string): Promise<AddressAccountInfo> {
-  if (process.env.NODE_ENV === "test") {
-    return {
-      accountNumber: "0",
-      sequence: "0",
-    };
-  }
+export async function getAddressAccountInfo(address: string, apiClients: QueryClient = defaultClients): Promise<AddressAccountInfo> {
 
-  try {
-    const response = await apiClients.lcdGet<LcdAccountResponse>(
-      `/cosmos/auth/v1beta1/accounts/${encodeURIComponent(address)}`,
-    );
-    const accountNumber = readDeepStringField(response.account, "account_number");
-    const sequence = readDeepStringField(response.account, "sequence");
-    return {
-      accountNumber,
-      sequence,
-    };
-  } catch {
-    return {
-      accountNumber: null,
-      sequence: null,
-    };
-  }
+  const response = await apiClients.lcdGet<LcdAccountResponse>(
+    `/cosmos/auth/v1beta1/accounts/${encodeURIComponent(address)}`,
+  );
+  const accountNumber = readDeepStringField(response.account, "account_number");
+  const sequence = readDeepStringField(response.account, "sequence");
+  if (accountNumber === null || sequence === null) schemaError("계정 번호/sequence를 확인할 수 없습니다.");
+  return {
+    accountNumber,
+    sequence,
+  };
 }
