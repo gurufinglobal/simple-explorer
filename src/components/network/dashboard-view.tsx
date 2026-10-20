@@ -8,6 +8,8 @@ import { getActiveChainConfig } from "@/lib/chain-selection";
 import { useMemo, useState } from "react";
 import { useQuery } from "@/hooks/use-query";
 import { QueryStatus } from "@/components/query/query-status";
+import { DashboardQueryInfo } from "./dashboard-query-info";
+import { MetricRawDetails } from "./metric-raw-details";
 
 import {
   Alert,
@@ -150,9 +152,7 @@ export function DashboardView() {
   };
 
   return (
-    <Stack spacing={2}>
-      {state && <details><summary>공급·bond 원본</summary>{state.supplyRaw ?? "공급 미확인"}<br />{state.bondedRaw ?? "bond 미확인"}</details>}
-      <QueryStatus {...summary} /><QueryStatus {...validators} /><QueryStatus {...versions} /><QueryStatus {...accounts} />
+    <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
 
       <Card variant="outlined">
         <CardContent>
@@ -182,9 +182,16 @@ export function DashboardView() {
         </CardContent>
       </Card>
 
+      <DashboardQueryInfo key={summary.result.context.chain} queries={[
+        { ...summary, label: "네트워크 지표" },
+        { ...validators, label: "검증인" },
+        { ...versions, label: "앱 버전" },
+        { ...accounts, label: "계정 수" },
+      ]} />
+
       <Grid container spacing={2}>
-        <Grid size={{ xs: 12, md: 2 }}>
-          <Card variant="outlined">
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
               <Typography variant="caption">Height</Typography>
               <Typography variant="h6">
@@ -193,8 +200,8 @@ export function DashboardView() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 2 }}>
-          <Card variant="outlined">
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
               <Typography variant="caption">Validators</Typography>
               <Typography variant="h6">
@@ -203,28 +210,30 @@ export function DashboardView() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 2 }}>
-          <Card variant="outlined">
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
               <Typography variant="caption">Supply</Typography>
               <Typography variant="h6" title={state?.supply ?? "-"}>
                 {loading ? <Skeleton variant="text" width={130} /> : formatCompactAmount(state?.supply)}
               </Typography>
+              <MetricRawDetails key={summary.result.context.chain} label="공급량" raw={state?.supplyRaw} />
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 2 }}>
-          <Card variant="outlined">
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
               <Typography variant="caption">Bonded</Typography>
               <Typography variant="h6" title={state?.bonded ?? "-"}>
                 {loading ? <Skeleton variant="text" width={130} /> : formatCompactAmount(state?.bonded)}
               </Typography>
+              <MetricRawDetails key={summary.result.context.chain} label="본딩량" raw={state?.bondedRaw} />
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 2 }}>
-          <Card variant="outlined">
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
               <Typography variant="caption">Inflation</Typography>
               <Typography variant="h6">
@@ -233,8 +242,8 @@ export function DashboardView() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 2 }}>
-          <Card variant="outlined">
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
               <Typography variant="caption">Avg Block Time (10)</Typography>
               <Typography variant="h6">
@@ -243,8 +252,8 @@ export function DashboardView() {
             </CardContent>
           </Card>
         </Grid>
-        <Grid size={{ xs: 12, md: 2 }}>
-          <Card variant="outlined">
+        <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
+          <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
               <Typography variant="caption">Accounts</Typography>
               <Typography variant="h6">
