@@ -1,4 +1,4 @@
-import { QueryError, readFields, schemaError } from "@/lib/query-result";
+import { PartialQueryError, QueryError, readFields, schemaError } from "@/lib/query-result";
 import { normalizeGovV1Beta1Proposal, normalizeGovV1Proposal } from "@/lib/gov-mapper";
 import type {
   GovCoin,
@@ -14,22 +14,16 @@ type ProposalsV1Response = {
   pagination?: { next_key?: string | null; total?: string };
 };
 
-type ProposalsV1Beta1Response = {
-  proposals?: Record<string, unknown>[];
-  pagination?: { next_key?: string | null; total?: string };
-};
-
 type ProposalOneV1 = { proposal?: Record<string, unknown> };
-type ProposalOneV1Beta1 = { proposal?: Record<string, unknown> };
 
 type TallyResponse = { tally?: Record<string, unknown> };
 
 type VotesResponse = {
-  votes?: Array<Record<string, unknown>>;
+  votes?: unknown[];
 };
 
 type DepositsResponse = {
-  deposits?: Array<Record<string, unknown>>;
+  deposits?: unknown[];
 };
 
 /** Normalized row for UI (handles gov v1, v1beta1, and nested `vote` wrappers). */
@@ -43,12 +37,17 @@ export type GovernanceDepositRow = {
   amountDisplay: string;
 };
 
-function normalizeVoteEntry(raw: Record<string, unknown>): GovernanceVoteRow | null {
-  const inner = (raw.vote as Record<string, unknown> | undefined) ?? raw;
-  const voter = String(inner.voter ?? "").trim();
-  if (!voter) {
+function record(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function normalizeVoteEntry(raw: unknown): GovernanceVoteRow | null {
+  const outer = record(raw);
+  const inner = record(outer?.vote ?? outer);
+  if (typeof inner?.voter !== "string" || !inner.voter.trim()) {
     return null;
   }
+  const voter = inner.voter.trim();
 
   const opts = inner.options;
   let optionDisplay = "";
@@ -67,12 +66,13 @@ function normalizeVoteEntry(raw: Record<string, unknown>): GovernanceVoteRow | n
   };
 }
 
-function normalizeDepositEntry(raw: Record<string, unknown>): GovernanceDepositRow | null {
-  const inner = (raw.deposit as Record<string, unknown> | undefined) ?? raw;
-  const depositor = String(inner.depositor ?? "").trim();
-  if (!depositor) {
+function normalizeDepositEntry(raw: unknown): GovernanceDepositRow | null {
+  const outer = record(raw);
+  const inner = record(outer?.deposit ?? outer);
+  if (typeof inner?.depositor !== "string" || !inner.depositor.trim()) {
     return null;
   }
+  const depositor = inner.depositor.trim();
   const coins = inner.amount;
   let amountDisplay = "";
   if (Array.isArray(coins)) {
@@ -101,56 +101,36 @@ type ParamsDeposit = {
   };
 };
 
-async function safeLcdGet<T>(path: string, apiClients: QueryClient = defaultClients): Promise<T | null> {
-
+/** Retain the response version so legacy proposals use their own mapper. */
+async function lcdGetWithVersion<T>(path: string, apiClients: QueryClient): Promise<{ data: T; legacy: boolean }> {
   try {
-    return await apiClients.lcdGet<T>(path);
+    return { data: await apiClients.lcdGet<T>(path), legacy: path.startsWith("/cosmos/gov/v1beta1/") };
   } catch (error) {
-    if (error instanceof QueryError && error.info.status === 404 && path.startsWith("/cosmos/gov/v1/")) return apiClients.lcdGet<T>(path.replace("/v1/", "/v1beta1/"));
+    if (error instanceof QueryError && error.info.status === 404 && path.startsWith("/cosmos/gov/v1/")) {
+      return { data: await apiClients.lcdGet<T>(path.replace("/v1/", "/v1beta1/")), legacy: true };
+    }
     throw error;
   }
 }
 
+async function safeLcdGet<T>(path: string, apiClients: QueryClient = defaultClients): Promise<T> {
+  return (await lcdGetWithVersion<T>(path, apiClients)).data;
+}
+
 export async function listProposals(limit = 100, apiClients: QueryClient = defaultClients): Promise<NormalizedProposal[]> {
-
-  const v1 = await safeLcdGet<ProposalsV1Response>(`/cosmos/gov/v1/proposals?pagination.limit=${limit}&pagination.reverse=true`, apiClients
-  );
-  if (v1?.proposals) {
-    return v1.proposals.map((p) => normalizeGovV1Proposal(p));
-  }
-
-  const legacy = await safeLcdGet<ProposalsV1Beta1Response>(`/cosmos/gov/v1beta1/proposals?pagination.limit=${limit}&pagination.reverse=true`, apiClients
-  );
-  if (legacy?.proposals) {
-    return legacy.proposals.map((p) => normalizeGovV1Beta1Proposal(p));
-  }
-
-  return [];
+  const { data, legacy } = await lcdGetWithVersion<ProposalsV1Response>(`/cosmos/gov/v1/proposals?pagination.limit=${limit}&pagination.reverse=true`, apiClients);
+  if (!Array.isArray(data.proposals)) schemaError("제안 목록이 올바르지 않습니다.");
+  return data.proposals.map(legacy ? normalizeGovV1Beta1Proposal : normalizeGovV1Proposal);
 }
 
 export async function getProposalRaw(proposalId: string, apiClients: QueryClient = defaultClients): Promise<unknown | null> {
-
-  const v1 = await safeLcdGet<unknown>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}`, apiClients);
-  if (v1) {
-    return v1;
-  }
-  return safeLcdGet<unknown>(`/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}`, apiClients);
+  return safeLcdGet<unknown>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}`, apiClients);
 }
 
 export async function getProposal(proposalId: string, apiClients: QueryClient = defaultClients): Promise<NormalizedProposal | null> {
-
-  const v1 = await safeLcdGet<ProposalOneV1>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}`, apiClients);
-  if (v1?.proposal) {
-    return normalizeGovV1Proposal(v1.proposal);
-  }
-
-  const legacy = await safeLcdGet<ProposalOneV1Beta1>(`/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}`, apiClients
-  );
-  if (legacy?.proposal) {
-    return normalizeGovV1Beta1Proposal(legacy.proposal);
-  }
-
-  return null;
+  const { data, legacy } = await lcdGetWithVersion<ProposalOneV1>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}`, apiClients);
+  if (!data.proposal) schemaError("제안 응답이 올바르지 않습니다.");
+  return (legacy ? normalizeGovV1Beta1Proposal : normalizeGovV1Proposal)(data.proposal);
 }
 
 /** Current tally (useful during voting period). */
@@ -192,68 +172,32 @@ export async function getGovParams(apiClients: QueryClient = defaultClients): Pr
   });
 }
 
-function mapVoteRows(res: VotesResponse | null): GovernanceVoteRow[] {
-  const raw = res?.votes;
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-  const rows: GovernanceVoteRow[] = [];
+/** Validate each row here so a malformed sibling cannot erase valid rows. */
+function mapGovernanceRows<T>(raw: unknown, normalize: (item: unknown) => T | null, label: string): T[] {
+  if (!Array.isArray(raw)) schemaError(`${label} 목록이 올바르지 않습니다.`);
+  const rows: T[] = [];
+  let invalid = 0;
   for (const item of raw) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-    const row = normalizeVoteEntry(item as Record<string, unknown>);
-    if (row) {
-      rows.push(row);
-    }
+    const row = normalize(item);
+    if (row) rows.push(row);
+    else invalid++;
+  }
+  if (invalid) {
+    const info = { kind: "schema" as const, message: `${label} ${raw.length}건 중 ${invalid}건의 식별자가 올바르지 않습니다.` };
+    if (rows.length) throw new PartialQueryError(rows, info);
+    throw new QueryError(info);
   }
   return rows;
 }
 
 export async function listVotes(proposalId: string, apiClients: QueryClient = defaultClients): Promise<GovernanceVoteRow[]> {
-
-  const v1 = await safeLcdGet<VotesResponse>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/votes?pagination.limit=200`, apiClients
-  );
-  const fromV1 = mapVoteRows(v1);
-  if (v1) {
-    return fromV1;
-  }
-
-  const legacy = await safeLcdGet<VotesResponse>(`/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}/votes?pagination.limit=200`, apiClients
-  );
-  return mapVoteRows(legacy);
-}
-
-function mapDepositRows(res: DepositsResponse | null): GovernanceDepositRow[] {
-  const raw = res?.deposits;
-  if (!Array.isArray(raw)) {
-    return [];
-  }
-  const rows: GovernanceDepositRow[] = [];
-  for (const item of raw) {
-    if (!item || typeof item !== "object") {
-      continue;
-    }
-    const row = normalizeDepositEntry(item as Record<string, unknown>);
-    if (row) {
-      rows.push(row);
-    }
-  }
-  return rows;
+  const response = await safeLcdGet<VotesResponse>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/votes?pagination.limit=200`, apiClients);
+  return mapGovernanceRows(response.votes, normalizeVoteEntry, "투표 내역");
 }
 
 export async function listDeposits(proposalId: string, apiClients: QueryClient = defaultClients): Promise<GovernanceDepositRow[]> {
-
-  const v1 = await safeLcdGet<DepositsResponse>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/deposits`, apiClients
-  );
-  const fromV1 = mapDepositRows(v1);
-  if (v1) {
-    return fromV1;
-  }
-
-  const legacy = await safeLcdGet<DepositsResponse>(`/cosmos/gov/v1beta1/proposals/${encodeURIComponent(proposalId)}/deposits`, apiClients
-  );
-  return mapDepositRows(legacy);
+  const response = await safeLcdGet<DepositsResponse>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/deposits`, apiClients);
+  return mapGovernanceRows(response.deposits, normalizeDepositEntry, "예치 내역");
 }
 
 /** Map LCD vote option string to app vote option. */

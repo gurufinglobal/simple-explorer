@@ -27,7 +27,11 @@ export function validateLcdJson<T>(path: string, value: T): T {
     if (!header?.height || !/^\d+$/.test(header.height) || !header.time || !Number.isFinite(Date.parse(header.time))) schemaError('블록 높이/시각이 올바르지 않습니다.');
   }
   const objectRows = ['balances', 'metadatas', 'tx_responses', 'validators', 'channels', 'proposals', 'votes', 'deposits', 'exchanges', 'discounts', 'requests', 'reports', 'results', 'coins'];
-  for (const field of objectRows) if (Array.isArray(body[field]) && (body[field] as unknown[]).some(row => !row || typeof row !== 'object' || Array.isArray(row))) schemaError(`응답의 ${field} 항목이 올바르지 않습니다.`);
+  for (const field of objectRows) {
+    // Governance history validates individual rows in its mapper to retain partial data.
+    if ((field === 'votes' || field === 'deposits') && /^\/cosmos\/gov\/v1(?:beta1)?\/proposals\/[^/]+\/(?:votes|deposits)$/.test(route)) continue;
+    if (Array.isArray(body[field]) && (body[field] as unknown[]).some(row => !row || typeof row !== 'object' || Array.isArray(row))) schemaError(`응답의 ${field} 항목이 올바르지 않습니다.`);
+  }
   const rows = (field: string) => (body[field] ?? []) as Record<string, unknown>[];
   if (rows('balances').some(row => typeof row.denom !== 'string' || typeof row.amount !== 'string' || !/^\d+$/.test(row.amount))) schemaError('잔액 응답이 올바르지 않습니다.');
   if (rows('metadatas').some(row => typeof row.base !== 'string' || !row.base.trim())) schemaError('Metadata base denom이 없습니다.');
