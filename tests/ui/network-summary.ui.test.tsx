@@ -13,7 +13,7 @@ describe("network summary DOM", () => {
     render(<NetworkSummaryPanel />);
     expect(screen.getByText("체인 주요 지표")).toBeTruthy();
     expect(await screen.findByText("fixture-chain-1")).toBeTruthy();
-    expect(screen.getByText("123456789.0123 gxn")).toBeTruthy();
+    expect(screen.getByText("123456789.012345 GXN")).toBeTruthy();
     expect(screen.getByText("4.20%")).toBeTruthy();
   });
 });

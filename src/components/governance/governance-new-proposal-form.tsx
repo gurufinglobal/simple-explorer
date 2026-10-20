@@ -1,5 +1,6 @@
 "use client";
 
+import { useAmountEntry } from "@/components/amount/amount-entry";
 import Link from "next/link";
 import { useState } from "react";
 import { Alert, Button, Card, CardContent, Stack, TextField, Typography } from "@mui/material";
@@ -21,6 +22,7 @@ export function GovernanceNewProposalForm({ defaultDenom }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  const amountEntry = useAmountEntry(deposit, denom);
   const canSign = useWalletSessionStore(s => s.status === "connected" && s.writeStatus === "ready");
   const metamask = status === "connected" && walletType === "metamask";
 
@@ -33,8 +35,8 @@ export function GovernanceNewProposalForm({ defaultDenom }: Props) {
       setError("제목과 요약은 필수입니다.");
       return;
     }
-    if (!/^[0-9]+$/.test(deposit.trim())) {
-      setError("예치금은 최소 단위 정수 문자열이어야 합니다.");
+    if (!amountEntry.ready) {
+      setError("표시 수량과 전송 원본을 확인하세요.");
       return;
     }
     setError(null);
@@ -48,8 +50,8 @@ export function GovernanceNewProposalForm({ defaultDenom }: Props) {
         title: title.trim(),
         summary: summary.trim(),
         description: description.trim() || summary.trim(),
-        initialDepositAmount: deposit.trim(),
-        denom: denom.trim() || defaultDenom,
+        initialDepositAmount: amountEntry.requireBase(),
+        denom,
       });
       setSuccess(`제안이 전송되었습니다. Tx: ${txHash}`);
     } catch (e) {
@@ -98,13 +100,14 @@ export function GovernanceNewProposalForm({ defaultDenom }: Props) {
               minRows={4}
             />
             <TextField
-              label="초기 예치 (최소 단위)"
+              label="초기 예치 (표시 단위)"
               value={deposit}
               onChange={(e) => setDeposit(e.target.value)}
               helperText="체인 최소 예치 요건을 충족해야 합니다."
             />
             <TextField label="Denom" value={denom} onChange={(e) => setDenom(e.target.value)} />
-            <Button variant="contained" disabled={!canSign || busy} onClick={() => void onSubmit()}>
+            {amountEntry.confirmation}
+            <Button variant="contained" disabled={!canSign || !amountEntry.ready || busy} onClick={() => void onSubmit()}>
               제안 전송
             </Button>
           </Stack>

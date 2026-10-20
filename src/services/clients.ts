@@ -16,7 +16,7 @@ function toUrl(base: string, pathOrUrl: string): string {
   return `${base}/${pathOrUrl}`;
 }
 
-export type ReadOptions = { signal?: AbortSignal; timeoutMs?: number };
+export type ReadOptions = { signal?: AbortSignal; timeoutMs?: number; onResponse?: (response: Response) => void };
 
 export async function requestJson<T>(url: string, init: RequestInit = {}, options: ReadOptions = {}): Promise<T> {
   const controller = new AbortController();
@@ -26,6 +26,7 @@ export async function requestJson<T>(url: string, init: RequestInit = {}, option
   if (options.signal?.aborted) cancel();
   const timer = setTimeout(() => { timedOut = true; controller.abort(); }, options.timeoutMs ?? 10_000);
   try {
+    if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
     const response = await fetch(url, { ...init, cache: "no-store", signal: controller.signal });
     if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
     if (!response.ok) {
@@ -39,6 +40,7 @@ export async function requestJson<T>(url: string, init: RequestInit = {}, option
       const retryAt = retry ? (/^\d+(?:\.\d+)?$/.test(retry) ? Date.now() + Number(retry) * 1000 : Date.parse(retry)) : NaN;
       throw new QueryError({ kind: "http", status: response.status, message: `HTTP ${response.status}: 조회에 실패했습니다.`, ...(Number.isFinite(retryAt) ? { retryAt } : {}) });
     }
+    options.onResponse?.(response);
     try {
       const body = await response.json() as T;
       if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -69,7 +71,19 @@ function getActiveChainConfigForRuntime(): ChainConfig {
   return getActiveChainConfigFromClientCookie();
 }
 
+async function readObserved<T>(chain: ChainConfig, path: string, signal?: AbortSignal, height?: string) {
+  let blockHeight: string | null = null;
+  const data = await requestJson<T>(toUrl(chain.lcdUrl, path), height ? { headers: { "x-cosmos-block-height": height } } : {}, {
+    signal, onResponse: response => {
+      const raw = response.headers.get("x-cosmos-block-height") ?? response.headers.get("grpc-metadata-x-cosmos-block-height");
+      blockHeight = raw && /^\d+$/.test(raw) ? raw : null;
+    },
+  });
+  return { data: validateLcdJson(path, data), blockHeight };
+}
+
 export const apiClients = {
+  lcdGetObserved: <T>(path: string, height?: string) => readObserved<T>(getActiveChainConfigForRuntime(), path, undefined, height),
   get chain() { return getActiveChainConfigForRuntime(); },
   /**
    * Synchronous URL helpers keep default env behavior.
@@ -113,6 +127,7 @@ export function createQueryClient(chain: ChainConfig, signal?: AbortSignal) {
   return {
     ...apiClients,
     chain,
+    lcdGetObserved: <T>(path: string, height?: string) => readObserved<T>(chain, path, signal, height),
     lcdGet: async <T>(path: string) => validateLcdJson(path, await requestJson<T>(toUrl(chain.lcdUrl, path), {}, { signal })),
     rpcGet: <T>(path: string) => requestJson<T>(toUrl(resolveRpcBaseUrl(chain), path), {}, { signal }),
     evmRpcGet: <T>(path: string) => requestJson<T>(toUrl(resolveEvmRpcBaseUrl(chain), path), {}, { signal }),

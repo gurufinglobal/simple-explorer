@@ -36,8 +36,8 @@ describe('address page distinguishes query outcomes on the same screen', () => {
       return { balances: [{}] };
     });
     show();
-    expect(await screen.findByText('조회 실패')).toBeTruthy();
-    expect(screen.getByText(new RegExp(kind === '500' ? 'HTTP 500' : `\\(${kind}\\)`))).toBeTruthy();
+    expect(await screen.findAllByText('조회 실패')).toBeTruthy();
+    expect(screen.getAllByText(new RegExp(kind === '500' ? 'HTTP 500' : `\\(${kind}\\)`))).toBeTruthy();
     expect(await screen.findByText('Account Number: 1')).toBeTruthy();
     expect(screen.queryByText('0 agxn')).toBeNull();
     expect(screen.queryByText('잔액 조회 완료: 보유 코인이 없습니다.')).toBeNull();

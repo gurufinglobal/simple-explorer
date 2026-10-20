@@ -12,27 +12,27 @@ describe('network summary HTTP boundary', () => {
     expect(await getNetworkSummaryPayload()).toEqual({
       status: 200, body: {
         chainId: 'fixture-chain-1', blockHeight: 3, averageBlockTimeSec: 1,
-        supply: '123456789.0123 gxn', bonded: '4.5 gxn', inflation: '4.20%',
+        supply: '123456789.012345 GXN', bonded: '4.5 GXN', inflation: '4.20%', supplyRaw: '123456789012345678900000000 agxn', bondedRaw: '4500000000000000000 agxn',
       }
     });
-    expect(http).toHaveBeenCalledTimes(7);
+    expect(http).toHaveBeenCalledTimes(9);
   });
   it('preserves successful zero', async () => {
     const respond = http.getMockImplementation()!;
     http.mockImplementation((input, init) => String(input).includes('/supply/') ? Promise.resolve(Response.json({ amount: { amount: '0', denom: 'agxn' } })) : respond(input, init));
-    expect(await readQuery(context, () => getNetworkSummary())).toMatchObject({ status: 'success', data: { supply: '0 gxn' }, blockHeight: '3', error: null });
+    expect(await readQuery(context, () => getNetworkSummary())).toMatchObject({ status: 'success', data: { supply: '0 GXN' }, blockHeight: '3', error: null });
   });
   it('keeps successful metrics and failed inflation without inventing zero', async () => {
     const respond = http.getMockImplementation()!;
     http.mockImplementation((input, init) => String(input).endsWith('/inflation') ? Promise.resolve(new Response('', { status: 503 })) : respond(input, init));
-    expect(await readQuery(context, () => getNetworkSummary())).toMatchObject({ status: 'partial', data: { supply: '123456789.0123 gxn', inflation: '-' }, error: { kind: 'http', status: 503 } });
+    expect(await readQuery(context, () => getNetworkSummary())).toMatchObject({ status: 'partial', data: { supply: '123456789.012345 GXN', inflation: '-' }, error: { kind: 'http', status: 503 } });
   });
   it.each(['http', 'parse', 'timeout', 'network', 'schema'])('preserves %s failure instead of zero', async kind => {
     if (kind === 'http') http.mockResolvedValue(new Response('', { status: 500 }));
     if (kind === 'parse') http.mockResolvedValue(new Response('bad-json'));
     if (kind === 'timeout') http.mockRejectedValue(new DOMException('timeout', 'TimeoutError'));
     if (kind === 'network') http.mockRejectedValue(new TypeError('offline'));
-    if (kind === 'schema') http.mockResolvedValue(Response.json({}));
+    if (kind === 'schema') http.mockImplementation(async () => Response.json({}));
     expect(await readQuery(context, () => getNetworkSummary())).toMatchObject({ status: 'error', data: null, error: { kind } });
   });
   it('preserves total as a string', async () => { expect(await getAccountsTotal()).toBe('9007199254740993'); });

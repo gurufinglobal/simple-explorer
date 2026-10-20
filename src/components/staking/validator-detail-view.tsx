@@ -18,7 +18,10 @@ import {
 } from "@mui/material";
 import { useNowTick } from "@/hooks/use-now-tick";
 import { useEffectiveCosmosAddress } from "@/hooks/use-effective-cosmos-address";
-import { formatBaseAmountToGxn } from "@/lib/cosmos-amount";
+import { useAmountEntry } from "@/components/amount/amount-entry";
+import { CoinAmount } from "@/components/amount/coin-amount";
+import { UnbondingDetails } from "@/components/amount/unbonding-details";
+import { getActiveChainConfig } from "@/lib/chain-selection";
 import { formatRelativeFutureOrPast } from "@/lib/relative-time";
 import {
   getDelegatorValidatorPosition,
@@ -42,12 +45,6 @@ function statusLabel(status: string): string {
     .replace("BOND_STATUS_", "")
     .toLowerCase()
     .replaceAll("_", " ");
-}
-
-function formatRawTokenAmount(value: string): string {
-  if (!value.trim()) return "-";
-  if (/^[0-9]+$/.test(value)) return formatBaseAmountToGxn(value);
-  return `${value} agxn`;
 }
 
 function formatCommissionPercent(rate: string): string {
@@ -79,7 +76,8 @@ export function ValidatorDetailView({ detail }: Props) {
   const positionLoading = positionQuery.busy && !positionQuery.result.data;
   const refreshPosition = positionQuery.refresh;
   const [amount, setAmount] = useState("");
-  const [denom, setDenom] = useState("agxn");
+  const denom = detail.bondDenom ?? "";
+  const amountEntry = useAmountEntry(amount, denom);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -111,6 +109,10 @@ export function ValidatorDetailView({ detail }: Props) {
     [canSignCosmos, refreshPosition, walletType],
   );
 
+  const formatRawTokenAmount = (value: string) => value === "-" ? "미확인" : <CoinAmount coin={{ amount: value, denom: detail.bondDenom ?? "bond denom 미확인" }} metadata={detail.metadata} />;
+  const renderAmount = (key: string, value: string, source: typeof detail | typeof position) => source.amountCoins?.[key]
+    ? source.amountCoins[key].length ? source.amountCoins[key].map(coin => <CoinAmount key={coin.denom} coin={coin} metadata={source.metadata} />) : "보유 항목 없음"
+    : formatRawTokenAmount(value);
   return (
     <Stack spacing={2}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
@@ -178,10 +180,10 @@ export function ValidatorDetailView({ detail }: Props) {
               <strong>Voting Power:</strong> {formatRawTokenAmount(detail.votingPower)}
             </Typography>
             <Typography variant="body2">
-              <strong>Total Delegation:</strong> {formatRawTokenAmount(detail.totalDelegationAmount)}
+              <strong>Total Delegation:</strong> {renderAmount("totalDelegationAmount", detail.totalDelegationAmount, detail)}
             </Typography>
             <Typography variant="body2">
-              <strong>Self Delegation:</strong> {formatRawTokenAmount(detail.selfDelegationAmount)}
+              <strong>Self Delegation:</strong> {renderAmount("selfDelegationAmount", detail.selfDelegationAmount, detail)}
             </Typography>
             <Typography variant="body2">
               <strong>Delegator Shares:</strong> {detail.delegatorShares}
@@ -190,10 +192,10 @@ export function ValidatorDetailView({ detail }: Props) {
               <strong>Commission Rate:</strong> {formatCommissionPercent(detail.commission)}
             </Typography>
             <Typography variant="body2">
-              <strong>Outstanding Rewards:</strong> {formatRawTokenAmount(detail.outstandingRewardsAmount)}
+              <strong>Outstanding Rewards:</strong> {renderAmount("outstandingRewardsAmount", detail.outstandingRewardsAmount, detail)}
             </Typography>
             <Typography variant="body2">
-              <strong>Commission Rewards:</strong> {formatRawTokenAmount(detail.commissionRewardsAmount)}
+              <strong>Commission Rewards:</strong> {renderAmount("commissionRewardsAmount", detail.commissionRewardsAmount, detail)}
             </Typography>
             <Typography variant="body2">
               <strong>Min Self Delegation:</strong> {formatRawTokenAmount(detail.minSelfDelegation)}
@@ -226,21 +228,22 @@ export function ValidatorDetailView({ detail }: Props) {
               </Stack>
             ) : null}
             <Typography variant="body2">
-              <strong>My Delegation:</strong> {formatRawTokenAmount(position.delegationAmount)}
+              <strong>My Delegation:</strong> {renderAmount("delegationAmount", position.delegationAmount, position)}
             </Typography>
             <Typography variant="body2">
-              <strong>My Unbonding:</strong> {formatRawTokenAmount(position.unbondingAmount)}
+              <strong>My Unbonding:</strong> {renderAmount("unbondingAmount", position.unbondingAmount, position)}
             </Typography>
             <Typography variant="body2">
-              <strong>My Reward:</strong> {formatRawTokenAmount(position.rewardAmount)}
+              <strong>My Reward:</strong> {renderAmount("rewardAmount", position.rewardAmount, position)}
             </Typography>
             <Typography variant="body2">
               <strong>Operator Wallet:</strong> {position.isOperator ? "Yes" : "No"}
             </Typography>
+            {position.unbondingSnapshot && <UnbondingDetails snapshot={position.unbondingSnapshot} duration={position.unbondingDuration} metadata={position.metadata} />}
             <Divider />
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
               <TextField
-                label="Amount (base denom)"
+                label="Amount (표시 단위)"
                 value={amount}
                 onChange={(e) => setAmount(e.target.value.trim())}
                 fullWidth
@@ -249,15 +252,16 @@ export function ValidatorDetailView({ detail }: Props) {
               <TextField
                 label="Denom"
                 value={denom}
-                onChange={(e) => setDenom(e.target.value.trim())}
+                slotProps={{ input: { readOnly: true } }}
                 sx={{ minWidth: 160 }}
                 disabled={!canSignCosmos || busyAction !== null}
               />
             </Stack>
+            {amountEntry.confirmation}
             <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
               <Button
                 variant="contained"
-                disabled={!canSignCosmos || busyAction !== null}
+                disabled={!canSignCosmos || !amountEntry.ready || denom !== getActiveChainConfig().bondDenom || busyAction !== null}
                 onClick={() =>
                   void runAction("delegate", () =>
                     submitDelegateTx({
@@ -265,8 +269,8 @@ export function ValidatorDetailView({ detail }: Props) {
                       sessionTopic,
                       bech32Address,
                       validatorAddress: detail.operatorAddress,
-                      amount,
-                      denom: denom || "agxn",
+                      amount: amountEntry.requireBase(),
+                      denom,
                     }),
                   )
                 }
@@ -275,7 +279,7 @@ export function ValidatorDetailView({ detail }: Props) {
               </Button>
               <Button
                 variant="outlined"
-                disabled={!canSignCosmos || busyAction !== null}
+                disabled={!canSignCosmos || !amountEntry.ready || denom !== getActiveChainConfig().bondDenom || busyAction !== null}
                 onClick={() =>
                   void runAction("undelegate", () =>
                     submitUndelegateTx({
@@ -283,8 +287,8 @@ export function ValidatorDetailView({ detail }: Props) {
                       sessionTopic,
                       bech32Address,
                       validatorAddress: detail.operatorAddress,
-                      amount,
-                      denom: denom || "agxn",
+                      amount: amountEntry.requireBase(),
+                      denom,
                     }),
                   )
                 }

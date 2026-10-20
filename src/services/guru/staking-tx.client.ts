@@ -1,5 +1,7 @@
 "use client";
 
+import { assertBaseAmount } from "@/lib/cosmos-amount";
+import { getActiveChainConfig } from "@/lib/chain-selection";
 import { calculateFee, GasPrice } from "@cosmjs/stargate";
 import { MsgWithdrawDelegatorReward, MsgWithdrawValidatorCommission } from "cosmjs-types/cosmos/distribution/v1beta1/tx";
 import { MsgDelegate, MsgUndelegate } from "cosmjs-types/cosmos/staking/v1beta1/tx";
@@ -31,18 +33,11 @@ function assertBrowser(): void {
   }
 }
 
-function assertAmount(value: string): void {
-  if (!/^[0-9]+$/.test(value)) {
-    throw new Error("Amount must be an integer string in base denom.");
-  }
-  if (value === "0") {
-    throw new Error("Amount must be greater than zero.");
-  }
-}
 
 export async function submitDelegateTx(params: StakingAmountTxInput): Promise<{ txHash: string }> {
   assertBrowser();
-  assertAmount(params.amount);
+  assertBaseAmount(params.amount);
+  if (!params.denom || params.denom !== getActiveChainConfig().bondDenom) throw new Error("검증된 bond denom과 다릅니다.");
 
   const { client, signerAddress } = await createBoundSigningClient(params, gasPrice());
   const msg = {
@@ -62,7 +57,8 @@ export async function submitDelegateTx(params: StakingAmountTxInput): Promise<{ 
 
 export async function submitUndelegateTx(params: StakingAmountTxInput): Promise<{ txHash: string }> {
   assertBrowser();
-  assertAmount(params.amount);
+  assertBaseAmount(params.amount);
+  if (!params.denom || params.denom !== getActiveChainConfig().bondDenom) throw new Error("검증된 bond denom과 다릅니다.");
 
   const { client, signerAddress } = await createBoundSigningClient(params, gasPrice());
   const msg = {

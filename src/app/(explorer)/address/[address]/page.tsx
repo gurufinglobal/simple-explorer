@@ -25,20 +25,11 @@ import {
 } from "@/services/guru/address-profile.service";
 import { getTransactionsByAddress } from "@/services/guru/transactions.service";
 
-type AddressBalanceDisplay = {
-  amount: string;
-  denomLabel: string;
-};
-
+import { CoinAmount } from "@/components/amount/coin-amount";
+import { getDenomsMetadata } from "@/services/guru/token-metadata.service";
+import { getWalletPortfolio } from "@/services/guru/wallet-portfolio.service";
+import { UnbondingDetails } from "@/components/amount/unbonding-details";
 const TRANSACTIONS_PAGE_SIZE = 15;
-
-function shortenIbcHash(denom: string): string {
-  const hash = denom.slice(4);
-  if (hash.length <= 14) {
-    return denom;
-  }
-  return `ibc/${hash.slice(0, 6)}...${hash.slice(-6)}`;
-}
 
 export default function AddressDetailPage() {
   const params = useParams<{ address: string }>();
@@ -46,8 +37,9 @@ export default function AddressDetailPage() {
   const bank = useQuery(`balances:${address}`, client => getAddressBalances(address, client));
   const account = useQuery(`account:${address}`, client => getAddressAccountInfo(address, client));
   const txQuery = useQuery(`address-transactions:${address}`, client => getTransactionsByAddress(address, 200, client));
+  const metadata = useQuery("address-metadata", client => getDenomsMetadata(client));
+  const portfolio = useQuery(`address-portfolio:${address}`, client => getWalletPortfolio(address, client));
   const balances = bank.result.data ?? [];
-  const balanceDisplayRows: AddressBalanceDisplay[] = balances.map(balance => ({ amount: balance.amount, denomLabel: balance.denom.startsWith("ibc/") ? shortenIbcHash(balance.denom) : balance.denom }));
   const accountInfo = account.result.data ?? { accountNumber: null, sequence: null };
   const transactions = useMemo(() => txQuery.result.data ?? [], [txQuery.result.data]);
   const profileLoading = bank.busy && !bank.result.data;
@@ -77,7 +69,7 @@ export default function AddressDetailPage() {
             <Typography>Account Number: {accountInfo.accountNumber ?? "-"}</Typography>
             <Typography>Sequence: {accountInfo.sequence ?? "-"}</Typography>
             <Typography variant="subtitle2">Balances</Typography>
-            <QueryStatus {...bank} />
+            <QueryStatus {...bank} /><QueryStatus {...metadata} />
             {profileLoading ? (
               <Stack spacing={1}>
                 <Skeleton variant="text" width={180} />
@@ -88,9 +80,9 @@ export default function AddressDetailPage() {
               bank.result.status === "empty" ? <Typography>잔액 조회 완료: 보유 코인이 없습니다.</Typography> : null
             ) : (
               <List dense>
-                {balanceDisplayRows.map((row) => (
-                  <ListItem key={`${row.denomLabel}-${row.amount}`}>
-                    <ListItemText primary={`${row.amount} ${row.denomLabel}`} />
+                {balances.map((row) => (
+                  <ListItem key={`${row.denom}-${row.amount}`}>
+                    <ListItemText disableTypography primary={<CoinAmount coin={row} metadata={metadata.result.data ?? []} />} />
                   </ListItem>
                 ))}
               </List>
@@ -99,6 +91,10 @@ export default function AddressDetailPage() {
         </CardContent>
       </Card>
 
+      <QueryStatus {...portfolio} />
+      <Typography>위임: {portfolio.result.data?.staking ?? "미확인"} · 보상: {portfolio.result.data?.reward ?? "미확인"}</Typography>
+      {portfolio.result.data?.details?.reward?.map(coin => <CoinAmount key={coin.denom} coin={coin} metadata={metadata.result.data ?? []} />)}
+      {portfolio.result.data?.details?.unbonding && <UnbondingDetails snapshot={portfolio.result.data.details.unbonding} duration={portfolio.result.data.details.unbondingTime} metadata={metadata.result.data ?? []} />}
       <Card variant="outlined">
         <CardContent>
           <Stack spacing={1}>
