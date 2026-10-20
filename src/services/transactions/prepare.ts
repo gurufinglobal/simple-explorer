@@ -149,4 +149,3 @@ export async function prepareTransaction(params: SigningInput, setup: (context: 
     },
   };
 }
-
