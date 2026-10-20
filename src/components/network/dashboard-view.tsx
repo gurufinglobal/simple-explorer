@@ -275,11 +275,7 @@ export function DashboardView() {
             </Button>
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            {loading ? (
-              <Skeleton variant="text" width="100%" />
-            ) : (
-              "No active proposals — open Governance for the full list."
-            )}
+            활성 제안은 아직 조회하지 않았습니다. Governance에서 확인하세요.
           </Typography>
         </CardContent>
       </Card>
