@@ -93,15 +93,17 @@ function normalizeDepositEntry(raw: unknown): GovernanceDepositRow | null {
   };
 }
 
-type ParamsVoting = { voting_params?: { voting_period?: string } };
+type ParamsVoting = { voting_params?: { voting_period?: string }; params?: { voting_period?: string } };
 type ParamsTally = {
   tally_params?: { quorum?: string; threshold?: string; veto_threshold?: string };
+  params?: { quorum?: string; threshold?: string; veto_threshold?: string };
 };
 type ParamsDeposit = {
   deposit_params?: {
     min_deposit?: GovCoin[];
     max_deposit_period?: string;
   };
+  params?: { min_deposit?: GovCoin[]; max_deposit_period?: string };
 };
 
 /** Retain the response version so legacy proposals use their own mapper. */
@@ -158,17 +160,17 @@ export async function getGovParams(apiClients: QueryClient = defaultClients): Pr
 
   return readFields<GovParamsBundle>({ voting: null, tallying: null, deposit: null }, {
     voting: safeLcdGet<ParamsVoting>("/cosmos/gov/v1/params/voting", apiClients).then(response => {
-      const value = response?.voting_params;
+      const value = response?.params ?? response?.voting_params;
       if (!value?.voting_period) schemaError("Voting params 응답이 올바르지 않습니다.");
       return { votingPeriod: value.voting_period };
     }),
     tallying: safeLcdGet<ParamsTally>("/cosmos/gov/v1/params/tallying", apiClients).then(response => {
-      const value = response?.tally_params;
+      const value = response?.params ?? response?.tally_params;
       if (!value?.quorum || !value.threshold || !value.veto_threshold) schemaError("Tally params 응답이 올바르지 않습니다.");
       return { quorum: value.quorum, threshold: value.threshold, vetoThreshold: value.veto_threshold };
     }),
     deposit: safeLcdGet<ParamsDeposit>("/cosmos/gov/v1/params/deposit", apiClients).then(response => {
-      const value = response?.deposit_params;
+      const value = response?.params ?? response?.deposit_params;
       if (!value || !Array.isArray(value.min_deposit)) schemaError("Deposit params 응답이 올바르지 않습니다.");
       return { minDeposit: value.min_deposit, maxDepositPeriod: value.max_deposit_period ?? "" };
     }),

@@ -26,6 +26,7 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
+import type { ChainConfig } from "@/lib/env";
 import type { GovParamsBundle, GovTally, NormalizedProposal, VoteOption } from "@/lib/gov-types";
 import { formatGovDurationLabel, formatGovRatioPercent } from "@/lib/gov-format";
 import { tallyPercentages } from "@/lib/gov-mapper";
@@ -33,10 +34,12 @@ import { formatRelativeFutureOrPast } from "@/lib/relative-time";
 import { useNowTick } from "@/hooks/use-now-tick";
 import type { GovernanceDepositRow, GovernanceVoteRow } from "@/services/guru/governance-query.service";
 import { getVoteForVoter } from "@/services/guru/governance-query.service";
-import {
-  submitGovernanceDepositTx,
-  submitGovernanceVoteTx,
-} from "@/services/guru/governance-tx.client";
+import { prepareGovernanceTx, governanceBlockReason } from "@/services/guru/governance-tx.client";
+import { getActiveChainConfig } from "@/lib/chain-selection";
+import { writeBlockReason } from "@/services/wallet/chain-eligibility";
+import { useTransactionFlow } from "@/hooks/use-transaction-flow";
+import { TransactionConfirmDialog } from "@/components/transactions/transaction-confirm-dialog";
+import { TransactionResult, SavedTransactions } from "@/components/transactions/transaction-result";
 import { useWalletSessionStore } from "@/stores/wallet-session.store";
 
 const STATUS_KO: Record<string, string> = {
@@ -49,6 +52,7 @@ const STATUS_KO: Record<string, string> = {
 };
 
 type Props = {
+  pinnedChain?: ChainConfig;
   proposal: NormalizedProposal;
   govParams: GovParamsBundle;
   liveTally: GovTally | null;
@@ -68,6 +72,7 @@ function mergeTally(proposal: NormalizedProposal, live: GovTally | null): GovTal
 
 export function GovernanceProposalDetail({
   proposal,
+  pinnedChain,
   govParams,
   liveTally,
   votes,
@@ -87,75 +92,38 @@ export function GovernanceProposalDetail({
   } = useWalletSessionStore();
 
   const [tab, setTab] = useState(0);
-  const voteQuery = useQuery(`my-vote:${proposal.id}:${bech32Address}`, client => getVoteForVoter(proposal.id, bech32Address!, client), undefined, walletStatus === "connected" && !!bech32Address);
+  const voteQuery = useQuery(`my-vote:${proposal.id}:${bech32Address}`, client => getVoteForVoter(proposal.id, bech32Address!, client), undefined, walletStatus === "connected" && !!bech32Address, pinnedChain);
   const myVote = voteQuery.result.data;
-  const loadMyVote = voteQuery.refresh;
-  const [voteBusy, setVoteBusy] = useState(false);
-  const [depositBusy, setDepositBusy] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const denom = govParams.deposit?.minDeposit[0]?.denom ?? "";
   const amountEntry = useAmountEntry(depositAmount, denom);
-  const metadata = useQuery("gov-metadata", client => getDenomsMetadata(client));
+  const metadata = useQuery("gov-metadata", client => getDenomsMetadata(client), undefined, true, pinnedChain);
 
   const canSignCosmos = useWalletSessionStore(s => s.status === "connected" && s.writeStatus === "ready");
   const metamaskReadonly = walletStatus === "connected" && walletType === "metamask";
 
-  const onVote = async (option: VoteOption) => {
-    if (!canSignCosmos || !walletType) {
-      setError("Keplr 또는 WalletConnect로 Cosmos 주소를 연결하세요.");
-      return;
-    }
-    setError(null);
-    setSuccess(null);
-    setVoteBusy(true);
-    try {
-      const { txHash } = await submitGovernanceVoteTx({
-        walletType,
-        sessionTopic,
-        bech32Address,
-        proposalId: proposal.id,
-        option,
-      });
-      setSuccess(`투표가 전송되었습니다. Tx: ${txHash}`);
-      await loadMyVote();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "투표에 실패했습니다.");
-    } finally {
-      setVoteBusy(false);
-    }
-  };
-
-  const onDeposit = async () => {
-    if (!canSignCosmos || !walletType) {
-      setError("Keplr 또는 WalletConnect로 Cosmos 주소를 연결하세요.");
-      return;
-    }
-    if (!amountEntry.ready) {
-      setError("표시 수량과 전송 원본을 확인하세요.");
-      return;
-    }
-    setError(null);
-    setSuccess(null);
-    setDepositBusy(true);
-    try {
-      const { txHash } = await submitGovernanceDepositTx({
-        walletType,
-        sessionTopic,
-        bech32Address,
-        proposalId: proposal.id,
-        amount: amountEntry.requireBase(),
-        denom,
-      });
-      setSuccess(`예치 트랜잭션이 전송되었습니다. Tx: ${txHash}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "예치에 실패했습니다.");
-    } finally {
-      setDepositBusy(false);
-    }
-  };
+  const chain = getActiveChainConfig();
+  const wallet = useWalletSessionStore();
+  const periodValid = proposal.status === "voting_period"
+    ? nowMs >= Date.parse(proposal.votingStartTime) && nowMs < Date.parse(proposal.votingEndTime)
+    : proposal.status === "deposit_period" && nowMs < Date.parse(proposal.depositEndTime);
+  const flow = useTransactionFlow(JSON.stringify([chain.key, wallet.generation, proposal.id, depositAmount, denom, amountEntry.base, amountEntry.ready]), JSON.stringify([proposal.status, proposal.votingStartTime, proposal.votingEndTime, proposal.depositEndTime, govParams, periodValid]));
+  const blocked = pinnedChain && pinnedChain.key !== chain.key ? "제안 링크의 체인과 선택한 지갑 체인이 다릅니다. 해당 체인으로 전환하세요." : writeBlockReason(chain, wallet);
+  const voteReason = blocked ?? governanceBlockReason(chain, "vote", walletType);
+  const depositReason = blocked ?? governanceBlockReason(chain, "deposit", walletType);
+  const voteBusy = flow.busy || flow.phase === "confirming" || !!voteReason || !periodValid;
+  const depositBusy = flow.busy || flow.phase === "confirming" || !!depositReason || !periodValid;
+  const onVote = (option: VoteOption) => flow.begin(assertCurrent => {
+    if (blocked) throw new Error(blocked);
+    if (!walletType) throw new Error("지갑을 연결하세요.");
+    return prepareGovernanceTx({ walletType, sessionTopic, bech32Address, action: "vote", proposalId: proposal.id, option }, assertCurrent);
+  });
+  const onDeposit = () => flow.begin(assertCurrent => {
+    if (blocked) throw new Error(blocked);
+    if (!walletType) throw new Error("지갑을 연결하세요.");
+    return prepareGovernanceTx({ walletType, sessionTopic, bech32Address, action: "deposit", proposalId: proposal.id, amount: amountEntry.requireBase(), denom, displayAmount: depositAmount }, assertCurrent);
+  });
 
   return (
     <Stack spacing={2}>
@@ -171,11 +139,17 @@ export function GovernanceProposalDetail({
 
       {metamaskReadonly ? (
         <Alert severity="info">
-          MetaMask는 Cosmos 거버넌스 서명을 지원하지 않습니다. 투표·예치는 Keplr 또는 WalletConnect를 사용하세요.
+          MetaMask는 Cosmos 거버넌스 서명을 지원하지 않습니다. 검증된 Keplr Direct 서명 설정이 필요합니다.
         </Alert>
       ) : null}
-      {error ? <Alert severity="error">{error}</Alert> : null}
-      {success ? <Alert severity="success">{success}</Alert> : null}
+      {[...new Set([voteReason, depositReason].filter(Boolean))].map(reason => <Alert key={reason} severity="info">{reason}</Alert>)}
+      {!periodValid && (proposal.status === "voting_period" || proposal.status === "deposit_period") && <Alert severity="warning">제안 기간이 종료되었거나 아직 시작되지 않았습니다. 기간 미확인 시에도 전송을 차단합니다.</Alert>}
+      {flow.error && <Alert severity="warning" role="status">{flow.error}</Alert>}
+      {flow.phase === "validating" && <Alert severity="info" role="status">제안 기간·params·잔액·수수료 확인 중</Alert>}
+      {flow.phase === "signing" && <Alert severity="info" role="status">지갑 서명 대기 중</Alert>}
+      {flow.receipt && <TransactionResult key={`${flow.receipt.hash}:${flow.receipt.status}`} receipt={flow.receipt} />}
+      <SavedTransactions chainKey={chain.key} excludeHash={flow.receipt?.hash} />
+      <TransactionConfirmDialog snapshot={flow.prepared?.snapshot ?? null} onCancel={flow.cancel} onConfirm={() => void flow.confirm()} />
 
       <Card variant="outlined">
         <CardContent>

@@ -70,6 +70,11 @@ export function TransactionResult({ receipt }: { receipt: TransactionReceipt }) 
     <Typography variant="body2">실제 체인 수수료: {result.actualFee === null ? "미조회" : result.actualFee.length ? result.actualFee.map(c => `${c.amount} ${c.denom}`).join(", ") : "원문 amount 목록이 비어 있음"}</Typography>
     {result.feeWarning && <Alert severity="warning">{result.feeWarning}</Alert>}
     {result.queryError && <Alert severity="warning">{result.queryError}</Alert>}
+    {result.governance?.action === "proposal" && result.status === "success" && (
+      result.governance.proposalId
+        ? <Link href={`/governance/${encodeURIComponent(result.governance.proposalId)}?chain=${encodeURIComponent(result.chainKey)}`}>이벤트로 확인한 새 제안 #{result.governance.proposalId}</Link>
+        : <Alert severity="warning">{result.proposalIdWarning ?? "새 제안 ID 미확인 · 거래 이벤트 조회 후 표시합니다."}</Alert>
+    )}
     {refreshErrors.length > 0 && <Alert severity="warning">거래 성공 후 화면 갱신 실패 · {refreshErrors.join(" / ")}</Alert>}
     {result.hash && <Button disabled={busy} onClick={() => void refresh()}>{busy ? "조회 갱신 중" : "거래 상태·관련 조회 다시 읽기"}</Button>}
   </Stack>;

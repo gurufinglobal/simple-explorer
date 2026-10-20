@@ -9,7 +9,7 @@ import { connectExtension } from '@/services/wallet/wallet-lifecycle';
 import { displayToBase } from '@/lib/cosmos-amount';
 import { prepareSendTx, submitSendTx as executeSend, type SendTxInput } from '@/services/guru/bank-tx.client';
 import { stakingMessages, prepareStakingTx } from "@/services/guru/staking-tx.client";
-import { submitGovernanceDepositTx, submitTextProposalTx } from '@/services/guru/governance-tx.client';
+import { prepareGovernanceTx, governanceMessages } from '@/services/guru/governance-tx.client';
 const submitSendTx = async (input: SendTxInput) => executeSend(await prepareSendTx(input));
 const boundary = vi.hoisted(() => ({ connect: vi.fn(), sign: vi.fn(), broadcast: vi.fn() }));
 vi.mock('@cosmjs/stargate', async original => ({ ...await original<typeof import('@cosmjs/stargate')>(), SigningStargateClient: { connectWithSigner: boundary.connect } }));
@@ -19,7 +19,8 @@ const pubkey = new Uint8Array(33).fill(3);
 const base = { walletType: 'keplr' as const, sessionTopic: null, bech32Address: address };
 function configure(decimals = 6) {
   vi.stubEnv('NEXT_PUBLIC_CHAINS', JSON.stringify([{ key: 'a', name: 'A', chainId: 'a-1', lcdUrl: 'https://a.test:1317', rpcUrl: 'https://a.test:26657', bech32Prefix: 'guru', nativeDenom: 'agxn', bondDenom: 'agxn', feeDenom: 'agxn', decimals,
-    features: { staking: true, distribution: true },
+    features: { staking: true, distribution: true, governance: true },
+    governanceCapabilities: Object.fromEntries(Object.entries(governanceMessages).map(([action, definition]) => [action, { typeUrl: definition.typeUrl, evidence: 'synthetic only', legacyContent: { authority: address, evidence: 'synthetic only' }, signing: [{ wallet: 'keplr', method: 'direct', evidence: 'synthetic' }], fee: { mode: 'fixed', gasPrice: '0.001agxn', gas: 220000, evidence: 'synthetic', limitation: 'synthetic only' } }])) ,
     stakingCapabilities: Object.fromEntries(Object.entries(stakingMessages).map(([action, definition]) => [action, { typeUrl: definition.typeUrl, evidence: 'synthetic only', signing: [{ wallet: 'keplr', method: 'direct', evidence: 'synthetic' }], fee: { mode: 'fixed', gasPrice: '0.001agxn', gas: 220000, evidence: 'synthetic', limitation: 'synthetic only' } }])),
     sendFeePolicy: { mode: 'fixed', gasPrice: '0.001agxn', gas: 220000, evidence: 'synthetic fee policy', limitation: 'synthetic only' },
     signing: [{ wallet: 'keplr', method: 'direct', evidence: 'synthetic boundary' }], rpcAccess: { origin: 'http://localhost:3000', get: true, post: true, options: true, observedAt: '2026-10-20', evidence: 'synthetic boundary' } }]));
@@ -30,6 +31,10 @@ function configure(decimals = 6) {
     if (url.pathname.endsWith('/node_info')) return Response.json({ default_node_info: { network: 'a-1' }, application_version: {} });
     if (url.pathname.endsWith('/denoms_metadata')) return Response.json({ metadatas: [{ base: 'agxn', display: 'gxn', symbol: 'GXN', denom_units: [{ denom: 'agxn', exponent: 0 }, { denom: 'gxn', exponent: decimals }] }] });
     if ((url.pathname.includes('/balances/') || url.pathname.includes('/spendable_balances/'))) return Response.json({ balances: [{ denom: 'agxn', amount: '999999999999999999999999999999999999999999999999' }] });
+    if (url.pathname.endsWith('/params/deposit')) return Response.json({ deposit_params: { min_deposit: [{ denom: 'agxn', amount: '1' }] } });
+    if (url.pathname.endsWith('/params/voting')) return Response.json({ voting_params: { voting_period: '100s' } });
+    if (url.pathname.endsWith('/params/tallying')) return Response.json({ tally_params: { quorum: '0.3', threshold: '0.5', veto_threshold: '0.3' } });
+    if (url.pathname.endsWith('/proposals/1')) return Response.json({ proposal: { id: '1', status: 'PROPOSAL_STATUS_DEPOSIT_PERIOD', deposit_end_time: '2099-01-01T00:00:00Z', voting_start_time: '', voting_end_time: '' } });
     if (url.pathname.endsWith('/module_accounts')) return Response.json({ accounts: [{ name: 'gov', base_account: { address } }] });
     if (url.pathname.includes('/auth/')) return Response.json({ account: { account_number: '1', sequence: '0', pub_key: { key: Buffer.from(pubkey).toString('base64') } }, pagination: { total: '1' } });
     if (url.pathname.endsWith('/staking/v1beta1/params')) return Response.json({ params: { bond_denom: 'agxn', unbonding_time: '86400s' } });
@@ -56,8 +61,8 @@ const actions = [
   ['send', (amount: string) => submitSendTx({ ...base, toAddress: address, denom: 'agxn', amount })],
   ['delegate', (amount: string) => prepareStakingTx({ action: "delegate", ...base, validatorAddress, denom: 'agxn', amount }).then(tx => tx.execute(() => {}))],
   ['undelegate', (amount: string) => prepareStakingTx({ action: "undelegate", ...base, validatorAddress, denom: 'agxn', amount }).then(tx => tx.execute(() => {}))],
-  ['deposit', (amount: string) => submitGovernanceDepositTx({ ...base, proposalId: '1', denom: 'agxn', amount })],
-  ['proposal', (amount: string) => submitTextProposalTx({ ...base, title: 'Title', summary: 'Summary', description: 'Details', denom: 'agxn', initialDepositAmount: amount })],
+  ['deposit', (amount: string) => prepareGovernanceTx({ action: "deposit", ...base, proposalId: '1', denom: 'agxn', amount }).then(tx => tx.execute(() => {}))],
+  ['proposal', (amount: string) => prepareGovernanceTx({ action: 'proposal', ...base, title: 'Title', summary: 'Summary', description: 'Details', denom: 'agxn', amount }).then(tx => tx.execute(() => {}))],
 ] as const;
 describe('AC02-4 real message generation with only SDK/network/wallet boundaries mocked', () => {
   it.each(actions)('%s rejects 0/00/negative/exponent/fraction before signer access', async (_name, send) => {
@@ -94,7 +99,9 @@ describe('AC02-4 real message generation with only SDK/network/wallet boundaries
     expect((screen.getByRole('checkbox') as HTMLInputElement).checked).toBe(false);
     fireEvent.click(screen.getByRole('checkbox'));
     fireEvent.click(screen.getByRole('button', { name: '제안 전송' }));
-    await screen.findByText(/MOCK-TX/);
+    expect(boundary.sign).not.toHaveBeenCalled();
+    fireEvent.click(await screen.findByRole('button', { name: '확인하고 지갑 서명' }));
+    await waitFor(() => expect(boundary.sign).toHaveBeenCalledOnce());
     expect(boundary.sign.mock.calls[0][1][0].value.initialDeposit).toEqual([{ amount: '1234567', denom: 'agxn' }]);
   });
   it('dashboard SEND confirms display/base and resets approval when the account generation changes', async () => {
