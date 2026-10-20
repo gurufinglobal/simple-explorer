@@ -1,4 +1,4 @@
-import { apiClients } from "@/services/clients";
+import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
 export type FeePolicyDiscountItem = {
   discountType: string;
@@ -83,55 +83,29 @@ export function toFeePolicyAddressLabel(address: string): string {
   return isFeePolicyGlobalAddress(address) ? FEEPOLICY_ALL_ROUTE_PARAM : address;
 }
 
-async function safeLcdGet<T>(path: string): Promise<T | null> {
-  if (process.env.NODE_ENV === "test") {
-    return null;
-  }
-  try {
-    return await apiClients.lcdGet<T>(path);
-  } catch {
-    return null;
-  }
+async function safeLcdGet<T>(path: string, apiClients: QueryClient = defaultClients): Promise<T | null> {
+
+  return await apiClients.lcdGet<T>(path);
 }
 
-export async function isFeePolicyAvailable(): Promise<boolean> {
-  if (process.env.NODE_ENV === "test") {
-    return true;
-  }
-  const response = await safeLcdGet<ModeratorAddressResponse>("/guru/feepolicy/v1/moderator_address");
+export async function isFeePolicyAvailable(apiClients: QueryClient = defaultClients): Promise<boolean> {
+
+  const response = await safeLcdGet<ModeratorAddressResponse>("/guru/feepolicy/v1/moderator_address", apiClients);
   return response !== null;
 }
 
-export async function getFeePolicyModeratorAddress(): Promise<string | null> {
-  if (process.env.NODE_ENV === "test") {
-    return "guru1moderatoraddress";
-  }
-  const response = await safeLcdGet<ModeratorAddressResponse>("/guru/feepolicy/v1/moderator_address");
+export async function getFeePolicyModeratorAddress(apiClients: QueryClient = defaultClients): Promise<string | null> {
+
+  const response = await safeLcdGet<ModeratorAddressResponse>("/guru/feepolicy/v1/moderator_address", apiClients);
   if (!response) {
     return null;
   }
   return response.moderator_address ?? response.moderatorAddress ?? null;
 }
 
-export async function listFeePolicyDiscounts(): Promise<FeePolicyAccountDiscount[]> {
-  if (process.env.NODE_ENV === "test") {
-    return [
-      {
-        address: "guru1exampleaddress",
-        modules: [
-          {
-            module: "exchange",
-            discounts: [
-              { discountType: "percentage", msgType: "/guru.bex.v1.MsgSwap", amount: "0.10" },
-              { discountType: "percentage", msgType: "/guru.bex.v1.MsgAddLiquidity", amount: "0.05" },
-            ],
-          },
-        ],
-      },
-    ];
-  }
+export async function listFeePolicyDiscounts(apiClients: QueryClient = defaultClients): Promise<FeePolicyAccountDiscount[]> {
 
-  const response = await safeLcdGet<DiscountsResponse>("/guru/feepolicy/v1/discounts");
+  const response = await safeLcdGet<DiscountsResponse>("/guru/feepolicy/v1/discounts", apiClients);
   if (!response?.discounts) {
     return [];
   }
@@ -139,10 +113,10 @@ export async function listFeePolicyDiscounts(): Promise<FeePolicyAccountDiscount
 }
 
 export async function getFeePolicyDiscountByAddress(
-  address: string,
+  address: string, apiClients: QueryClient = defaultClients
 ): Promise<FeePolicyAccountDiscount | null> {
   if (address === FEEPOLICY_ALL_ROUTE_PARAM) {
-    const discounts = await listFeePolicyDiscounts();
+    const discounts = await listFeePolicyDiscounts(apiClients);
     return discounts.find((item) => isFeePolicyGlobalAddress(item.address)) ?? null;
   }
 
@@ -150,20 +124,7 @@ export async function getFeePolicyDiscountByAddress(
     return null;
   }
 
-  if (process.env.NODE_ENV === "test") {
-    return {
-      address,
-      modules: [
-        {
-          module: "exchange",
-          discounts: [{ discountType: "percentage", msgType: "/guru.bex.v1.MsgSwap", amount: "0.10" }],
-        },
-      ],
-    };
-  }
-
-  const response = await safeLcdGet<DiscountResponse>(
-    `/guru/feepolicy/v1/discounts/${encodeURIComponent(address)}`,
+  const response = await safeLcdGet<DiscountResponse>(`/guru/feepolicy/v1/discounts/${encodeURIComponent(address)}`, apiClients
   );
   if (!response?.discount) {
     return null;

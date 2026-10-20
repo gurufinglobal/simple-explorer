@@ -1,4 +1,4 @@
-import { apiClients } from "@/services/clients";
+import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
 export type TxDetail = {
   hash: string;
@@ -96,73 +96,50 @@ function collectAddressesFromMessageValue(value: unknown, out: Set<string>): voi
   }
 }
 
-export async function getTxDetail(hash: string): Promise<TxDetail | null> {
-  if (process.env.NODE_ENV === "test") {
-    return {
-      hash,
-      code: 0,
-      codespace: "",
-      height: "0",
-      gasUsed: "0",
-      gasWanted: "0",
-      memo: "",
-      rawLog: "",
-      feeAmount: [],
-      feePayer: "",
-      feeGranter: "",
-      timeoutHeight: "0",
-      messages: [],
-      signerAddresses: [],
-      participantAddresses: [],
-    };
-  }
+export async function getTxDetail(hash: string, apiClients: QueryClient = defaultClients): Promise<TxDetail | null> {
 
-  try {
-    const response = await apiClients.lcdGet<LcdTxResponse>(
-      `/cosmos/tx/v1beta1/txs/${encodeURIComponent(hash)}`,
-    );
-    const txResponse = response.tx_response;
-    if (!txResponse) {
-      return null;
-    }
-    const messagesRaw = response.tx?.body?.messages ?? [];
-    const messages = messagesRaw.map((message) => {
-      const typeUrl = message["@type"] ?? message.type_url ?? "";
-      return {
-        typeUrl,
-        shortType: shortType(typeUrl),
-      };
-    });
-
-    const participants = new Set<string>();
-    for (const msg of messagesRaw) {
-      collectAddressesFromMessageValue(msg, participants);
-    }
-
-    const feeAmount = (response.tx?.auth_info?.fee?.amount ?? []).map((coin) => ({
-      denom: coin.denom ?? "-",
-      amount: coin.amount ?? "0",
-    }));
-
-    return {
-      hash: txResponse.txhash ?? hash,
-      code: txResponse.code ?? 0,
-      codespace: txResponse.codespace ?? "",
-      height: txResponse.height ?? "0",
-      gasUsed: txResponse.gas_used ?? "0",
-      gasWanted: txResponse.gas_wanted ?? "0",
-      memo: response.tx?.body?.memo ?? "",
-      rawLog: txResponse.raw_log ?? "",
-      feeAmount,
-      feePayer: response.tx?.auth_info?.fee?.payer ?? "",
-      feeGranter: response.tx?.auth_info?.fee?.granter ?? "",
-      timeoutHeight: response.tx?.body?.timeout_height ?? "0",
-      messages,
-      signerAddresses: [],
-      participantAddresses: Array.from(participants),
-      timestamp: txResponse.timestamp,
-    };
-  } catch {
+  const response = await apiClients.lcdGet<LcdTxResponse>(
+    `/cosmos/tx/v1beta1/txs/${encodeURIComponent(hash)}`,
+  );
+  const txResponse = response.tx_response;
+  if (!txResponse) {
     return null;
   }
+  const messagesRaw = response.tx?.body?.messages ?? [];
+  const messages = messagesRaw.map((message) => {
+    const typeUrl = message["@type"] ?? message.type_url ?? "";
+    return {
+      typeUrl,
+      shortType: shortType(typeUrl),
+    };
+  });
+
+  const participants = new Set<string>();
+  for (const msg of messagesRaw) {
+    collectAddressesFromMessageValue(msg, participants);
+  }
+
+  const feeAmount = (response.tx?.auth_info?.fee?.amount ?? []).map((coin) => ({
+    denom: coin.denom ?? "-",
+    amount: coin.amount ?? "0",
+  }));
+
+  return {
+    hash: txResponse.txhash ?? hash,
+    code: txResponse.code ?? 0,
+    codespace: txResponse.codespace ?? "",
+    height: txResponse.height ?? "0",
+    gasUsed: txResponse.gas_used ?? "0",
+    gasWanted: txResponse.gas_wanted ?? "0",
+    memo: response.tx?.body?.memo ?? "",
+    rawLog: txResponse.raw_log ?? "",
+    feeAmount,
+    feePayer: response.tx?.auth_info?.fee?.payer ?? "",
+    feeGranter: response.tx?.auth_info?.fee?.granter ?? "",
+    timeoutHeight: response.tx?.body?.timeout_height ?? "0",
+    messages,
+    signerAddresses: [],
+    participantAddresses: Array.from(participants),
+    timestamp: txResponse.timestamp,
+  };
 }

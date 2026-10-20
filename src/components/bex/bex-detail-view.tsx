@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
 import { useParams } from "next/navigation";
 import {
   Alert,
@@ -8,7 +10,6 @@ import {
   CardContent,
   Divider,
   Grid,
-  Skeleton,
   Stack,
   Table,
   TableBody,
@@ -17,8 +18,8 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import type { BexCoin, BexExchange, BexExchangeFees } from "@/services/guru/bex.service";
-import { getBexExchangeById, getBexExchangeFees, isBexAvailable } from "@/services/guru/bex.service";
+import type { BexCoin } from "@/services/guru/bex.service";
+import { getBexExchangeById, getBexExchangeFees } from "@/services/guru/bex.service";
 
 function formatFeePercent(rawFee: string): string {
   const trimmed = rawFee.trim();
@@ -44,7 +45,7 @@ function FeesTable({ title, coins, hasError }: { title: string; coins: BexCoin[]
         {hasError ? <Alert severity="warning">일부 수수료 데이터를 불러오지 못했습니다.</Alert> : null}
         {coins.length === 0 ? (
           <Typography variant="body2" color="text.secondary" sx={{ mt: hasError ? 1 : 0 }}>
-            데이터가 없습니다.
+            {hasError ? "조회 결과를 확인할 수 없습니다." : "데이터가 없습니다."}
           </Typography>
         ) : (
           <Table size="small">
@@ -72,103 +73,18 @@ function FeesTable({ title, coins, hasError }: { title: string; coins: BexCoin[]
 export function BexDetailView() {
   const params = useParams<{ id: string }>();
   const id = params.id ?? "";
-  const [exchange, setExchange] = useState<BexExchange | null>(null);
-  const [fees, setFees] = useState<BexExchangeFees | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [supported, setSupported] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      try {
-        const available = await isBexAvailable();
-        if (!mounted) return;
-        setSupported(available);
-        if (!available) {
-          setExchange(null);
-          setFees(null);
-          setError(null);
-          return;
-        }
-
-        const exchangeResponse = await getBexExchangeById(id);
-        if (!mounted) return;
-        if (!exchangeResponse) {
-          setExchange(null);
-          setFees(null);
-          setError(null);
-          return;
-        }
-        setExchange(exchangeResponse);
-
-        const feesResponse = await getBexExchangeFees(id);
-        if (!mounted) return;
-        setFees(feesResponse);
-        setError(null);
-      } catch {
-        if (!mounted) return;
-        setExchange(null);
-        setFees(null);
-        setError("BEX 상세 정보를 불러오지 못했습니다.");
-      } finally {
-        if (!mounted) return;
-        setLoading(false);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, [id]);
-
-  if (loading) {
-    return (
-      <Stack spacing={2}>
-        <Skeleton variant="text" width={240} height={40} />
-        <Card variant="outlined">
-          <CardContent>
-            <Stack spacing={1}>
-              <Skeleton variant="text" width={120} />
-              {Array.from({ length: 6 }).map((_, index) => (
-                <Skeleton key={`bex-detail-skeleton-${index}`} variant="text" width={index % 2 === 0 ? "75%" : "60%"} />
-              ))}
-            </Stack>
-          </CardContent>
-        </Card>
-      </Stack>
-    );
-  }
-
-  if (!supported) {
-    return (
-      <Stack spacing={2}>
-        <Typography variant="h5" fontWeight={700}>
-          BEX Exchange 상세
-        </Typography>
-        <Alert severity="info">현재 선택한 체인은 BEX 모듈을 지원하지 않거나 조회 API가 비활성화되어 있습니다.</Alert>
-      </Stack>
-    );
-  }
-
-  if (!exchange) {
-    return (
-      <Stack spacing={2}>
-        <Typography variant="h5" fontWeight={700}>
-          BEX Exchange 상세
-        </Typography>
-        {error ? <Alert severity="error">{error}</Alert> : null}
-        <Typography variant="body2">요청한 exchange를 찾을 수 없습니다.</Typography>
-      </Stack>
-    );
-  }
+  const query = useQuery(`bex:${id}`, client => getBexExchangeById(id, client));
+  const exchange = query.result.data;
+  const feeQuery = useQuery(`bex-fees:${id}`, client => getBexExchangeFees(id, client));
+  const fees = feeQuery.result.data;
+  if (!exchange) return <><QueryStatus {...query} /><QueryStatus {...feeQuery} /></>;
 
   return (
     <Stack spacing={2}>
+      <QueryStatus {...query} /><QueryStatus {...feeQuery} />
       <Typography variant="h5" fontWeight={700}>
         BEX Exchange #{exchange.id}
       </Typography>
-      {error ? <Alert severity="error">{error}</Alert> : null}
 
       <Card variant="outlined">
         <CardContent>
@@ -278,17 +194,17 @@ export function BexDetailView() {
       <FeesTable
         title="Collected Fees"
         coins={fees?.collected ?? []}
-        hasError={fees?.hasCollectedError ?? false}
+        hasError={fees?.hasCollectedError ?? true}
       />
       <FeesTable
         title="Locked Fees"
         coins={fees?.locked ?? []}
-        hasError={fees?.hasLockedError ?? false}
+        hasError={fees?.hasLockedError ?? true}
       />
       <FeesTable
         title="Available Fees"
         coins={fees?.available ?? []}
-        hasError={fees?.hasAvailableError ?? false}
+        hasError={fees?.hasAvailableError ?? true}
       />
     </Stack>
   );

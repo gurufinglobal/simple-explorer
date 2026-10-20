@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readQuery } from "@/lib/query-result";
 import { getDenomsMetadata } from "@/services/guru/token-metadata.service";
 import observed from "../fixtures/tgxn-2026-10-20/metadata.json";
 import { restoreHttpBoundary } from "../helpers/network-summary";
@@ -20,27 +21,29 @@ describe("denom metadata HTTP contract", () => {
     const metadata = await getDenomsMetadata();
     expect(metadata).toHaveLength(10);
     expect(metadata).toContainEqual({ baseDenom: "agxn", displayDenom: "gxn", name: "Guru Token", symbol: "GXN", description: "Guru Token", decimals: 18 });
-    expect(http).toHaveBeenNthCalledWith(2, "https://lcd.example.test/cosmos/bank/v1beta1/denoms_metadata?pagination.limit=200&pagination.key=a%2B%2F%3D", { cache: "no-store" });
+    expect(http).toHaveBeenNthCalledWith(2, "https://lcd.example.test/cosmos/bank/v1beta1/denoms_metadata?pagination.limit=200&pagination.key=a%2B%2F%3D", expect.objectContaining({ cache: "no-store", signal: expect.any(AbortSignal) }));
   });
 
-  it("filters rows without a base denom and supports an empty successful page", async () => {
+  it("rejects malformed rows and supports an empty successful page", async () => {
     http.mockResolvedValueOnce(Response.json({ metadatas: [{ symbol: "missing base" }] }))
       .mockResolvedValueOnce(Response.json({ metadatas: [], pagination: { next_key: null } }));
-    expect(await getDenomsMetadata()).toEqual([]);
+    await expect(getDenomsMetadata()).rejects.toMatchObject({ info: { kind: "schema" } });
     expect(await getDenomsMetadata()).toEqual([]);
   });
 
-  it("characterizes loss of earlier pages on a later HTTP failure for W02", async () => {
+  it("preserves earlier pages with the later HTTP failure", async () => {
     http.mockResolvedValueOnce(Response.json({ ...observed.response, pagination: { next_key: "next" } }))
       .mockResolvedValueOnce(new Response("offline", { status: 503 }));
-    expect(await getDenomsMetadata()).toEqual([]);
+    const result = await readQuery({ chain: "fixture", target: "metadata" }, () => getDenomsMetadata());
+    expect(result).toMatchObject({ status: "partial", error: { kind: "http", status: 503 } });
+    expect(result.data).toHaveLength(10);
     expect(http).toHaveBeenCalledTimes(2);
   });
 
-  it.each(["parse", "timeout"])("runs the existing %s fallback through the service", async (failure) => {
+  it.each(["parse", "timeout"])("preserves %s failure through the service", async (failure) => {
     if (failure === "parse") http.mockResolvedValue(new Response("not JSON"));
     else http.mockRejectedValue(new DOMException("Timed out", "TimeoutError"));
-    expect(await getDenomsMetadata()).toEqual([]);
+    await expect(getDenomsMetadata()).rejects.toMatchObject({ info: { kind: failure } });
     expect(http).toHaveBeenCalledTimes(1);
   });
 });

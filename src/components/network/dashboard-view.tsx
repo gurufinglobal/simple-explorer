@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { getActiveChainConfig } from "@/lib/chain-selection";
+import { useMemo, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
 import {
   Alert,
   Button,
@@ -24,25 +28,13 @@ import {
   getAccountsTotal,
   getApplicationVersions,
   getNetworkSummary,
-  type ApplicationVersionItem,
 } from "@/services/guru/network-summary.service";
 import { useEffectiveCosmosAddress } from "@/hooks/use-effective-cosmos-address";
-import { getTopValidators, type ValidatorSummary } from "@/services/guru/staking.service";
+import { getTopValidators } from "@/services/guru/staking.service";
 import { submitSendTx } from "@/services/guru/bank-tx.client";
 import { submitDelegateTx } from "@/services/guru/staking-tx.client";
 import { useWalletPortfolioStore } from "@/stores/wallet-portfolio.store";
 import { useWalletSessionStore } from "@/stores/wallet-session.store";
-
-type DashboardState = {
-  chainId: string;
-  blockHeight: number;
-  averageBlockTimeSec: number;
-  supply: string;
-  bonded: string;
-  inflation: string;
-  validators: number;
-  accountsTotal: string;
-};
 
 function formatIntegerDisplay(value: string | null): string {
   if (!value || !/^[0-9]+$/.test(value)) {
@@ -70,14 +62,19 @@ function formatCompactAmount(value: string | null | undefined): string {
 }
 
 export function DashboardView() {
-  const [state, setState] = useState<DashboardState | null>(null);
-  const [appVersions, setAppVersions] = useState<ApplicationVersionItem[]>([]);
-  const [validatorOptions, setValidatorOptions] = useState<ValidatorSummary[]>([]);
-  const [error, setError] = useState<string | null>(null);
+  const summary = useQuery("dashboard-summary", client => getNetworkSummary(client));
+  const validators = useQuery("dashboard-validators", client => getTopValidators(100, client));
+  const versions = useQuery("application-versions", client => getApplicationVersions(client));
+  const accounts = useQuery("accounts-total", client => getAccountsTotal(client));
+  const validatorOptions = validators.result.data ?? [];
+  const appVersions = versions.result.data ?? [];
+  const state = summary.result.data;
   const wallet = useWalletSessionStore();
   const effectiveCosmos = useEffectiveCosmosAddress();
-  const portfolio = useWalletPortfolioStore();
-  const loading = state === null && !error;
+  const storedPortfolio = useWalletPortfolioStore();
+  const portfolio = storedPortfolio.result.context.chain === getActiveChainConfig().key && storedPortfolio.result.context.target === `portfolio:${effectiveCosmos}`
+    ? storedPortfolio : { ...storedPortfolio, balance: "—", staking: "—", reward: "—", unbonding: "—", error: null, loading: false };
+  const loading = summary.busy && !state;
   const canSignCosmos = wallet.status === "connected" && (wallet.walletType === "keplr" || wallet.walletType === "walletconnect");
   const isMetamask = wallet.status === "connected" && wallet.walletType === "metamask";
   const [activeAction, setActiveAction] = useState<"send" | "delegate" | null>(null);
@@ -90,44 +87,6 @@ export function DashboardView() {
   const [actionBusy, setActionBusy] = useState<"send" | "delegate" | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-
-    async function load() {
-      try {
-        const [summary, validators, versions, accountsTotal] = await Promise.all([
-          getNetworkSummary(),
-          getTopValidators(100),
-          getApplicationVersions(),
-          getAccountsTotal(),
-        ]);
-        if (!mounted) return;
-        setState({
-          chainId: summary.chainId,
-          blockHeight: summary.blockHeight,
-          averageBlockTimeSec: summary.averageBlockTimeSec,
-          supply: summary.supply,
-          bonded: summary.bonded,
-          inflation: summary.inflation,
-          validators: validators.length,
-          accountsTotal: formatIntegerDisplay(accountsTotal),
-        });
-        setValidatorOptions(validators);
-        setDelegateValidatorAddress((prev) => prev || validators[0]?.operatorAddress || "");
-        setAppVersions(versions);
-        setError(null);
-      } catch {
-        if (!mounted) return;
-        setError("대시보드 데이터를 불러오지 못했습니다.");
-      }
-    }
-
-    void load();
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const walletTitle = useMemo(
     () => (wallet.status === "connected" ? `Connected (${wallet.walletType ?? "wallet"})` : "Not Connected"),
@@ -202,7 +161,7 @@ export function DashboardView() {
 
   return (
     <Stack spacing={2}>
-      {error ? <Alert severity="error">{error}</Alert> : null}
+      <QueryStatus {...summary} /><QueryStatus {...validators} /><QueryStatus {...versions} /><QueryStatus {...accounts} />
 
       <Card variant="outlined">
         <CardContent>
@@ -248,7 +207,7 @@ export function DashboardView() {
             <CardContent>
               <Typography variant="caption">Validators</Typography>
               <Typography variant="h6">
-                {loading ? <Skeleton variant="text" width={60} /> : (state?.validators ?? "-")}
+                {validators.busy && !validators.result.data ? <Skeleton variant="text" width={60} /> : (validators.result.data?.length ?? "-")}
               </Typography>
             </CardContent>
           </Card>
@@ -288,7 +247,7 @@ export function DashboardView() {
             <CardContent>
               <Typography variant="caption">Avg Block Time (10)</Typography>
               <Typography variant="h6">
-                {loading ? <Skeleton variant="text" width={90} /> : (state ? `${state.averageBlockTimeSec.toFixed(2)}s` : "-")}
+                {loading ? <Skeleton variant="text" width={90} /> : (state ? `${state.averageBlockTimeSec?.toFixed(2) ?? "-"}s` : "-")}
               </Typography>
             </CardContent>
           </Card>
@@ -298,7 +257,7 @@ export function DashboardView() {
             <CardContent>
               <Typography variant="caption">Accounts</Typography>
               <Typography variant="h6">
-                {loading ? <Skeleton variant="text" width={90} /> : (state?.accountsTotal ?? "-")}
+                {accounts.busy && accounts.result.data === null ? <Skeleton variant="text" width={90} /> : formatIntegerDisplay(accounts.result.data)}
               </Typography>
             </CardContent>
           </Card>
@@ -340,6 +299,7 @@ export function DashboardView() {
               Cosmos (LCD): {effectiveCosmos}
             </Typography>
           ) : null}
+          {wallet.status === "connected" && portfolio.result.context.chain === getActiveChainConfig().key && portfolio.result.context.target === `portfolio:${effectiveCosmos}` ? <QueryStatus result={portfolio.result} busy={portfolio.loading} refresh={() => { if (effectiveCosmos) void portfolio.refresh(effectiveCosmos); }} /> : null}
           {portfolio.error ? (
             <Alert severity="warning" sx={{ mb: 1 }}>
               {portfolio.error}
@@ -501,23 +461,23 @@ export function DashboardView() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {loading
+              {versions.busy && !versions.result.data
                 ? Array.from({ length: 4 }).map((_, index) => (
-                    <TableRow key={`skeleton-${index}`}>
-                      <TableCell>
-                        <Skeleton variant="text" width={120} />
-                      </TableCell>
-                      <TableCell>
-                        <Skeleton variant="text" width={160} />
-                      </TableCell>
-                    </TableRow>
-                  ))
+                  <TableRow key={`skeleton-${index}`}>
+                    <TableCell>
+                      <Skeleton variant="text" width={120} />
+                    </TableCell>
+                    <TableCell>
+                      <Skeleton variant="text" width={160} />
+                    </TableCell>
+                  </TableRow>
+                ))
                 : appVersions.map((item) => (
-                    <TableRow key={item.name}>
-                      <TableCell>{item.name}</TableCell>
-                      <TableCell>{item.version}</TableCell>
-                    </TableRow>
-                  ))}
+                  <TableRow key={item.name}>
+                    <TableCell>{item.name}</TableCell>
+                    <TableCell>{item.version}</TableCell>
+                  </TableRow>
+                ))}
             </TableBody>
           </Table>
         </CardContent>

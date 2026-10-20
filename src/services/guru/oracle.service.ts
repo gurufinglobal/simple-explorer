@@ -1,4 +1,4 @@
-import { apiClients } from "@/services/clients";
+import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
 export type OracleParams = {
   enable: boolean;
@@ -186,62 +186,41 @@ function normalizeOracleParams(raw: OracleParamsRaw | undefined): OracleParams {
   };
 }
 
-async function safeLcdGet<T>(path: string): Promise<T | null> {
-  if (process.env.NODE_ENV === "test") {
-    return null;
-  }
-  try {
-    return await apiClients.lcdGet<T>(path);
-  } catch {
-    return null;
-  }
+async function safeLcdGet<T>(path: string, apiClients: QueryClient = defaultClients): Promise<T | null> {
+
+  return await apiClients.lcdGet<T>(path);
 }
 
-export async function isOracleAvailable(): Promise<boolean> {
-  if (process.env.NODE_ENV === "test") return true;
-  const response = await safeLcdGet<OracleParamsResponse>("/guru/oracle/v2/params");
+export async function isOracleAvailable(apiClients: QueryClient = defaultClients): Promise<boolean> {
+
+  const response = await safeLcdGet<OracleParamsResponse>("/guru/oracle/v2/params", apiClients);
   return response !== null;
 }
 
-export async function getOracleParams(): Promise<OracleParams | null> {
-  if (process.env.NODE_ENV === "test") {
-    return {
-      enable: true,
-      quorumRatio: "0.67",
-      reportRetentionBlocks: "10000",
-    };
-  }
-  const response = await safeLcdGet<OracleParamsResponse>("/guru/oracle/v2/params");
+export async function getOracleParams(apiClients: QueryClient = defaultClients): Promise<OracleParams | null> {
+
+  const response = await safeLcdGet<OracleParamsResponse>("/guru/oracle/v2/params", apiClients);
   if (!response) return null;
   return normalizeOracleParams(response.params);
 }
 
-export async function getOracleModeratorAddress(): Promise<string | null> {
-  if (process.env.NODE_ENV === "test") {
-    return "guru1oraclemoderator";
-  }
-  const response = await safeLcdGet<OracleModeratorAddressResponse>("/guru/oracle/v2/moderator_address");
+export async function getOracleModeratorAddress(apiClients: QueryClient = defaultClients): Promise<string | null> {
+
+  const response = await safeLcdGet<OracleModeratorAddressResponse>("/guru/oracle/v2/moderator_address", apiClients);
   if (!response) return null;
   return response.moderator_address ?? response.moderatorAddress ?? null;
 }
 
-export async function getOracleCategories(): Promise<string[]> {
-  if (process.env.NODE_ENV === "test") {
-    return ["CATEGORY_OPERATION", "CATEGORY_CRYPTO", "CATEGORY_CURRENCY"];
-  }
-  const response = await safeLcdGet<OracleCategoriesResponse>("/guru/oracle/v2/categories");
+export async function getOracleCategories(apiClients: QueryClient = defaultClients): Promise<string[]> {
+
+  const response = await safeLcdGet<OracleCategoriesResponse>("/guru/oracle/v2/categories", apiClients);
   if (!response?.categories) return [];
   return response.categories.map((category) => normalizeCategory(category));
 }
 
-export async function getOracleWhitelist(): Promise<{ addresses: string[]; count: string }> {
-  if (process.env.NODE_ENV === "test") {
-    return {
-      addresses: ["guru1providera", "guru1providerb", "guru1providerc"],
-      count: "3",
-    };
-  }
-  const response = await safeLcdGet<OracleWhitelistResponse>("/guru/oracle/v2/whitelist");
+export async function getOracleWhitelist(apiClients: QueryClient = defaultClients): Promise<{ addresses: string[]; count: string }> {
+
+  const response = await safeLcdGet<OracleWhitelistResponse>("/guru/oracle/v2/whitelist", apiClients);
   if (!response) {
     return { addresses: [], count: "0" };
   }
@@ -254,29 +233,7 @@ export async function getOracleWhitelist(): Promise<{ addresses: string[]; count
 export async function listOracleRequests(filters?: {
   category?: string;
   status?: string;
-}): Promise<OracleRequestRow[]> {
-  if (process.env.NODE_ENV === "test") {
-    return [
-      {
-        id: "1",
-        category: "CATEGORY_CRYPTO",
-        symbol: "BTC/USD",
-        count: "100",
-        period: "20",
-        status: "STATUS_ACTIVE",
-        nonce: "17",
-      },
-      {
-        id: "2",
-        category: "CATEGORY_CURRENCY",
-        symbol: "USD/KRW",
-        count: "50",
-        period: "10",
-        status: "STATUS_ACTIVE",
-        nonce: "9",
-      },
-    ];
-  }
+}, apiClients: QueryClient = defaultClients): Promise<OracleRequestRow[]> {
 
   const query = new URLSearchParams();
   if (filters?.category && filters.category !== "ALL") {
@@ -287,25 +244,15 @@ export async function listOracleRequests(filters?: {
   }
   const queryString = query.toString();
   const path = queryString ? `/guru/oracle/v2/requests?${queryString}` : "/guru/oracle/v2/requests";
-  const response = await safeLcdGet<OracleRequestsResponse>(path);
+  const response = await safeLcdGet<OracleRequestsResponse>(path, apiClients);
   if (!response?.requests) return [];
   return response.requests.map(normalizeOracleRequest);
 }
 
-export async function getOracleRequestById(requestId: string): Promise<OracleRequestRow | null> {
+export async function getOracleRequestById(requestId: string, apiClients: QueryClient = defaultClients): Promise<OracleRequestRow | null> {
   if (!/^[0-9]+$/.test(requestId)) return null;
-  if (process.env.NODE_ENV === "test") {
-    return {
-      id: requestId,
-      category: "CATEGORY_CRYPTO",
-      symbol: "BTC/USD",
-      count: "100",
-      period: "20",
-      status: "STATUS_ACTIVE",
-      nonce: "17",
-    };
-  }
-  const response = await safeLcdGet<OracleRequestResponse>(`/guru/oracle/v2/requests/${encodeURIComponent(requestId)}`);
+
+  const response = await safeLcdGet<OracleRequestResponse>(`/guru/oracle/v2/requests/${encodeURIComponent(requestId)}`, apiClients);
   if (!response?.request) return null;
   return normalizeOracleRequest(response.request);
 }
@@ -314,27 +261,9 @@ export async function listOracleReports(params: {
   requestId: string;
   nonce?: string;
   provider?: string;
-}): Promise<OracleReportRow[]> {
+}, apiClients: QueryClient = defaultClients): Promise<OracleReportRow[]> {
   const requestId = params.requestId;
   if (!/^[0-9]+$/.test(requestId)) return [];
-  if (process.env.NODE_ENV === "test") {
-    return [
-      {
-        requestId,
-        provider: "guru1providera",
-        rawData: "62000.1",
-        nonce: "17",
-        signature: "c2lnbmF0dXJl",
-      },
-      {
-        requestId,
-        provider: "guru1providerb",
-        rawData: "62001.7",
-        nonce: "17",
-        signature: "c2lnbmF0dXJlMg==",
-      },
-    ];
-  }
 
   const query = new URLSearchParams();
   if (params.nonce && /^[0-9]+$/.test(params.nonce)) query.set("nonce", params.nonce);
@@ -344,51 +273,24 @@ export async function listOracleReports(params: {
     ? `/guru/oracle/v2/requests/${encodeURIComponent(requestId)}/reports?${queryString}`
     : `/guru/oracle/v2/requests/${encodeURIComponent(requestId)}/reports`;
 
-  const response = await safeLcdGet<OracleReportsResponse>(path);
+  const response = await safeLcdGet<OracleReportsResponse>(path, apiClients);
   if (!response?.reports) return [];
   return response.reports.map(normalizeOracleReport);
 }
 
-export async function getOracleLatestResult(requestId: string): Promise<OracleResultRow | null> {
+export async function getOracleLatestResult(requestId: string, apiClients: QueryClient = defaultClients): Promise<OracleResultRow | null> {
   if (!/^[0-9]+$/.test(requestId)) return null;
-  if (process.env.NODE_ENV === "test") {
-    return {
-      requestId,
-      aggregatedData: "62000.9",
-      aggregatedHeight: "123456",
-      aggregatedTime: "1712900000",
-      nonce: "17",
-    };
-  }
-  const response = await safeLcdGet<OracleResultResponse>(
-    `/guru/oracle/v2/requests/${encodeURIComponent(requestId)}/result?nonce=0`,
+
+  const response = await safeLcdGet<OracleResultResponse>(`/guru/oracle/v2/requests/${encodeURIComponent(requestId)}/result?nonce=0`, apiClients
   );
   if (!response?.result || Object.keys(response.result).length === 0) return null;
   return normalizeOracleResult(response.result);
 }
 
-export async function listOracleResults(requestId: string): Promise<OracleResultRow[]> {
+export async function listOracleResults(requestId: string, apiClients: QueryClient = defaultClients): Promise<OracleResultRow[]> {
   if (!/^[0-9]+$/.test(requestId)) return [];
-  if (process.env.NODE_ENV === "test") {
-    return [
-      {
-        requestId,
-        aggregatedData: "61990.4",
-        aggregatedHeight: "123430",
-        aggregatedTime: "1712899700",
-        nonce: "16",
-      },
-      {
-        requestId,
-        aggregatedData: "62000.9",
-        aggregatedHeight: "123456",
-        aggregatedTime: "1712900000",
-        nonce: "17",
-      },
-    ];
-  }
-  const response = await safeLcdGet<OracleResultsResponse>(
-    `/guru/oracle/v2/requests/${encodeURIComponent(requestId)}/results`,
+
+  const response = await safeLcdGet<OracleResultsResponse>(`/guru/oracle/v2/requests/${encodeURIComponent(requestId)}/results`, apiClients
   );
   if (!response?.results) return [];
   return response.results.map(normalizeOracleResult);

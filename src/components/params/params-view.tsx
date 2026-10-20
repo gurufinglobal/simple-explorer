@@ -1,10 +1,11 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
 import {
   Alert,
   Box,
-  Button,
   Card,
   CardContent,
   Chip,
@@ -13,30 +14,12 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { getChainParamsSections, type ParamsSectionResult } from "@/services/cosmos/params.service";
+import { getChainParamsSections } from "@/services/cosmos/params.service";
 
 export function ParamsView() {
-  const [rows, setRows] = useState<ParamsSectionResult[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const response = await getChainParamsSections();
-      setRows(response);
-      setError(null);
-    } catch {
-      setRows([]);
-      setError("파라미터 정보를 불러오지 못했습니다.");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
+  const query = useQuery("params", client => getChainParamsSections(client));
+  const rows = query.result.data ?? [];
+  const loading = query.busy && !query.result.data;
 
   return (
     <Stack spacing={2}>
@@ -44,16 +27,14 @@ export function ParamsView() {
         <Typography variant="h5" fontWeight={700}>
           Params
         </Typography>
-        <Button variant="outlined" size="small" onClick={() => void load()} disabled={loading}>
-          Refresh
-        </Button>
+
       </Stack>
 
       <Typography variant="body2" color="text.secondary">
         현재 선택한 체인의 주요 모듈 파라미터를 LCD에서 조회합니다.
       </Typography>
 
-      {error ? <Alert severity="error">{error}</Alert> : null}
+      <QueryStatus {...query} />
 
       {loading ? (
         <Grid container spacing={2}>
@@ -91,7 +72,7 @@ export function ParamsView() {
                       </Typography>
                     ) : null}
                     {row.error ? (
-                      <Alert severity="warning">{row.error}</Alert>
+                      <Alert severity="warning">{row.error.message} ({row.error.kind})</Alert>
                     ) : (
                       <Box
                         component="pre"

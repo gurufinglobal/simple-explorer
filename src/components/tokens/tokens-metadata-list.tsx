@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
 import {
-  Alert,
   Card,
   CardContent,
   Skeleton,
@@ -14,34 +15,12 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import { getDenomsMetadata, type TokenDenomMetadata } from "@/services/guru/token-metadata.service";
+import { getDenomsMetadata } from "@/services/guru/token-metadata.service";
 
 export function TokensMetadataList() {
-  const [items, setItems] = useState<TokenDenomMetadata[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      try {
-        const result = await getDenomsMetadata();
-        if (!mounted) return;
-        setItems(result);
-        setError(null);
-      } catch {
-        if (!mounted) return;
-        setItems([]);
-        setError("토큰 메타데이터를 불러오지 못했습니다.");
-      } finally {
-        if (!mounted) return;
-        setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const query = useQuery("tokens", client => getDenomsMetadata(client));
+  const items = query.result.data ?? [];
+  const loading = query.busy && !query.result.data;
 
   return (
     <Stack spacing={2}>
@@ -52,7 +31,7 @@ export function TokensMetadataList() {
         `/cosmos/bank/v1beta1/denoms_metadata` 결과를 기준으로 표시합니다.
       </Typography>
 
-      {error ? <Alert severity="error">{error}</Alert> : null}
+      <QueryStatus {...query} />
 
       {loading ? (
         <Card variant="outlined">
@@ -84,7 +63,7 @@ export function TokensMetadataList() {
           </CardContent>
         </Card>
       ) : items.length === 0 ? (
-        <Typography variant="body2">표시할 토큰 메타데이터가 없습니다.</Typography>
+        query.result.status === "empty" ? <Typography variant="body2">표시할 토큰 메타데이터가 없습니다.</Typography> : null
       ) : (
         <Card variant="outlined">
           <CardContent>

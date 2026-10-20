@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
 import { useRouter } from "next/navigation";
 import {
-  Alert,
   Card,
   CardContent,
   Pagination,
@@ -20,7 +22,6 @@ import {
   FEEPOLICY_ALL_ROUTE_PARAM,
   getFeePolicyModeratorAddress,
   isFeePolicyGlobalAddress,
-  isFeePolicyAvailable,
   listFeePolicyDiscounts,
   toFeePolicyAddressLabel,
   type FeePolicyAccountDiscount,
@@ -34,49 +35,13 @@ function countDiscountItems(item: FeePolicyAccountDiscount): number {
 
 export function FeePolicyList() {
   const router = useRouter();
-  const [items, setItems] = useState<FeePolicyAccountDiscount[]>([]);
-  const [moderatorAddress, setModeratorAddress] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [supported, setSupported] = useState(true);
+  const query = useQuery("feepolicy-discounts", client => listFeePolicyDiscounts(client));
+  const moderator = useQuery("feepolicy-moderator", client => getFeePolicyModeratorAddress(client));
+  const items = useMemo(() => query.result.data ?? [], [query.result.data]);
+  const moderatorAddress = moderator.result.data;
+  const loading = query.busy && !query.result.data;
+  const supported = query.result.data !== null;
   const [page, setPage] = useState(1);
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      try {
-        const available = await isFeePolicyAvailable();
-        if (!mounted) return;
-        setSupported(available);
-        if (!available) {
-          setItems([]);
-          setModeratorAddress(null);
-          setError(null);
-          return;
-        }
-
-        const [discounts, moderator] = await Promise.all([
-          listFeePolicyDiscounts(),
-          getFeePolicyModeratorAddress(),
-        ]);
-        if (!mounted) return;
-        setItems(discounts);
-        setModeratorAddress(moderator);
-        setError(null);
-      } catch {
-        if (!mounted) return;
-        setItems([]);
-        setModeratorAddress(null);
-        setError("FeePolicy 목록을 불러오지 못했습니다.");
-      } finally {
-        if (!mounted) return;
-        setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
 
   const pageCount = useMemo(() => Math.max(1, Math.ceil(items.length / PAGE_SIZE)), [items.length]);
   const pagedItems = useMemo(() => {
@@ -93,10 +58,7 @@ export function FeePolicyList() {
         `/guru/feepolicy/v1/moderator_address`, `/guru/feepolicy/v1/discounts` 결과를 기반으로 표시합니다.
       </Typography>
 
-      {error ? <Alert severity="error">{error}</Alert> : null}
-      {!supported && !loading ? (
-        <Alert severity="info">현재 선택한 체인은 FeePolicy 모듈을 지원하지 않거나 조회 API가 비활성화되어 있습니다.</Alert>
-      ) : null}
+      <QueryStatus {...query} /><QueryStatus {...moderator} />
 
       {!loading && supported ? (
         <Card variant="outlined">

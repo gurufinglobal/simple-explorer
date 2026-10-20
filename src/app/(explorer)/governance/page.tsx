@@ -1,38 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Alert, Button, CircularProgress, Stack, Typography } from "@mui/material";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
+import { Button, Stack, Typography } from "@mui/material";
 import { GovernanceProposalsList } from "@/components/governance/governance-proposals-list";
-import type { NormalizedProposal } from "@/lib/gov-types";
 import { listProposals } from "@/services/guru/governance-query.service";
 
 export default function GovernancePage() {
-  const [proposals, setProposals] = useState<NormalizedProposal[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      try {
-        const next = await listProposals();
-        if (!mounted) return;
-        setProposals(next);
-        setError(null);
-      } catch {
-        if (!mounted) return;
-        setProposals([]);
-        setError("거버넌스 제안 목록을 불러오지 못했습니다.");
-      } finally {
-        if (!mounted) return;
-        setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const query = useQuery("governance", client => listProposals(100, client));
 
   return (
     <Stack spacing={2}>
@@ -44,9 +21,9 @@ export default function GovernancePage() {
           새 제안
         </Button>
       </Stack>
-      {loading ? <CircularProgress size={22} /> : null}
-      {error ? <Alert severity="error">{error}</Alert> : null}
-      <GovernanceProposalsList initialProposals={proposals} />
+
+      <QueryStatus {...query} />
+      {query.result.data && <GovernanceProposalsList initialProposals={query.result.data} />}
     </Stack>
   );
 }

@@ -37,7 +37,7 @@ export function IbcChannelsPanel({ channels }: Props) {
   if (channels.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary">
-        LCD에서 IBC 채널을 가져오지 못했거나, 등록된 채널이 없습니다. (
+        조회한 범위에 등록된 채널이 없습니다. (
         <code>/ibc/core/channel/v1/channels</code>)
       </Typography>
     );

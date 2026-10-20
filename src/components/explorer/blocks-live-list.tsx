@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
 import { Box, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { useNowTick } from "@/hooks/use-now-tick";
@@ -20,49 +22,14 @@ function hasTransactions(txCount: number | string): boolean {
   return Number.isFinite(parsed) && parsed > 0;
 }
 
-type Props = {
-  initialBlocks?: BlockDetail[];
-};
-
-export function BlocksLiveList({ initialBlocks = [] }: Props) {
-  const [blocks, setBlocks] = useState<BlockDetail[]>(initialBlocks);
-  const [liveError, setLiveError] = useState<string | null>(null);
-  const blocksRef = useRef(blocks);
-  blocksRef.current = blocks;
+export function BlocksLiveList() {
+  const query = useQuery<BlockDetail[]>("blocks", async (client, previous) => {
+    const fresh = await fetchBlocksNewerThan(previous?.[0]?.height ?? "0", 50, client);
+    const seen = new Set((previous ?? []).map(block => block.height));
+    return [...fresh.filter(block => !seen.has(block.height)), ...(previous ?? [])].slice(0, MAX_BLOCKS);
+  }, POLL_MS);
+  const blocks = query.result.data ?? [];
   const nowMs = useNowTick(POLL_MS);
-
-  useEffect(() => {
-    let mounted = true;
-
-    const syncLatest = async () => {
-      try {
-        const top = blocksRef.current[0]?.height ?? "0";
-        const newBlocks = await fetchBlocksNewerThan(top, 50);
-        if (!mounted) return;
-        if (newBlocks.length > 0) {
-          setBlocks((prev) => {
-            const seen = new Set(prev.map((b) => b.height));
-            const merged = [...newBlocks.filter((b) => !seen.has(b.height)), ...prev];
-            return merged.slice(0, MAX_BLOCKS);
-          });
-        }
-        setLiveError(null);
-      } catch {
-        if (!mounted) return;
-        setLiveError("실시간 블록 갱신 중 오류가 발생했습니다.");
-      }
-    };
-
-    void syncLatest();
-    const id = window.setInterval(() => {
-      void syncLatest();
-    }, POLL_MS);
-
-    return () => {
-      mounted = false;
-      window.clearInterval(id);
-    };
-  }, []);
 
   const averageBlockTimeSec = (() => {
     if (blocks.length < 2) {
@@ -97,20 +64,16 @@ export function BlocksLiveList({ initialBlocks = [] }: Props) {
         </Typography>
         <Chip
           size="small"
-          color={liveError ? "warning" : "success"}
-          label={liveError ? "Live paused" : "Live (3s)"}
+          color={query.result.status === "success" ? "success" : "warning"}
+          label={query.result.status === "success" ? "Live (3s)" : query.busy ? "불러오는 중" : "Live paused"}
         />
       </Stack>
       <Typography variant="body2" color="text.secondary">
         현재 목록 평균 블록 생성 시간: {averageBlockTimeSec !== null ? `${averageBlockTimeSec.toFixed(2)}s` : "-"}
       </Typography>
-      {liveError ? (
-        <Typography variant="body2" color="warning.main">
-          {liveError}
-        </Typography>
-      ) : null}
+      <QueryStatus {...query} />
       {blocks.length === 0 ? (
-        <Typography variant="body2">블록 데이터를 불러오지 못했습니다.</Typography>
+        query.result.status === "empty" ? <Typography variant="body2">조회한 블록이 없습니다.</Typography> : null
       ) : (
         <Box
           sx={{

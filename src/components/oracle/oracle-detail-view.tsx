@@ -1,7 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
 import { useParams } from "next/navigation";
 import {
   Alert,
@@ -25,12 +28,8 @@ import {
 import {
   getOracleLatestResult,
   getOracleRequestById,
-  isOracleAvailable,
   listOracleReports,
   listOracleResults,
-  type OracleReportRow,
-  type OracleRequestRow,
-  type OracleResultRow,
 } from "@/services/guru/oracle.service";
 
 const MAX_ORACLE_ROWS = 30;
@@ -73,89 +72,27 @@ function formatNumericShort(value: number): string {
 export function OracleDetailView() {
   const params = useParams<{ requestId: string }>();
   const requestId = params.requestId ?? "";
-  const [request, setRequest] = useState<OracleRequestRow | null>(null);
-  const [latestResult, setLatestResult] = useState<OracleResultRow | null>(null);
-  const [reports, setReports] = useState<OracleReportRow[]>([]);
-  const [results, setResults] = useState<OracleResultRow[]>([]);
-  const [reportsTruncated, setReportsTruncated] = useState(false);
-  const [resultsTruncated, setResultsTruncated] = useState(false);
   const [reportNonce, setReportNonce] = useState("");
   const [reportProvider, setReportProvider] = useState("");
-  const [reportsLoading, setReportsLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [supported, setSupported] = useState(true);
+  const [reportFilter, setReportFilter] = useState({ nonce: "", provider: "" });
   const [tab, setTab] = useState(0);
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      try {
-        const available = await isOracleAvailable();
-        if (!mounted) return;
-        setSupported(available);
-        if (!available) {
-          setRequest(null);
-          setLatestResult(null);
-          setReports([]);
-          setResults([]);
-          setReportsTruncated(false);
-          setResultsTruncated(false);
-          setError(null);
-          return;
-        }
-
-        const [requestResponse, latestResultResponse, reportsResponse, resultsResponse] = await Promise.all([
-          getOracleRequestById(requestId),
-          getOracleLatestResult(requestId),
-          listOracleReports({ requestId }),
-          listOracleResults(requestId),
-        ]);
-        if (!mounted) return;
-        setRequest(requestResponse);
-        setLatestResult(latestResultResponse);
-        const nextReports = takeLatestRows(reportsResponse);
-        const nextResults = takeLatestRows(resultsResponse);
-        setReports(nextReports.rows);
-        setResults(nextResults.rows);
-        setReportsTruncated(nextReports.truncated);
-        setResultsTruncated(nextResults.truncated);
-        setError(null);
-      } catch {
-        if (!mounted) return;
-        setRequest(null);
-        setLatestResult(null);
-        setReports([]);
-        setResults([]);
-        setReportsTruncated(false);
-        setResultsTruncated(false);
-        setError("Oracle 상세 정보를 불러오지 못했습니다.");
-      } finally {
-        if (!mounted) return;
-        setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [requestId]);
-
-  const reloadReports = async () => {
-    setReportsLoading(true);
-    try {
-      const response = await listOracleReports({
-        requestId,
-        nonce: reportNonce.trim() || undefined,
-        provider: reportProvider.trim() || undefined,
-      });
-      const nextReports = takeLatestRows(response);
-      setReports(nextReports.rows);
-      setReportsTruncated(nextReports.truncated);
-    } catch {
-      setError("Oracle report 조회에 실패했습니다.");
-    } finally {
-      setReportsLoading(false);
-    }
+  const query = useQuery(`oracle-request:${requestId}`, client => getOracleRequestById(requestId, client));
+  const latestQuery = useQuery(`oracle-latest:${requestId}`, client => getOracleLatestResult(requestId, client));
+  const reportQuery = useQuery(`oracle-reports:${requestId}:${reportFilter.nonce}:${reportFilter.provider}`, client => listOracleReports({ requestId, nonce: reportFilter.nonce || undefined, provider: reportFilter.provider || undefined }, client));
+  const resultsQuery = useQuery(`oracle-results:${requestId}`, client => listOracleResults(requestId, client));
+  const request = query.result.data;
+  const latestResult = latestQuery.result.data;
+  const reportRows = takeLatestRows(reportQuery.result.data ?? []);
+  const resultRows = useMemo(() => takeLatestRows(resultsQuery.result.data ?? []), [resultsQuery.result.data]);
+  const reports = reportRows.rows;
+  const results = resultRows.rows;
+  const reportsTruncated = reportRows.truncated;
+  const resultsTruncated = resultRows.truncated;
+  const reportsLoading = reportQuery.busy;
+  const reloadReports = () => {
+    const next = { nonce: reportNonce.trim(), provider: reportProvider.trim() };
+    if (next.nonce === reportFilter.nonce && next.provider === reportFilter.provider) void reportQuery.refresh();
+    else setReportFilter(next);
   };
 
   const resultsSorted = useMemo(() => sortByNonceDesc(results), [results]);
@@ -201,64 +138,7 @@ export function OracleDetailView() {
     };
   }, [resultsSorted]);
 
-  if (loading) {
-    return (
-      <Stack spacing={2}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Skeleton variant="text" width={220} height={40} />
-          <Skeleton variant="rounded" width={64} height={32} />
-        </Stack>
-        <Card variant="outlined">
-          <CardContent>
-            <Grid container spacing={2}>
-              {Array.from({ length: 6 }).map((_, index) => (
-                <Grid key={`oracle-detail-summary-skeleton-${index}`} size={{ xs: 12, md: 2 }}>
-                  <Skeleton variant="text" width={80} />
-                  <Skeleton variant="text" width={110} />
-                </Grid>
-              ))}
-            </Grid>
-          </CardContent>
-        </Card>
-        <Card variant="outlined">
-          <CardContent>
-            <Stack spacing={1.5}>
-              <Skeleton variant="text" width={220} />
-              <Skeleton variant="rounded" height={220} />
-            </Stack>
-          </CardContent>
-        </Card>
-      </Stack>
-    );
-  }
-
-  if (!supported) {
-    return (
-      <Stack spacing={2}>
-        <Typography variant="h5" fontWeight={700}>
-          Oracle Request 상세
-        </Typography>
-        <Alert severity="info">현재 선택한 체인은 Oracle 모듈을 지원하지 않거나 조회 API가 비활성화되어 있습니다.</Alert>
-      </Stack>
-    );
-  }
-
-  if (!request) {
-    return (
-      <Stack spacing={2}>
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Typography variant="h5" fontWeight={700}>
-            Oracle Request 상세
-          </Typography>
-          <Button component={Link} href="/oracle" variant="outlined" size="small">
-            목록
-          </Button>
-        </Stack>
-        {error ? <Alert severity="error">{error}</Alert> : null}
-        <Typography variant="body2">요청한 request를 찾을 수 없습니다.</Typography>
-      </Stack>
-    );
-  }
+  if (!request) return <QueryStatus {...query} />;
 
   return (
     <Stack spacing={2}>
@@ -270,7 +150,7 @@ export function OracleDetailView() {
           목록
         </Button>
       </Stack>
-      {error ? <Alert severity="error">{error}</Alert> : null}
+      <QueryStatus {...query} /><QueryStatus {...latestQuery} /><QueryStatus {...reportQuery} /><QueryStatus {...resultsQuery} />
 
       <Card variant="outlined">
         <CardContent>
@@ -312,7 +192,7 @@ export function OracleDetailView() {
               <Typography>
                 {latestResult
                   ? `${latestResult.aggregatedData} (nonce ${latestResult.nonce}, height ${latestResult.aggregatedHeight}, ${formatUnixSecondsWithTimezone(latestResult.aggregatedTime)})`
-                  : "결과 없음"}
+                  : latestQuery.result.status === "not-found" ? "확인된 결과 없음" : "결과 미확인"}
               </Typography>
             </Grid>
           </Grid>
@@ -329,8 +209,8 @@ export function OracleDetailView() {
           <Box sx={{ mt: 2 }}>
             {tab === 0 ? (
               <Stack spacing={1.5}>
-                <Typography variant="body2">Reports: {reports.length}</Typography>
-                <Typography variant="body2">Results History: {results.length}</Typography>
+                <Typography variant="body2">Reports: {reportQuery.result.data ? reports.length : "-"}</Typography>
+                <Typography variant="body2">Results History: {resultsQuery.result.data ? results.length : "-"}</Typography>
                 {resultsTruncated ? (
                   <Alert severity="info">
                     Oracle Results API는 서버 페이징을 지원하지 않아 최근 {MAX_ORACLE_ROWS}건 기준으로 변화를 표시합니다.
@@ -424,7 +304,7 @@ export function OracleDetailView() {
                     </TableBody>
                   </Table>
                 ) : reports.length === 0 ? (
-                  <Typography variant="body2">표시할 report가 없습니다.</Typography>
+                  <Typography variant="body2">{reportQuery.result.status === "empty" ? "표시할 report가 없습니다." : "Report 조회 결과 미확인"}</Typography>
                 ) : (
                   <Table size="small">
                     <TableHead>
@@ -460,7 +340,7 @@ export function OracleDetailView() {
                   </Alert>
                 ) : null}
                 {resultsSorted.length === 0 ? (
-                  <Typography variant="body2">표시할 결과 이력이 없습니다.</Typography>
+                  <Typography variant="body2">{resultsQuery.result.status === "empty" ? "표시할 결과 이력이 없습니다." : "결과 이력 미확인"}</Typography>
                 ) : (
                   <Table size="small">
                     <TableHead>

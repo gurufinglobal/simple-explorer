@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+
 import { useParams } from "next/navigation";
 import {
   Card,
@@ -14,52 +16,14 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
-import { getTxDetail, type TxDetail } from "@/services/guru/tx-details.service";
+import { getTxDetail } from "@/services/guru/tx-details.service";
 
 export default function TxDetailPage() {
   const params = useParams<{ hash: string }>();
   const hash = params.hash ?? "";
-  const [tx, setTx] = useState<TxDetail | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let mounted = true;
-    void (async () => {
-      try {
-        const next = await getTxDetail(hash);
-        if (!mounted) return;
-        setTx(next);
-      } finally {
-        if (!mounted) return;
-        setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [hash]);
-
-  if (loading) {
-    return (
-      <Stack spacing={2}>
-        <Typography variant="h5" fontWeight={700}>
-          트랜잭션 상세
-        </Typography>
-        <Typography>트랜잭션 정보를 불러오는 중입니다.</Typography>
-      </Stack>
-    );
-  }
-
-  if (!tx) {
-    return (
-      <Stack spacing={2}>
-        <Typography variant="h5" fontWeight={700}>
-          트랜잭션 상세
-        </Typography>
-        <Typography>트랜잭션 정보를 가져오지 못했습니다.</Typography>
-      </Stack>
-    );
-  }
+  const query = useQuery(`transaction:${hash}`, client => getTxDetail(hash, client));
+  const tx = query.result.data;
+  if (!tx) return <QueryStatus {...query} />;
 
   const gasUsedNumber = Number(tx.gasUsed);
   const gasWantedNumber = Number(tx.gasWanted);
@@ -75,6 +39,7 @@ export default function TxDetailPage() {
 
   return (
     <Stack spacing={2}>
+      <QueryStatus {...query} />
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ md: "center" }}>
         <Typography variant="h5" fontWeight={700}>
           트랜잭션 상세

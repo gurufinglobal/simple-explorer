@@ -1,7 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQuery } from "@/hooks/use-query";
+import { QueryStatus } from "@/components/query/query-status";
+import { useMemo, useState } from "react";
 import {
   Alert,
   Box,
@@ -50,6 +52,8 @@ type Props = {
   votes: GovernanceVoteRow[];
   deposits: GovernanceDepositRow[];
   rawJson: unknown;
+  votesAvailable?: boolean;
+  depositsAvailable?: boolean;
 };
 
 function mergeTally(proposal: NormalizedProposal, live: GovTally | null): GovTally {
@@ -66,6 +70,8 @@ export function GovernanceProposalDetail({
   votes,
   deposits,
   rawJson,
+  votesAvailable = true,
+  depositsAvailable = true,
 }: Props) {
   const nowMs = useNowTick(1000);
   const tally = useMemo(() => mergeTally(proposal, liveTally), [proposal, liveTally]);
@@ -78,7 +84,9 @@ export function GovernanceProposalDetail({
   } = useWalletSessionStore();
 
   const [tab, setTab] = useState(0);
-  const [myVote, setMyVote] = useState<VoteOption | null>(null);
+  const voteQuery = useQuery(`my-vote:${proposal.id}:${bech32Address}`, client => getVoteForVoter(proposal.id, bech32Address!, client), undefined, walletStatus === "connected" && !!bech32Address);
+  const myVote = voteQuery.result.data;
+  const loadMyVote = voteQuery.refresh;
   const [voteBusy, setVoteBusy] = useState(false);
   const [depositBusy, setDepositBusy] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
@@ -86,19 +94,6 @@ export function GovernanceProposalDetail({
   const [success, setSuccess] = useState<string | null>(null);
 
   const denom = proposal.totalDeposit[0]?.denom ?? "agxn";
-
-  const loadMyVote = useCallback(async () => {
-    if (!bech32Address) {
-      setMyVote(null);
-      return;
-    }
-    const v = await getVoteForVoter(proposal.id, bech32Address);
-    setMyVote(v);
-  }, [bech32Address, proposal.id]);
-
-  useEffect(() => {
-    void loadMyVote();
-  }, [loadMyVote]);
 
   const canSignCosmos = walletStatus === "connected" && (walletType === "keplr" || walletType === "walletconnect");
   const metamaskReadonly = walletStatus === "connected" && walletType === "metamask";
@@ -159,6 +154,7 @@ export function GovernanceProposalDetail({
 
   return (
     <Stack spacing={2}>
+      <QueryStatus {...voteQuery} />
       <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
         <Typography variant="h5" fontWeight={700}>
           제안 #{proposal.id}
@@ -238,7 +234,7 @@ export function GovernanceProposalDetail({
               <LinearProgress color="error" variant="determinate" value={Math.min(100, pct.veto)} />
             </Box>
             <Typography variant="caption" color="text.secondary">
-              Raw — Yes: {tally.yes} Abstain: {tally.abstain} No: {tally.no} Veto: {tally.noWithVeto}
+              {!liveTally ? "실시간 집계 미확인 · 제안 응답의 저장된 집계: " : "실시간 집계: "} Yes: {tally.yes} Abstain: {tally.abstain} No: {tally.no} Veto: {tally.noWithVeto}
             </Typography>
           </Stack>
         </CardContent>
@@ -402,7 +398,7 @@ export function GovernanceProposalDetail({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {votes.length === 0 ? (
+                  {!votesAvailable ? <TableRow><TableCell colSpan={2}>투표 내역 미확인: 조회 상태를 확인하세요.</TableCell></TableRow> : votes.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={2}>
                         <Stack spacing={0.5}>
@@ -436,7 +432,7 @@ export function GovernanceProposalDetail({
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {deposits.length === 0 ? (
+                  {!depositsAvailable ? <TableRow><TableCell colSpan={2}>예치 내역 미확인: 조회 상태를 확인하세요.</TableCell></TableRow> : deposits.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={2}>
                         <Stack spacing={0.5}>

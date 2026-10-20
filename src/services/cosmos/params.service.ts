@@ -1,4 +1,5 @@
-import { apiClients } from "@/services/clients";
+import { PartialQueryError, QueryError, combinedError, queryError, type QueryErrorInfo } from "@/lib/query-result";
+import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
 type ParamsSectionConfig = {
   key: string;
@@ -12,7 +13,7 @@ export type ParamsSectionResult = {
   status: "ok" | "error";
   sourcePath: string | null;
   data: unknown;
-  error: string | null;
+  error: QueryErrorInfo | null;
 };
 
 const SECTION_CONFIGS: ParamsSectionConfig[] = [
@@ -64,7 +65,7 @@ const SECTION_CONFIGS: ParamsSectionConfig[] = [
   },
 ];
 
-async function fetchFirstAvailable(paths: string[]): Promise<{ path: string; data: unknown }> {
+async function fetchFirstAvailable(paths: string[], apiClients: QueryClient): Promise<{ path: string; data: unknown }> {
   let lastError: unknown = null;
   for (const path of paths) {
     try {
@@ -72,16 +73,17 @@ async function fetchFirstAvailable(paths: string[]): Promise<{ path: string; dat
       return { path, data };
     } catch (error) {
       lastError = error;
+      if (queryError(error).status !== 404) throw error;
     }
   }
   throw lastError ?? new Error("request failed");
 }
 
-export async function getChainParamsSections(): Promise<ParamsSectionResult[]> {
+export async function getChainParamsSections(apiClients: QueryClient = defaultClients): Promise<ParamsSectionResult[]> {
   const results = await Promise.all(
     SECTION_CONFIGS.map(async (section): Promise<ParamsSectionResult> => {
       try {
-        const response = await fetchFirstAvailable(section.paths);
+        const response = await fetchFirstAvailable(section.paths, apiClients);
         return {
           key: section.key,
           title: section.title,
@@ -90,17 +92,23 @@ export async function getChainParamsSections(): Promise<ParamsSectionResult[]> {
           data: response.data,
           error: null,
         };
-      } catch {
+      } catch (error) {
         return {
           key: section.key,
           title: section.title,
           status: "error",
           sourcePath: null,
           data: null,
-          error: "조회 실패 또는 미지원 모듈",
+          error: queryError(error),
         };
       }
     }),
   );
+  const failed = results.find(row => row.error);
+  if (failed?.error) {
+    const errors = results.flatMap(row => row.error ? [new QueryError(row.error)] : []);
+    if (errors.length === results.length) throw new QueryError(combinedError(errors));
+    throw new PartialQueryError(results, combinedError(errors));
+  }
   return results;
 }
