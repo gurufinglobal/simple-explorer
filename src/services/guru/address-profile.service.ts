@@ -51,14 +51,22 @@ function readDeepStringField(target: unknown, fieldName: string): string | null 
   return null;
 }
 
-export async function getAddressBalances(address: string, apiClients: QueryClient = defaultClients): Promise<AddressBalance[]> {
+export function getAddressBalances(address: string, client: QueryClient = defaultClients): Promise<AddressBalance[]> {
+  return getBalances(address, client, "balances");
+}
+/** Spendable coins exclude locked vesting funds; query failures are never zero balances. */
+export function getSpendableBalances(address: string, client: QueryClient = defaultClients): Promise<AddressBalance[]> {
+  return getBalances(address, client, "spendable_balances");
+}
+
+async function getBalances(address: string, apiClients: QueryClient, kind: "balances" | "spendable_balances"): Promise<AddressBalance[]> {
 
   const balances: AddressBalance[] = [];
   let cursor: string | null = null;
   const seen = new Set<string>();
   do {
     const response: LcdBalancesResponse & { pagination?: { next_key?: string | null } } = await apiClients.lcdGet(
-      `/cosmos/bank/v1beta1/balances/${encodeURIComponent(address)}${cursor ? `?pagination.key=${encodeURIComponent(cursor)}` : ""}`,
+      `/cosmos/bank/v1beta1/${kind}/${encodeURIComponent(address)}${cursor ? `?pagination.key=${encodeURIComponent(cursor)}` : ""}`,
     );
     for (const item of response.balances ?? schemaError()) {
       if (!item.denom || !item.amount || !/^\d+$/.test(item.amount)) schemaError();

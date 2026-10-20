@@ -4,6 +4,9 @@ import {
   type ChainConfig,
 } from "@/lib/env";
 
+let chainGeneration = 0;
+export function getChainSelectionGeneration(): number { return chainGeneration; }
+
 export const ACTIVE_CHAIN_COOKIE = "gf_chain";
 
 function parseCookieValue(rawCookie: string, key: string): string | null {
@@ -40,7 +43,7 @@ export function setActiveChainKeyCookie(key: string): void {
   let previous: string | null = null;
   try { previous = getActiveChainKeyFromClientCookie(); } catch { /* An explicit selection replaces a malformed cookie. */ }
   document.cookie = `${ACTIVE_CHAIN_COOKIE}=${encodeURIComponent(key)}; path=/; max-age=31536000; samesite=lax`;
-  if (previous !== key) window.dispatchEvent(new Event("explorer:chain-changed"));
+  if (previous !== key) { chainGeneration += 1; window.dispatchEvent(new Event("explorer:chain-changed")); }
 }
 
 export function getActiveChainConfig(): ChainConfig {

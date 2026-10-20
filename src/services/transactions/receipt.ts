@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { bech32 } from "bech32";
+import { getDelegatorValidatorPosition, getValidatorDetail, getTopValidators } from "@/services/guru/staking.service";
+import { getWalletPortfolio } from "@/services/guru/wallet-portfolio.service";
 import { getChainByKey } from "@/lib/env";
 import { getActiveChainConfig } from "@/lib/chain-selection";
 import { requestJson, createQueryClient } from "@/services/clients";
@@ -13,6 +16,7 @@ const coin = z.object({ amount: z.string().regex(/^\d+$/), denom: z.string().min
 const receiptSchema = z.object({
   chainKey: z.string(), chainId: z.string(), sender: z.string(), hash: z.string().regex(/^[A-Fa-f0-9]{64}$/).nullable(),
   status: z.enum(["pending", "success", "failed", "cancelled"]), message: z.string(),
+  staking: z.object({ action: z.enum(["delegate", "undelegate", "reward", "commission"]), validator: z.string().min(1) }).optional(),
   code: z.number().int().optional(), estimatedFee: z.array(coin), actualFee: z.array(coin).nullable(), feeWarning: z.string().optional(), queryError: z.string().optional(),
 });
 const storageKey = "explorer:transaction-receipts:v1";
@@ -47,6 +51,10 @@ export function saveReceipt(receipt: TransactionReceipt): boolean {
 function receiptChain(receipt: TransactionReceipt) {
   const chain = getChainByKey(receipt.chainKey);
   if (!chain || chain.chainId !== receipt.chainId) throw new Error("거래 체인 설정이 변경되었거나 없습니다. 원래 체인 설정을 확인하세요.");
+  if (receipt.staking) {
+    const decoded = bech32.decode(receipt.staking.validator);
+    if (decoded.prefix !== `${chain.bech32Prefix}valoper` || bech32.fromWords(decoded.words).length !== 20) throw new Error("보관된 검증자 주소가 원래 체인과 다릅니다.");
+  }
   return chain;
 }
 /** Missing/malformed raw fee is not zero and is never replaced by the estimate. */
@@ -88,6 +96,13 @@ export async function refreshTransactionReads(receipt: TransactionReceipt): Prom
     ["송신자 잔액", () => getAddressBalances(receipt.sender, client)],
     ["주소 거래", () => getTransactionsByAddress(receipt.sender, 30, client)],
   ];
+  const staking = receipt.staking;
+  if (staking) jobs.push(
+    ["개인 위임 포지션", () => getDelegatorValidatorPosition(receipt.sender, staking.validator, client)],
+    ["자산·보상·언본딩", () => getWalletPortfolio(receipt.sender, client)],
+    ["검증자 상세", () => getValidatorDetail(staking.validator, client)],
+    ["검증자 목록", () => getTopValidators(100, client)],
+  );
   if (getActiveChainConfig().key === chain.key && useWalletSessionStore.getState().bech32Address === receipt.sender) {
     jobs.push(["지갑 자산", async () => {
       const portfolio = useWalletPortfolioStore.getState();
@@ -101,7 +116,7 @@ export async function refreshTransactionReads(receipt: TransactionReceipt): Prom
   }
   window.dispatchEvent(new CustomEvent("explorer:queries-invalidated", { detail: {
     chain: chain.key,
-    targets: [`balances:${receipt.sender}`, `address-transactions:${receipt.sender}`, `address-portfolio:${receipt.sender}`, `transaction:${receipt.hash}`],
+    targets: [`balances:${receipt.sender}`, `address-transactions:${receipt.sender}`, `address-portfolio:${receipt.sender}`, `transaction:${receipt.hash}`, ...(staking ? [`delegator:${receipt.sender}:${staking.validator}`, `staking:${staking.validator}`, "staking", "dashboard-validators", "dashboard-summary"] : [])],
   } }));
   const results = await Promise.allSettled(jobs.map(([, read]) => read()));
   return results.flatMap((result, i) => result.status === "rejected" ? [`${jobs[i][0]}: ${errorMessage(result.reason)}`] : []);

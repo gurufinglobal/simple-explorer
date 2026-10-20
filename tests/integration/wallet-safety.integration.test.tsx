@@ -14,7 +14,7 @@ import { attachWalletLifecycle, connectExtension, connectQr, disconnectWallet, r
 import { normalizeWalletConnectSession } from "@/services/wallet/walletconnect-session";
 import { resetWalletConnectClientForTests } from "@/services/wallet/walletconnect-client";
 import { prepareSendTx, submitSendTx as executeSend, type SendTxInput } from "@/services/guru/bank-tx.client";
-import { submitDelegateTx, submitUndelegateTx, submitWithdrawDelegatorRewardTx, submitWithdrawValidatorCommissionTx } from "@/services/guru/staking-tx.client";
+import { prepareStakingTx } from "@/services/guru/staking-tx.client";
 import { submitGovernanceVoteTx, submitGovernanceDepositTx, submitTextProposalTx } from "@/services/guru/governance-tx.client";
 import { GovernanceNewProposalForm } from "@/components/governance/governance-new-proposal-form";
 import { HeaderWalletMenu } from "@/components/wallet/header-wallet-menu";
@@ -78,7 +78,7 @@ beforeEach(() => {
   window.keplr = { enable: vi.fn().mockResolvedValue(undefined) };
   window.getOfflineSigner = vi.fn(() => ({ getAccounts: async () => [{ address, pubkey, algo: "secp256k1" }], signDirect: sign }));
   boundary.request.mockImplementation(async args => ({ signed: args.request.params.signDoc, signature: {} }));
-  boundary.broadcast.mockResolvedValue({ code: 0, transactionHash: "TX" });
+  boundary.broadcast.mockResolvedValue({ code: 0, transactionHash: "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855" });
   boundary.disconnect.mockResolvedValue(undefined); boundary.sessionGet.mockReturnValue(session());
   boundary.connectSigner.mockImplementation(async (_rpc: string, signer: OfflineSigner) => ({
     sign: async () => {
@@ -122,7 +122,7 @@ describe("W03 chain configuration and signing boundaries", () => {
     expect(sign).not.toHaveBeenCalled(); expect(boundary.connectSigner).not.toHaveBeenCalled(); expect(boundary.broadcast).not.toHaveBeenCalled();
   });
   it("a valid scoped signer reaches broadcast through the real transaction service", async () => {
-    connected(); await expect(send()).resolves.toMatchObject({ status: "success", hash: "TX" }); expect(sign).toHaveBeenCalledTimes(1); expect(boundary.broadcast).toHaveBeenCalledTimes(1);
+    connected(); await expect(send()).resolves.toMatchObject({ status: "success", hash: "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855" }); expect(sign).toHaveBeenCalledTimes(1); expect(boundary.broadcast).toHaveBeenCalledTimes(1);
   });
   it("rejects an actual signer different from the displayed account", async () => {
     connected(); window.getOfflineSigner = () => ({ getAccounts: async () => [{ address: addressB, pubkey }] });
@@ -150,10 +150,10 @@ describe("W03 chain configuration and signing boundaries", () => {
     await refreshWriteEligibility(); expect(store.getState()).toMatchObject({ status: "connected", writeStatus: "blocked" }); expect(store.getState().writeReason).toBeTruthy();
   });
   it.each([
-    () => submitDelegateTx({ ...base, validatorAddress: addressB, amount: "1", denom: "agxn" }),
-    () => submitUndelegateTx({ ...base, validatorAddress: addressB, amount: "1", denom: "agxn" }),
-    () => submitWithdrawDelegatorRewardTx({ ...base, validatorAddress: addressB }),
-    () => submitWithdrawValidatorCommissionTx({ ...base, validatorAddress: addressB }),
+    () => prepareStakingTx({ action: "delegate", ...base, validatorAddress: addressB, amount: "1", denom: "agxn" }),
+    () => prepareStakingTx({ action: "undelegate", ...base, validatorAddress: addressB, amount: "1", denom: "agxn" }),
+    () => prepareStakingTx({ action: "reward", ...base, validatorAddress: addressB }),
+    () => prepareStakingTx({ action: "commission", ...base, validatorAddress: addressB }),
     () => submitGovernanceVoteTx({ ...base, proposalId: "1", option: "yes" }),
     () => submitGovernanceDepositTx({ ...base, proposalId: "1", amount: "1", denom: "agxn" }),
     () => submitTextProposalTx({ ...base, title: "test", summary: "test", description: "test", initialDepositAmount: "1", denom: "agxn" }),

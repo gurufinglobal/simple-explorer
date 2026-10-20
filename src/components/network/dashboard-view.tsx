@@ -1,6 +1,5 @@
 "use client";
 
-import { useAmountEntry } from "@/components/amount/amount-entry";
 import { CoinAmount } from "@/components/amount/coin-amount";
 import { UnbondingDetails } from "@/components/amount/unbonding-details";
 import Link from "next/link";
@@ -18,10 +17,8 @@ import {
   CardContent,
   Chip,
   Grid,
-  MenuItem,
   Skeleton,
   Stack,
-  TextField,
   Table,
   TableBody,
   TableCell,
@@ -38,7 +35,7 @@ import { useEffectiveCosmosAddress } from "@/hooks/use-effective-cosmos-address"
 import { getTopValidators } from "@/services/guru/staking.service";
 import { SendForm } from "@/components/transactions/send-form";
 import { SavedTransactions } from "@/components/transactions/transaction-result";
-import { submitDelegateTx } from "@/services/guru/staking-tx.client";
+import { StakingForm } from "@/components/transactions/staking-form";
 import { useWalletPortfolioStore } from "@/stores/wallet-portfolio.store";
 import { useWalletSessionStore } from "@/stores/wallet-session.store";
 
@@ -65,55 +62,12 @@ export function DashboardView() {
   const portfolio = storedPortfolio.result.context.chain === getActiveChainConfig().key && storedPortfolio.result.context.target === `portfolio:${effectiveCosmos}`
     ? storedPortfolio : { ...storedPortfolio, details: undefined, balance: "—", staking: "—", reward: "—", unbonding: "—", error: null, loading: false };
   const loading = summary.busy && !state;
-  const canSignCosmos = useWalletSessionStore(s => s.status === "connected" && s.writeStatus === "ready");
   const isMetamask = wallet.status === "connected" && wallet.walletType === "metamask";
   const [activeAction, setActiveAction] = useState<"send" | "delegate" | null>(null);
-  const [delegateValidatorAddress, setDelegateValidatorAddress] = useState("");
-  const [delegateAmount, setDelegateAmount] = useState("");
-  const delegateDenom = getActiveChainConfig().bondDenom ?? "";
-  const [actionBusy, setActionBusy] = useState<"send" | "delegate" | null>(null);
-  const [actionError, setActionError] = useState<string | null>(null);
-  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
-
-  const delegateEntry = useAmountEntry(delegateAmount, delegateDenom);
-
   const walletTitle = useMemo(
     () => (wallet.status === "connected" ? `Connected (${wallet.walletType ?? "wallet"})` : "Not Connected"),
     [wallet.status, wallet.walletType],
   );
-
-  const onDelegate = async () => {
-    if (!canSignCosmos || !wallet.walletType) {
-      setActionError("Keplr 또는 WalletConnect를 연결해야 DELEGATE를 실행할 수 있습니다.");
-      return;
-    }
-    if (!delegateValidatorAddress.trim()) {
-      setActionError("위임할 validator를 선택해주세요.");
-      return;
-    }
-    if (!delegateEntry.ready) {
-      setActionError("표시 수량과 전송 원본을 확인하세요.");
-      return;
-    }
-    setActionError(null);
-    setActionSuccess(null);
-    setActionBusy("delegate");
-    try {
-      const { txHash } = await submitDelegateTx({
-        walletType: wallet.walletType,
-        sessionTopic: wallet.sessionTopic,
-        bech32Address: wallet.bech32Address,
-        validatorAddress: delegateValidatorAddress.trim(),
-        amount: delegateEntry.requireBase(),
-        denom: delegateDenom,
-      });
-      setActionSuccess(`DELEGATE 트랜잭션이 전송되었습니다. Tx: ${txHash}`);
-    } catch (e) {
-      setActionError(e instanceof Error ? e.message : "DELEGATE 트랜잭션 전송에 실패했습니다.");
-    } finally {
-      setActionBusy(null);
-    }
-  };
 
   return (
     <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
@@ -299,16 +253,6 @@ export function DashboardView() {
               </Typography>
             </Grid>
           </Grid>
-          {actionError ? (
-            <Alert severity="error" sx={{ mt: 2 }}>
-              {actionError}
-            </Alert>
-          ) : null}
-          {actionSuccess ? (
-            <Alert severity="success" sx={{ mt: 2 }}>
-              {actionSuccess}
-            </Alert>
-          ) : null}
           <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mt: 2 }}>
             <Button variant="contained" color="success" fullWidth>
               SWAP
@@ -333,47 +277,7 @@ export function DashboardView() {
           </Stack>
           {activeAction === "send" && <SendForm key={getActiveChainConfig().key} />}
           <SavedTransactions chainKey={getActiveChainConfig().key} />
-          {activeAction === "delegate" ? (
-            <Stack spacing={1} sx={{ mt: 2 }}>
-              <Typography variant="subtitle2">DELEGATE</Typography>
-              <TextField
-                select
-                label="Validator"
-                size="small"
-                value={delegateValidatorAddress}
-                onChange={(e) => setDelegateValidatorAddress(e.target.value)}
-                disabled={!canSignCosmos || actionBusy !== null || validatorOptions.length === 0}
-              >
-                {validatorOptions.map((validator) => (
-                  <MenuItem key={validator.operatorAddress} value={validator.operatorAddress}>
-                    {validator.moniker || validator.operatorAddress}
-                  </MenuItem>
-                ))}
-              </TextField>
-              <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-                <TextField
-                  label="수량 (표시 단위)"
-                  size="small"
-                  value={delegateAmount}
-                  onChange={(e) => setDelegateAmount(e.target.value.trim())}
-                  disabled={!canSignCosmos || actionBusy !== null}
-                  fullWidth
-                />
-                <TextField
-                  label="Denom"
-                  size="small"
-                  value={delegateDenom}
-                  slotProps={{ input: { readOnly: true } }}
-                  disabled={!canSignCosmos || actionBusy !== null}
-                  sx={{ minWidth: 140 }}
-                />
-              </Stack>
-              {delegateEntry.confirmation}
-              <Button variant="contained" onClick={() => void onDelegate()} disabled={!canSignCosmos || !delegateEntry.ready || actionBusy !== null}>
-                Delegate Tx
-              </Button>
-            </Stack>
-          ) : null}
+          {activeAction === "delegate" && <StakingForm key={getActiveChainConfig().key} validators={validatorOptions} />}
         </CardContent>
       </Card>
 

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useQuery } from "@/hooks/use-query";
 import { QueryStatus } from "@/components/query/query-status";
-import { useCallback, useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Alert,
   Button,
@@ -13,27 +13,19 @@ import {
   Divider,
   Skeleton,
   Stack,
-  TextField,
   Typography,
 } from "@mui/material";
 import { useNowTick } from "@/hooks/use-now-tick";
 import { useEffectiveCosmosAddress } from "@/hooks/use-effective-cosmos-address";
-import { useAmountEntry } from "@/components/amount/amount-entry";
 import { CoinAmount } from "@/components/amount/coin-amount";
 import { UnbondingDetails } from "@/components/amount/unbonding-details";
-import { getActiveChainConfig } from "@/lib/chain-selection";
 import { formatRelativeFutureOrPast } from "@/lib/relative-time";
 import {
   getDelegatorValidatorPosition,
   type DelegatorValidatorPosition,
   type ValidatorDetail,
 } from "@/services/guru/staking.service";
-import {
-  submitDelegateTx,
-  submitUndelegateTx,
-  submitWithdrawDelegatorRewardTx,
-  submitWithdrawValidatorCommissionTx,
-} from "@/services/guru/staking-tx.client";
+import { StakingForm } from "@/components/transactions/staking-form";
 import { useWalletSessionStore } from "@/stores/wallet-session.store";
 
 type Props = {
@@ -66,47 +58,16 @@ const EMPTY_POSITION: DelegatorValidatorPosition = {
 
 export function ValidatorDetailView({ detail }: Props) {
   const nowMs = useNowTick(1000);
-  const { status, walletType, sessionTopic, bech32Address } = useWalletSessionStore();
+  const { status, walletType } = useWalletSessionStore();
   const effectiveAddress = useEffectiveCosmosAddress();
-  const canSignCosmos = useWalletSessionStore(s => s.status === "connected" && s.writeStatus === "ready");
   const isMetamask = status === "connected" && walletType === "metamask";
 
   const positionQuery = useQuery(`delegator:${effectiveAddress}:${detail.operatorAddress}`, client => getDelegatorValidatorPosition(effectiveAddress!, detail.operatorAddress, client), undefined, status === "connected" && !!effectiveAddress);
   const position = positionQuery.result.data ?? EMPTY_POSITION;
   const positionLoading = positionQuery.busy && !positionQuery.result.data;
-  const refreshPosition = positionQuery.refresh;
-  const [amount, setAmount] = useState("");
-  const denom = detail.bondDenom ?? "";
-  const amountEntry = useAmountEntry(amount, denom);
-  const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
-
   const unbondingRelative = useMemo(
     () => (detail.unbondingTime ? formatRelativeFutureOrPast(detail.unbondingTime, nowMs) : "-"),
     [detail.unbondingTime, nowMs],
-  );
-
-  const runAction = useCallback(
-    async (actionName: string, action: () => Promise<{ txHash: string }>) => {
-      if (!canSignCosmos || !walletType) {
-        setError("Keplr 또는 WalletConnect를 연결해야 스테이킹 액션을 실행할 수 있습니다.");
-        return;
-      }
-      setError(null);
-      setSuccess(null);
-      setBusyAction(actionName);
-      try {
-        const { txHash } = await action();
-        setSuccess(`트랜잭션이 전송되었습니다. Tx: ${txHash}`);
-        await refreshPosition();
-      } catch (e) {
-        setError(e instanceof Error ? e.message : "트랜잭션 전송에 실패했습니다.");
-      } finally {
-        setBusyAction(null);
-      }
-    },
-    [canSignCosmos, refreshPosition, walletType],
   );
 
   const formatRawTokenAmount = (value: string) => value === "-" ? "미확인" : <CoinAmount coin={{ amount: value, denom: detail.bondDenom ?? "bond denom 미확인" }} metadata={detail.metadata} />;
@@ -127,8 +88,6 @@ export function ValidatorDetailView({ detail }: Props) {
       {isMetamask ? (
         <Alert severity="info">MetaMask는 Cosmos staking 서명을 지원하지 않습니다. Keplr 또는 WalletConnect를 사용하세요.</Alert>
       ) : null}
-      {error ? <Alert severity="error">{error}</Alert> : null}
-      {success ? <Alert severity="success">{success}</Alert> : null}
 
       <Card variant="outlined">
         <CardContent>
@@ -241,94 +200,7 @@ export function ValidatorDetailView({ detail }: Props) {
             </Typography>
             {position.unbondingSnapshot && <UnbondingDetails snapshot={position.unbondingSnapshot} duration={position.unbondingDuration} metadata={position.metadata} />}
             <Divider />
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-              <TextField
-                label="Amount (표시 단위)"
-                value={amount}
-                onChange={(e) => setAmount(e.target.value.trim())}
-                fullWidth
-                disabled={!canSignCosmos || busyAction !== null}
-              />
-              <TextField
-                label="Denom"
-                value={denom}
-                slotProps={{ input: { readOnly: true } }}
-                sx={{ minWidth: 160 }}
-                disabled={!canSignCosmos || busyAction !== null}
-              />
-            </Stack>
-            {amountEntry.confirmation}
-            <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
-              <Button
-                variant="contained"
-                disabled={!canSignCosmos || !amountEntry.ready || denom !== getActiveChainConfig().bondDenom || busyAction !== null}
-                onClick={() =>
-                  void runAction("delegate", () =>
-                    submitDelegateTx({
-                      walletType: walletType ?? "keplr",
-                      sessionTopic,
-                      bech32Address,
-                      validatorAddress: detail.operatorAddress,
-                      amount: amountEntry.requireBase(),
-                      denom,
-                    }),
-                  )
-                }
-              >
-                Delegate
-              </Button>
-              <Button
-                variant="outlined"
-                disabled={!canSignCosmos || !amountEntry.ready || denom !== getActiveChainConfig().bondDenom || busyAction !== null}
-                onClick={() =>
-                  void runAction("undelegate", () =>
-                    submitUndelegateTx({
-                      walletType: walletType ?? "keplr",
-                      sessionTopic,
-                      bech32Address,
-                      validatorAddress: detail.operatorAddress,
-                      amount: amountEntry.requireBase(),
-                      denom,
-                    }),
-                  )
-                }
-              >
-                Undelegate
-              </Button>
-              <Button
-                variant="outlined"
-                disabled={!canSignCosmos || busyAction !== null}
-                onClick={() =>
-                  void runAction("claim-reward", () =>
-                    submitWithdrawDelegatorRewardTx({
-                      walletType: walletType ?? "keplr",
-                      sessionTopic,
-                      bech32Address,
-                      validatorAddress: detail.operatorAddress,
-                    }),
-                  )
-                }
-              >
-                Claim Reward
-              </Button>
-              <Button
-                variant="outlined"
-                color="secondary"
-                disabled={!canSignCosmos || !position.isOperator || busyAction !== null}
-                onClick={() =>
-                  void runAction("claim-commission", () =>
-                    submitWithdrawValidatorCommissionTx({
-                      walletType: walletType ?? "keplr",
-                      sessionTopic,
-                      bech32Address,
-                      validatorAddress: detail.operatorAddress,
-                    }),
-                  )
-                }
-              >
-                Claim Operator Reward
-              </Button>
-            </Stack>
+            <StakingForm validatorAddress={detail.operatorAddress} isOperator={positionQuery.result.status === "success" && position.isOperator} />
           </Stack>
         </CardContent>
       </Card>
