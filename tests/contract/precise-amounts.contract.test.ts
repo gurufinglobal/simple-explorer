@@ -70,10 +70,10 @@ describe('AC02 exact decimal contract', () => {
     expect(await readQuery({ chain: 'fixture', target: 'portfolio' }, () => getWalletPortfolio('a'))).toMatchObject({ status: 'partial', data: { balance: '123 agxn (정밀도 미확인)', reward: '—' } });
   });
   it('validator retains reward decimals and different denoms', async () => {
-    mockQueryHttp(url => amountResponse(url) ?? (url.pathname.endsWith('/outstanding_rewards') ? { rewards: { rewards: [{ denom: 'agxn', amount: '123.45' }, { denom: 'utest', amount: '7' }] } } : url.pathname.endsWith('/commission') ? { commission: { commission: [] } } : url.pathname.endsWith('/delegations') ? { delegation_responses: [{ balance: { denom: 'agxn', amount: '1' } }, { balance: { denom: 'utest', amount: '2' } }] } : { validator: { operator_address: 'v', tokens: '3' } }));
+    mockQueryHttp(url => amountResponse(url) ?? (url.pathname.endsWith('/outstanding_rewards') ? { rewards: { rewards: [{ denom: 'agxn', amount: '123.45' }, { denom: 'utest', amount: '7' }] } } : url.pathname.endsWith('/commission') ? { commission: { commission: [] } } : url.pathname.endsWith('/delegations') ? { delegation_responses: [{ balance: { denom: 'agxn', amount: '1' } }, { balance: { denom: 'agxn', amount: '3' } }, { balance: { denom: 'utest', amount: '2' } }] } : { validator: { operator_address: 'v', tokens: '3' } }));
     const detail = await getValidatorDetail('v');
     expect(detail?.amountCoins?.outstandingRewardsAmount).toEqual([{ denom: 'agxn', amount: '123.45' }, { denom: 'utest', amount: '7' }]);
-    expect(detail?.amountCoins?.totalDelegationAmount).toHaveLength(2);
+    expect(detail?.amountCoins?.totalDelegationAmount).toEqual([{ denom: 'agxn', amount: '4' }, { denom: 'utest', amount: '2' }]);
   });
   it('uses current gov periods and deposits instead of the observed sample', async () => {
     mockQueryHttp(url => url.pathname.endsWith('/voting') ? { voting_params: { voting_period: '120s' } } : url.pathname.endsWith('/deposit') ? { deposit_params: { max_deposit_period: '360s', min_deposit: [{ denom: 'utest', amount: '7654321' }] } } : { tally_params: { quorum: '0.1', threshold: '0.5', veto_threshold: '0.3' } });
