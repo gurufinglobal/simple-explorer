@@ -13,7 +13,7 @@ const coin = z.object({ amount: z.string().regex(/^\d+$/), denom: z.string().min
 const receiptSchema = z.object({
   chainKey: z.string(), chainId: z.string(), sender: z.string(), hash: z.string().regex(/^[A-Fa-f0-9]{64}$/).nullable(),
   status: z.enum(["pending", "success", "failed", "cancelled"]), message: z.string(),
-  code: z.number().int().optional(), estimatedFee: z.array(coin), actualFee: z.array(coin).nullable(), feeWarning: z.string().optional(),
+  code: z.number().int().optional(), estimatedFee: z.array(coin), actualFee: z.array(coin).nullable(), feeWarning: z.string().optional(), queryError: z.string().optional(),
 });
 const storageKey = "explorer:transaction-receipts:v1";
 export const receiptEvent = "explorer:transaction-receipts";
@@ -23,10 +23,21 @@ export function loadReceipts(): TransactionReceipt[] {
     return parsed.success ? parsed.data.slice(-20) : [];
   } catch { return []; }
 }
+export function storedReceipt(receipt: TransactionReceipt): TransactionReceipt | undefined {
+  return receipt.hash ? loadReceipts().find(r => r.chainKey === receipt.chainKey && r.chainId === receipt.chainId && r.hash === receipt.hash) : undefined;
+}
+/** Pending observations cannot retract a known outcome for the same transaction. */
+export function mergeReceiptUpdate(current: TransactionReceipt, next: TransactionReceipt): TransactionReceipt {
+  return current.chainKey === next.chainKey && current.chainId === next.chainId && current.hash === next.hash
+    && next.status === "pending" && (current.status === "success" || current.status === "failed") ? current : next;
+}
 /** Store public chain/hash/result data, never signed bytes or wallet session material. */
 export function saveReceipt(receipt: TransactionReceipt): boolean {
   if (!receipt.hash) return false;
   try {
+    // A delayed timeout/pending writer cannot erase observed execution evidence.
+    const current = storedReceipt(receipt);
+    if (current && mergeReceiptUpdate(current, receipt) === current) return true;
     const records = loadReceipts().filter(r => r.chainKey !== receipt.chainKey || r.hash !== receipt.hash);
     localStorage.setItem(storageKey, JSON.stringify([...records, receipt].slice(-20)));
     window.dispatchEvent(new Event(receiptEvent));
@@ -40,6 +51,13 @@ function receiptChain(receipt: TransactionReceipt) {
 }
 /** Missing/malformed raw fee is not zero and is never replaced by the estimate. */
 export async function queryReceipt(receipt: TransactionReceipt): Promise<TransactionReceipt> {
+  const stored = storedReceipt(receipt);
+  receipt = stored ? mergeReceiptUpdate(receipt, stored) : receipt;
+  // Storage may advance while HTTP is in flight, even if the result UI unmounts.
+  const reconcile = (next: TransactionReceipt) => {
+    const current = storedReceipt(receipt);
+    return current && JSON.stringify(current) !== JSON.stringify(stored) ? mergeReceiptUpdate(receipt, current) : next;
+  };
   try {
     const chain = receiptChain(receipt);
     if (!receipt.hash || !/^[a-fA-F0-9]{64}$/.test(receipt.hash)) throw new Error("해시가 없어 거래 상태를 조회할 수 없습니다.");
@@ -55,12 +73,11 @@ export async function queryReceipt(receipt: TransactionReceipt): Promise<Transac
     const normalized = (coins: typeof actualFee) => JSON.stringify(coins?.map(c => `${c.denom}:${BigInt(c.amount)}`).sort());
     const feeWarning = actualFee === null ? "실제 수수료 원문 미조회 또는 형식 불일치"
       : normalized(actualFee) !== normalized(receipt.estimatedFee) ? "실제 체인 수수료가 앱 예상 수수료와 다릅니다." : undefined;
-    return { ...receipt, status: response.tx_response.code === 0 ? "success" : "failed",
-      code: response.tx_response.code, actualFee, feeWarning,
-      message: response.tx_response.code === 0 ? "체인 포함 성공" : response.tx_response.raw_log || `체인 실행 실패 (code ${response.tx_response.code})` };
+    return reconcile({ ...receipt, status: response.tx_response.code === 0 ? "success" : "failed",
+      code: response.tx_response.code, actualFee, feeWarning, queryError: undefined,
+      message: response.tx_response.code === 0 ? "체인 포함 성공" : response.tx_response.raw_log || `체인 실행 실패 (code ${response.tx_response.code})` });
   } catch (error) {
-    return { ...receipt, message: receipt.status === "pending" ? `확인 중 · ${errorMessage(error)}` : receipt.message,
-      feeWarning: `거래 상세 재조회 실패 · ${errorMessage(error)}` };
+    return reconcile({ ...receipt, queryError: `거래 상세 재조회 실패 · ${errorMessage(error)}` });
   }
 }
 
