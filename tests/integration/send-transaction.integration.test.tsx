@@ -78,6 +78,142 @@ beforeEach(() => {
     broadcastTx: boundary.broadcast, disconnect: vi.fn(),
   }));
 });
+
+describe('W05 saved receipt updates and lookup races (F1)', () => {
+  const pending: TransactionReceipt = { chainKey: 'a', chainId: 'a-1', sender, hash, status: 'pending',
+    message: '전송·포함 확인 중', estimatedFee: [], actualFee: null };
+  const outcomes: TransactionReceipt[] = [
+    { ...pending, status: 'failed', code: 5, message: 'rejected checktx' },
+    { ...pending, status: 'success', code: 0, message: '체인 포함 성공', actualFee: [{ denom: 'agxn', amount: '999' }], feeWarning: '실제 fee 불일치' },
+    { ...pending, message: '확인 중 · Timeout waiting for inclusion', feeWarning: '응답을 확인하지 못했습니다.' },
+  ];
+  async function openPending() {
+    saveReceipt(pending);
+    render(<SavedTransactions chainKey="a" />);
+    fireEvent.click(screen.getByText(/보관된 거래 결과/));
+    fireEvent.click(await screen.findByRole('button', { name: new RegExp(hash) }));
+    expect(screen.getByRole('status').textContent).toBe(pending.message);
+  }
+  it.each(outcomes)('updates an expanded receipt to $status including message and warnings', async next => {
+    await openPending();
+    act(() => { saveReceipt(next); });
+    expect(screen.getByRole('status').textContent).toContain(next.message);
+    if (next.feeWarning) expect(screen.getByText(next.feeWarning)).toBeTruthy();
+    expect(loadReceipts()[0]).toEqual(next);
+    expect(boundary.broadcast).not.toHaveBeenCalled();
+  });
+  it.each(outcomes.slice(0, 2))('preserves $status evidence when a later lookup returns 404', async next => {
+    await openPending();
+    act(() => { saveReceipt(next); });
+    detailFailure = true;
+    fireEvent.click(screen.getByRole('button', { name: '거래 상태·관련 조회 다시 읽기' }));
+    await screen.findByText(/거래 상세 재조회 실패/);
+    expect(screen.getByRole('status').textContent).toContain(next.message);
+    expect(loadReceipts()[0]).toMatchObject(next);
+    if (next.feeWarning) expect(screen.getByText(next.feeWarning)).toBeTruthy();
+    expect(screen.queryByText(/거래 성공 후 화면 갱신 실패/)).toBeNull();
+  });
+  for (const reply of ['404', 'success', 'failed']) {
+    it.each(outcomes)(`ignores an older ${reply} lookup completing after a new $status receipt`, async next => {
+      const lookup = deferred<Response>();
+      http.mockImplementation(async url => String(url).includes('/txs/') ? lookup.promise : response(String(url)));
+      await openPending();
+      fireEvent.click(screen.getByRole('button', { name: '거래 상태·관련 조회 다시 읽기' }));
+      await waitFor(() => expect(http.mock.calls.some(([url]) => String(url).includes('/txs/'))).toBe(true));
+      act(() => { saveReceipt(next); });
+      txStatus = reply === 'failed' ? 9 : 0;
+      await act(async () => { lookup.resolve(reply === '404' ? new Response('', { status: 404 }) : response(`https://a.test:1317/cosmos/tx/v1beta1/txs/${hash}`)); });
+      expect(screen.getByRole('status').textContent).toContain(next.message);
+      expect(loadReceipts()[0]).toEqual(next);
+      expect(boundary.broadcast).not.toHaveBeenCalled();
+    });
+  }
+  it.each(outcomes.slice(0, 2))('cannot replace stored $status with a stale pending writer', next => {
+    saveReceipt(next);
+    saveReceipt(pending);
+    expect(loadReceipts()[0]).toEqual(next);
+  });
+  it('reflects same-status prop updates even without persistence', () => {
+    const view = render(<TransactionResult receipt={pending} />);
+    view.rerender(<TransactionResult receipt={outcomes[2]} />);
+    expect(screen.getByRole('status').textContent).toContain(outcomes[2].message);
+    expect(screen.getByText(outcomes[2].feeWarning!)).toBeTruthy();
+  });
+  it('shows a late real CheckTx rejection after opening the broadcast pending record', async () => {
+    const broadcast = deferred<never>();
+    boundary.broadcast.mockReturnValue(broadcast.promise);
+    const sending = submitSendTx(await prepareSendTx(input));
+    await waitFor(() => expect(boundary.broadcast).toHaveBeenCalledOnce());
+    render(<SavedTransactions chainKey="a" />);
+    fireEvent.click(screen.getByText(/보관된 거래 결과/));
+    fireEvent.click(await screen.findByRole('button', { name: new RegExp(hash) }));
+    await act(async () => {
+      broadcast.reject(new BroadcastTxError(5, 'sdk', 'rejected checktx'));
+      await sending;
+    });
+    expect(screen.getByRole('status').textContent).toContain('rejected checktx · code 5');
+    detailFailure = true;
+    fireEvent.click(screen.getByRole('button', { name: '거래 상태·관련 조회 다시 읽기' }));
+    await screen.findByText(/거래 상세 재조회 실패/);
+    expect(loadReceipts()[0]).toMatchObject({ status: 'failed', code: 5, hash, message: 'rejected checktx' });
+    expect(boundary.broadcast).toHaveBeenCalledOnce();
+  });
+  it('reconciles an in-flight service lookup with newer stored evidence without a mounted UI', async () => {
+    const lookup = deferred<Response>();
+    http.mockImplementation(async url => String(url).includes('/txs/') ? lookup.promise : response(String(url)));
+    saveReceipt(pending);
+    const reading = queryReceipt(pending);
+    await waitFor(() => expect(http.mock.calls.some(([url]) => String(url).includes('/txs/'))).toBe(true));
+    saveReceipt(outcomes[0]);
+    lookup.resolve(response(`https://a.test:1317/cosmos/tx/v1beta1/txs/${hash}`));
+    expect(await reading).toEqual(outcomes[0]);
+  });
+  it('preserves timeout text on lookup failure and clears only the query error on recovery', async () => {
+    await openPending();
+    act(() => { saveReceipt(outcomes[2]); });
+    detailFailure = true;
+    fireEvent.click(screen.getByRole('button', { name: '거래 상태·관련 조회 다시 읽기' }));
+    await screen.findByText(/거래 상세 재조회 실패/);
+    expect(loadReceipts()[0]).toMatchObject(outcomes[2]);
+    detailFailure = false;
+    fireEvent.click(screen.getByRole('button', { name: '거래 상태·관련 조회 다시 읽기' }));
+    await screen.findByText(/체인 포함 성공/);
+    await waitFor(() => expect(screen.queryByText(/거래 상세 재조회 실패/)).toBeNull());
+    expect(loadReceipts()[0].queryError).toBeUndefined();
+  });
+  it('discards related-read errors if a newer receipt arrives while those reads run', async () => {
+    const related = deferred<Response>();
+    http.mockImplementation(async url => new URL(String(url)).pathname.endsWith('/txs') ? related.promise : response(String(url)));
+    await openPending();
+    fireEvent.click(screen.getByRole('button', { name: '거래 상태·관련 조회 다시 읽기' }));
+    await waitFor(() => expect(http.mock.calls.some(([url]) => new URL(String(url)).pathname.endsWith('/txs'))).toBe(true));
+    const next = { ...outcomes[1], feeWarning: '최신 수수료 경고' };
+    act(() => { saveReceipt(next); });
+    await act(async () => { related.resolve(new Response('', { status: 503 })); });
+    expect(screen.getByText(next.feeWarning)).toBeTruthy();
+    expect(screen.queryByText(/거래 성공 후 화면 갱신 실패/)).toBeNull();
+    expect(loadReceipts()[0]).toEqual(next);
+  });
+  it('does not commit an old lookup after the result has unmounted', async () => {
+    const lookup = deferred<Response>();
+    http.mockImplementation(async url => String(url).includes('/txs/') ? lookup.promise : response(String(url)));
+    await openPending();
+    fireEvent.click(screen.getByRole('button', { name: '거래 상태·관련 조회 다시 읽기' }));
+    await waitFor(() => expect(http.mock.calls.some(([url]) => String(url).includes('/txs/'))).toBe(true));
+    cleanup();
+    await act(async () => { lookup.resolve(response(`https://a.test:1317/cosmos/tx/v1beta1/txs/${hash}`)); });
+    expect(loadReceipts()[0]).toEqual(pending);
+  });
+  it.each(outcomes.slice(0, 2))('preserves an unsaved $status outcome against stale stored and prop pending values', async next => {
+    saveReceipt(pending);
+    detailFailure = true;
+    const view = render(<TransactionResult receipt={next} />);
+    await screen.findByText(/거래 상세 재조회 실패/);
+    view.rerender(<TransactionResult receipt={pending} />);
+    expect(screen.getByRole('status').textContent).toContain(next.message);
+    expect(loadReceipts()[0]).toMatchObject(next);
+  });
+});
 afterEach(() => { cleanup(); store.getState().disconnect(); delete window.keplr; delete window.getOfflineSigner; vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 async function fill() {
   render(<SendForm />);

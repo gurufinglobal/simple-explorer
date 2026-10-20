@@ -11,7 +11,7 @@ export type TransactionReceipt = {
   chainKey: string; chainId: string; sender: string; hash: string | null;
   status: "pending" | "success" | "failed" | "cancelled";
   message: string; code?: number; estimatedFee: Coin[];
-  actualFee: Coin[] | null; feeWarning?: string;
+  actualFee: Coin[] | null; feeWarning?: string; queryError?: string;
 };
 export type PreparedTransaction = {
   snapshot: TransactionSnapshot;
