@@ -6,4 +6,7 @@ export type WalletConnectNormalizedSession = {
   bech32Address: string | null;
   connectedChains: string[];
   sessionTopic: string;
+  chainKey?: string;
+  chainId?: string;
+  methods?: string[];
 };

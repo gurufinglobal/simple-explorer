@@ -30,26 +30,5 @@ export function WalletPortfolioHydrator() {
     return clear;
   }, [status, bech32Address, evmAddress, clear, refresh]);
 
-  useEffect(() => {
-    const onChainChanged = () => {
-      const current = useWalletSessionStore.getState();
-      if (current.status !== "connected") {
-        clear();
-        return;
-      }
-      const cosmos = getEffectiveCosmosAddress({
-        bech32Address: current.bech32Address,
-        evmAddress: current.evmAddress,
-      });
-      if (!cosmos) {
-        clear();
-        return;
-      }
-      void refresh(cosmos);
-    };
-    window.addEventListener("explorer:chain-changed", onChainChanged);
-    return () => window.removeEventListener("explorer:chain-changed", onChainChanged);
-  }, [clear, refresh]);
-
   return null;
 }

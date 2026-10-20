@@ -1,18 +1,12 @@
 "use client";
 
-import { calculateFee, GasPrice, SigningStargateClient } from "@cosmjs/stargate";
-import type { OfflineSigner } from "@cosmjs/proto-signing";
+import { calculateFee, GasPrice } from "@cosmjs/stargate";
 import { MsgDeposit, MsgExecLegacyContent, MsgSubmitProposal, MsgVote } from "cosmjs-types/cosmos/gov/v1/tx";
 import { TextProposal } from "cosmjs-types/cosmos/gov/v1beta1/gov";
 import { Any } from "cosmjs-types/google/protobuf/any";
-import { getActiveChainRpcUrl } from "@/services/clients";
 import type { VoteOption } from "@/lib/gov-types";
-import {
-  getAccountPubkeyBytes,
-  getGovModuleAddress,
-} from "./governance-query.service";
-import { getNetworkSummary } from "./network-summary.service";
-import { createWalletConnectOfflineSigner } from "@/services/wallet/walletconnect-cosmos-signer";
+import { getGovModuleAddress } from "./governance-query.service";
+import { createBoundSigningClient } from "@/services/wallet/signing-context";
 
 function gasPrice(): GasPrice {
   const raw = typeof process !== "undefined" ? process.env.NEXT_PUBLIC_GAS_PRICE : undefined;
@@ -35,51 +29,7 @@ function mapProtoVoteOption(o: VoteOption): number {
   }
 }
 
-async function getKeplrSigner(chainId: string): Promise<OfflineSigner> {
-  if (typeof window === "undefined" || !window.keplr || !window.getOfflineSigner) {
-    throw new Error("Keplr is not available.");
-  }
-  await window.keplr.enable(chainId);
-  // Keplr's injected signer type can come from a different package instance; normalize to CosmJS signer type.
-  return window.getOfflineSigner(chainId) as unknown as OfflineSigner;
-}
-
-async function getSignerForWallet(params: {
-  walletType: "keplr" | "metamask" | "walletconnect";
-  sessionTopic: string | null;
-  bech32Address: string | null;
-  chainId: string;
-}): Promise<OfflineSigner> {
-  const { walletType, sessionTopic, bech32Address, chainId } = params;
-
-  if (walletType === "metamask") {
-    throw new Error("MetaMask cannot sign Cosmos governance transactions. Use Keplr or WalletConnect.");
-  }
-
-  if (walletType === "keplr") {
-    return getKeplrSigner(chainId);
-  }
-
-  if (walletType === "walletconnect") {
-    if (!sessionTopic || !bech32Address) {
-      throw new Error("WalletConnect session or Cosmos address is missing.");
-    }
-    const pk = await getAccountPubkeyBytes(bech32Address);
-    if (!pk) {
-      throw new Error("Could not load account public key from chain. Deposit funds or enable the account.");
-    }
-    return createWalletConnectOfflineSigner({
-      topic: sessionTopic,
-      chainId,
-      signerAddress: bech32Address,
-      pubkey: pk,
-    });
-  }
-
-  throw new Error("Unsupported wallet type.");
-}
-
-async function assertBrowser(): Promise<void> {
+function assertBrowser(): void {
   if (typeof window === "undefined") {
     throw new Error("Governance transactions must be submitted from the browser.");
   }
@@ -92,25 +42,8 @@ export async function submitGovernanceVoteTx(params: {
   proposalId: string;
   option: VoteOption;
 }): Promise<{ txHash: string }> {
-  await assertBrowser();
-  const network = await getNetworkSummary();
-  const signer = await getSignerForWallet({
-    walletType: params.walletType,
-    sessionTopic: params.sessionTopic,
-    bech32Address: params.bech32Address,
-    chainId: network.chainId,
-  });
-
-  const accounts = await signer.getAccounts();
-  const address = params.bech32Address ?? accounts[0]?.address ?? null;
-  if (!address) {
-    throw new Error("Connect a Cosmos address (Keplr or WalletConnect).");
-  }
-
-  const rpcUrl = await getActiveChainRpcUrl();
-  const client = await SigningStargateClient.connectWithSigner(rpcUrl, signer, {
-    gasPrice: gasPrice(),
-  });
+  assertBrowser();
+  const { client, signerAddress: address } = await createBoundSigningClient(params, gasPrice());
 
   const msg = {
     typeUrl: "/cosmos.gov.v1.MsgVote",
@@ -138,25 +71,8 @@ export async function submitGovernanceDepositTx(params: {
   amount: string;
   denom: string;
 }): Promise<{ txHash: string }> {
-  await assertBrowser();
-  const network = await getNetworkSummary();
-  const signer = await getSignerForWallet({
-    walletType: params.walletType,
-    sessionTopic: params.sessionTopic,
-    bech32Address: params.bech32Address,
-    chainId: network.chainId,
-  });
-
-  const accounts = await signer.getAccounts();
-  const address = params.bech32Address ?? accounts[0]?.address ?? null;
-  if (!address) {
-    throw new Error("Connect a Cosmos address (Keplr or WalletConnect).");
-  }
-
-  const rpcUrl = await getActiveChainRpcUrl();
-  const client = await SigningStargateClient.connectWithSigner(rpcUrl, signer, {
-    gasPrice: gasPrice(),
-  });
+  assertBrowser();
+  const { client, signerAddress: address } = await createBoundSigningClient(params, gasPrice());
 
   const msg = {
     typeUrl: "/cosmos.gov.v1.MsgDeposit",
@@ -185,25 +101,10 @@ export async function submitTextProposalTx(params: {
   initialDepositAmount: string;
   denom: string;
 }): Promise<{ txHash: string }> {
-  await assertBrowser();
-  const govAddr = await getGovModuleAddress();
-  if (!govAddr) {
-    throw new Error("Could not resolve governance module address.");
-  }
-
-  const network = await getNetworkSummary();
-  const signer = await getSignerForWallet({
-    walletType: params.walletType,
-    sessionTopic: params.sessionTopic,
-    bech32Address: params.bech32Address,
-    chainId: network.chainId,
-  });
-
-  const accounts = await signer.getAccounts();
-  const address = params.bech32Address ?? accounts[0]?.address ?? null;
-  if (!address) {
-    throw new Error("Connect a Cosmos address (Keplr or WalletConnect).");
-  }
+  assertBrowser();
+  const { client, signerAddress: address, queryClient } = await createBoundSigningClient(params, gasPrice());
+  const govAddr = await getGovModuleAddress(queryClient);
+  if (!govAddr) throw new Error("Could not resolve governance module address.");
 
   const tp = TextProposal.fromPartial({
     title: params.title,
@@ -233,10 +134,6 @@ export async function submitTextProposalTx(params: {
     initialDeposit: [{ denom: params.denom, amount: params.initialDepositAmount }],
   });
 
-  const rpcUrl = await getActiveChainRpcUrl();
-  const client = await SigningStargateClient.connectWithSigner(rpcUrl, signer, {
-    gasPrice: gasPrice(),
-  });
 
   const msg = {
     typeUrl: "/cosmos.gov.v1.MsgSubmitProposal",

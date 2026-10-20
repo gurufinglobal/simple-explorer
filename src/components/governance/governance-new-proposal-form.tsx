@@ -21,7 +21,7 @@ export function GovernanceNewProposalForm({ defaultDenom }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
-  const canSign = status === "connected" && (walletType === "keplr" || walletType === "walletconnect");
+  const canSign = useWalletSessionStore(s => s.status === "connected" && s.writeStatus === "ready");
   const metamask = status === "connected" && walletType === "metamask";
 
   const onSubmit = async () => {

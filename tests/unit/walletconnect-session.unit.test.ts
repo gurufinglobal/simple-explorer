@@ -30,7 +30,7 @@ describe("normalizeWalletConnectSession", () => {
       peer: { publicKey: "b", metadata: { name: "", description: "", url: "", icons: [] } },
     };
 
-    const n = normalizeWalletConnectSession(session as never);
+    const n = normalizeWalletConnectSession(session as never, { key: "test", name: "Test", lcdUrl: "https://lcd.test", chainId: "test-chain-1", evmChainId: "1" });
     expect(n.sessionTopic).toBe("abc123");
     expect(n.evmAddress).toBe("0x1111111111111111111111111111111111111111");
     expect(n.bech32Address).toBe("guru1testaddress000000000000000000000");
@@ -50,7 +50,7 @@ describe("normalizeWalletConnectSession", () => {
         },
       },
     };
-    const n1 = normalizeWalletConnectSession(evmOnly as never);
+    const n1 = normalizeWalletConnectSession(evmOnly as never, { key: "test", name: "Test", lcdUrl: "https://lcd.test", evmChainId: "5" });
     expect(n1.bech32Address).toBeNull();
     expect(n1.evmAddress).toMatch(/^0x/);
 

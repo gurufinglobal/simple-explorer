@@ -75,7 +75,7 @@ export function DashboardView() {
   const portfolio = storedPortfolio.result.context.chain === getActiveChainConfig().key && storedPortfolio.result.context.target === `portfolio:${effectiveCosmos}`
     ? storedPortfolio : { ...storedPortfolio, balance: "—", staking: "—", reward: "—", unbonding: "—", error: null, loading: false };
   const loading = summary.busy && !state;
-  const canSignCosmos = wallet.status === "connected" && (wallet.walletType === "keplr" || wallet.walletType === "walletconnect");
+  const canSignCosmos = useWalletSessionStore(s => s.status === "connected" && s.writeStatus === "ready");
   const isMetamask = wallet.status === "connected" && wallet.walletType === "metamask";
   const [activeAction, setActiveAction] = useState<"send" | "delegate" | null>(null);
   const [sendToAddress, setSendToAddress] = useState("");

@@ -14,9 +14,10 @@ export function getEffectiveCosmosAddress(input: {
     return input.bech32Address;
   }
   if (input.evmAddress && isEthereumAddress(input.evmAddress)) {
-    const chain = typeof window !== "undefined" ? getActiveChainConfigFromClientCookie() : null;
-    const hrp = chain?.bech32Prefix ?? readPublicEnv().NEXT_PUBLIC_BECH32_PREFIX ?? "guru";
     try {
+      const chain = typeof window !== "undefined" ? getActiveChainConfigFromClientCookie() : null;
+      const hrp = chain?.bech32Prefix ?? readPublicEnv().NEXT_PUBLIC_BECH32_PREFIX;
+      if (!hrp) return null;
       return ethToCosmosBech32(input.evmAddress, hrp);
     } catch {
       return null;

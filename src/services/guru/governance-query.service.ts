@@ -245,14 +245,11 @@ export async function getGovModuleAddress(apiClients: QueryClient = defaultClien
 
 export async function getAccountPubkeyBytes(address: string, apiClients: QueryClient = defaultClients): Promise<Uint8Array | null> {
 
-  type AccountResp = {
-    account?: {
-      pub_key?: { key?: string };
-    };
-  };
-  const res = await safeLcdGet<AccountResp>(`/cosmos/auth/v1beta1/accounts/${encodeURIComponent(address)}`, apiClients
-  );
-  const keyB64 = res?.account?.pub_key?.key;
+  const res = await safeLcdGet<{ account?: unknown }>(`/cosmos/auth/v1beta1/accounts/${encodeURIComponent(address)}`, apiClients);
+  const account = record(res?.account);
+  const base = record(account?.base_account) ?? record(record(account?.base_vesting_account)?.base_account) ?? account;
+  const keyB64 = record(base?.pub_key)?.key;
+  if (typeof keyB64 !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(keyB64)) return null;
   if (!keyB64) {
     return null;
   }

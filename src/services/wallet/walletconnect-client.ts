@@ -2,9 +2,9 @@ import type { ProposalTypes } from "@walletconnect/types";
 import type { SessionTypes } from "@walletconnect/types";
 import type SignClient from "@walletconnect/sign-client";
 import { getSdkError } from "@walletconnect/utils";
-import { readPublicEnv } from "@/lib/env";
+import { readPublicEnv, type ChainConfig } from "@/lib/env";
 import { getActiveChainConfig } from "@/lib/chain-selection";
-import { getNetworkSummary } from "@/services/guru/network-summary.service";
+import { verifyLcdChain } from "./chain-eligibility";
 
 let clientPromise: Promise<SignClient> | null = null;
 
@@ -44,43 +44,26 @@ export async function getOrCreateSignClient(): Promise<SignClient> {
           icons: [],
         },
       });
-    })();
+    })().catch(error => { clientPromise = null; throw error; });
   }
 
   return clientPromise;
 }
 
-async function buildRequiredNamespaces(): Promise<ProposalTypes.RequiredNamespaces> {
-  const network = await getNetworkSummary();
-  const env = readPublicEnv();
-  const activeChain = await getActiveChainConfig();
-  const evmRef = activeChain.evmChainId ?? env.NEXT_PUBLIC_EVM_CHAIN_ID ?? "1";
-  const eipChain = `eip155:${evmRef}`;
-  const cosmosChain = `cosmos:${network.chainId}`;
-
-  return {
-    eip155: {
-      chains: [eipChain],
-      methods: ["eth_sendTransaction", "personal_sign", "eth_signTypedData_v4"],
-      events: ["accountsChanged", "chainChanged"],
-    },
-    cosmos: {
-      chains: [cosmosChain],
-      methods: ["cosmos_signDirect", "cosmos_signAmino"],
-      events: [],
-    },
-  };
+async function buildRequiredNamespaces(chain: ChainConfig): Promise<ProposalTypes.RequiredNamespaces> {
+  const chainId = chain.chainId ?? await verifyLcdChain(chain);
+  return { cosmos: { chains: [`cosmos:${chainId}`], methods: ["cosmos_signAmino"], events: [] } };
 }
 
 /**
  * Starts a WalletConnect pairing. Shows `uri` as a QR code; await `approval()` for the settled session.
  */
-export async function connectWalletConnectPairing(): Promise<{
+export async function connectWalletConnectPairing(chain: ChainConfig = getActiveChainConfig()): Promise<{
   uri?: string;
   approval: () => Promise<SessionTypes.Struct>;
 }> {
   const client = await getOrCreateSignClient();
-  const requiredNamespaces = await buildRequiredNamespaces();
+  const requiredNamespaces = await buildRequiredNamespaces(chain);
   return client.connect({ requiredNamespaces });
 }
 

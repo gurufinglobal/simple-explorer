@@ -60,6 +60,7 @@ export function WalletConnectQrDialog({
             </Typography>
           ) : null}
           <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="center">
+            <Button onClick={onClose}>Cancel connection</Button>
             <Button variant="outlined" onClick={() => void copyUri()} disabled={!uri}>
               Copy URI
             </Button>

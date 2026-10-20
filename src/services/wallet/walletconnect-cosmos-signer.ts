@@ -2,6 +2,8 @@
 
 import type { AccountData, AminoSignResponse, StdSignDoc } from "@cosmjs/amino";
 import type { OfflineSigner } from "@cosmjs/proto-signing";
+import { assertWalletConnectApproval } from "./walletconnect-session";
+import { getActiveChainConfig } from "@/lib/chain-selection";
 import { getOrCreateSignClient } from "@/services/wallet/walletconnect-client";
 
 /**
@@ -12,6 +14,7 @@ export function createWalletConnectOfflineSigner(params: {
   chainId: string;
   signerAddress: string;
   pubkey: Uint8Array;
+  assertCurrent: () => void;
 }): OfflineSigner {
   const { topic, chainId, signerAddress, pubkey } = params;
 
@@ -24,10 +27,15 @@ export function createWalletConnectOfflineSigner(params: {
       },
     ],
     signAmino: async (signer: string, signDoc: StdSignDoc): Promise<AminoSignResponse> => {
-      if (signer !== signerAddress) {
+      params.assertCurrent();
+      if (signer !== signerAddress || signDoc.chain_id !== chainId || !pubkey.length) {
         throw new Error("Signer address mismatch");
       }
       const client = await getOrCreateSignClient();
+      params.assertCurrent();
+      const chain = getActiveChainConfig();
+      if (chain.chainId !== chainId) throw new Error("WalletConnect chain mismatch");
+      assertWalletConnectApproval(client.session.get(topic), chain, signerAddress);
       const result = await client.request({
         topic,
         chainId: `cosmos:${chainId}`,
@@ -39,6 +47,7 @@ export function createWalletConnectOfflineSigner(params: {
           },
         },
       });
+      params.assertCurrent();
       return result as AminoSignResponse;
     },
   };
