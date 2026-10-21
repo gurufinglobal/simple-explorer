@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/layout/chain-link";
 import { useEffect, useMemo, useState } from "react";
 import {
   Box,

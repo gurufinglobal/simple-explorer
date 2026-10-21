@@ -1,6 +1,6 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import Link from "@/components/layout/chain-link";
 import { Alert, Button, Stack, Typography } from "@mui/material";
 import { errorMessage, transactionLink, type TransactionReceipt } from "@/services/transactions/transaction";
 import { loadReceipts, mergeReceiptUpdate, queryReceipt, receiptEvent, refreshTransactionReads, saveReceipt, storedReceipt } from "@/services/transactions/receipt";

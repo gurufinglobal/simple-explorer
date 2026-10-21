@@ -2,7 +2,7 @@
 
 import { CoinAmount } from "@/components/amount/coin-amount";
 import { UnbondingDetails } from "@/components/amount/unbonding-details";
-import Link from "next/link";
+import Link from "@/components/layout/chain-link";
 import { getActiveChainConfig } from "@/lib/chain-selection";
 import { useMemo, useState } from "react";
 import { useQuery } from "@/hooks/use-query";

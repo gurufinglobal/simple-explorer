@@ -4,11 +4,11 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { PathParamsContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import AddressDetailPage from '@/app/(explorer)/address/[address]/page';
-import { mockQueryHttp } from '../helpers/query-http';
+import { mockQueryHttp, fixtureAddress } from '../helpers/query-http';
 import { restoreHttpBoundary } from '../helpers/network-summary';
 afterEach(() => { cleanup(); restoreHttpBoundary(); });
 function show() {
-  return render(<PathParamsContext.Provider value={{ address: 'fixture-address' }}><AddressDetailPage /></PathParamsContext.Provider>);
+  return render(<PathParamsContext.Provider value={{ address: fixtureAddress }}><AddressDetailPage /></PathParamsContext.Provider>);
 }
 function fixture(path: string) {
   if (path.includes('/auth/')) return { account: { account_number: '1', sequence: '2' } };

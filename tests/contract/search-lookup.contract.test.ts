@@ -1,4 +1,4 @@
-import { mockQueryHttp, block, transaction } from "../helpers/query-http";
+import { mockQueryHttp, block, transaction, fixtureAddress } from "../helpers/query-http";
 import { restoreHttpBoundary } from "../helpers/network-summary";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { lookupByQuery } from "@/server/handlers/search-lookup.handler";
@@ -20,7 +20,7 @@ describe("search lookup contract", () => {
   });
 
   it("returns address balances for address input", async () => {
-    const result = await lookupByQuery("0x0000000000000000000000000000000000000002");
+    const result = await lookupByQuery(fixtureAddress);
     expect(result.status).toBe(200);
     expect(result.body).toHaveProperty("resolvedType", "address");
   });

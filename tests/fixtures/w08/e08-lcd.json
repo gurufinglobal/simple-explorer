@@ -1,0 +1,156 @@
+{
+  "observedAt": "2026-10-21T00:03:15Z",
+  "chain": "guru_631-1",
+  "endpoint": "https://tgxn.gurufin.io:1317/cosmos/base/tendermint/v1beta1/blocks/19611674",
+  "source": "GURA-32 plan E08/E09; W08 public read re-observation",
+  "limitation": "Existing public history only. No signing/broadcast, EVM receipt or mapping verification. Terminal access does not prove browser RPC CORS.",
+  "response": {
+    "block_id": {
+      "hash": "y6TVLHKzYE68rrjfPJOiyQ68E4F2nxcVoCMmr7HKZfU=",
+      "part_set_header": {
+        "total": 1,
+        "hash": "kyReLhh1yP09aHPaGXGU9nPGJjUhTBcagrtGe9v7Wk0="
+      }
+    },
+    "block": {
+      "header": {
+        "version": {
+          "block": "11",
+          "app": "0"
+        },
+        "chain_id": "guru_631-1",
+        "height": "19611674",
+        "time": "2026-10-20T01:49:40.335974962Z",
+        "last_block_id": {
+          "hash": "HJfT6MGbt3YLj3TkGyb1L73U2Nq1TVaS6UNj4Mul08Y=",
+          "part_set_header": {
+            "total": 1,
+            "hash": "IPgP1jmctmBSpuJtigOESBe3PAJT7C42/F0ltDDTYLQ="
+          }
+        },
+        "last_commit_hash": "Fjw0O6v4fHbzFd2QPRf6VTtb8KuIiUVV7efqxpwbyk8=",
+        "data_hash": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=",
+        "validators_hash": "3xhf3X+scnNWNLYuO8j4/c34ehuPndJC/Vff/le2sA4=",
+        "next_validators_hash": "3xhf3X+scnNWNLYuO8j4/c34ehuPndJC/Vff/le2sA4=",
+        "consensus_hash": "vml94SL+cPwUT5B4L5ZAe/3n0gSLsv2tqMpUVEVA8gg=",
+        "app_hash": "92RDnsytKEoPJkRxyydNX8vpoMRJMB9mVjEZ+csAXsE=",
+        "last_results_hash": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=",
+        "evidence_hash": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=",
+        "proposer_address": "dSmv4vGJmFDTarg2ybwEyC8FOaY="
+      },
+      "data": {
+        "txs": []
+      },
+      "evidence": {
+        "evidence": []
+      },
+      "last_commit": {
+        "height": "19611673",
+        "round": 0,
+        "block_id": {
+          "hash": "HJfT6MGbt3YLj3TkGyb1L73U2Nq1TVaS6UNj4Mul08Y=",
+          "part_set_header": {
+            "total": 1,
+            "hash": "IPgP1jmctmBSpuJtigOESBe3PAJT7C42/F0ltDDTYLQ="
+          }
+        },
+        "signatures": [
+          {
+            "block_id_flag": "BLOCK_ID_FLAG_COMMIT",
+            "validator_address": "OuFSKoxflKFRPCNwe9uSEHc4dSE=",
+            "timestamp": "2026-10-20T01:49:40.431617695Z",
+            "signature": "42L4d40Rf5GORL9Ob6YAMHNcbpEH9rdfJN/J7WvuEoDcx/M/VPli9BPHRj2n+aFijOnN5g0WDBvrh9zEdhADDg=="
+          },
+          {
+            "block_id_flag": "BLOCK_ID_FLAG_COMMIT",
+            "validator_address": "dSmv4vGJmFDTarg2ybwEyC8FOaY=",
+            "timestamp": "2026-10-20T01:49:40.432008635Z",
+            "signature": "JVG2JacQsEuu7uLTmXXLA4RySnv+LvWqA4RR0w4rrj+HTmgMGVkZTi1arRk6nII/NabbDxtDI2v96jsE6fdcAA=="
+          },
+          {
+            "block_id_flag": "BLOCK_ID_FLAG_COMMIT",
+            "validator_address": "ynFcLdZBXeEwsgqJM7Za2moYGbg=",
+            "timestamp": "2026-10-20T01:49:40.332537520Z",
+            "signature": "DcnHCTJ32xWW0MMqVOKmyXZozSL/nl9UpnINqZqTc6fup9khHFd9yIfLiBs6GBlPatKPkH875/yKnvlR0l0GAw=="
+          },
+          {
+            "block_id_flag": "BLOCK_ID_FLAG_COMMIT",
+            "validator_address": "7EVXSpbcLW7le5ESaaWx+8Nr1uk=",
+            "timestamp": "2026-10-20T01:49:40.335974962Z",
+            "signature": "CrIkFY0/IeyFVo50Sm4hpgr8IYkJ2fuBfJqlfz17D5vtJPjuWqCOsXflMXqHvv9WMXEOScxysxAZo4WSOkqKCQ=="
+          }
+        ]
+      }
+    },
+    "sdk_block": {
+      "header": {
+        "version": {
+          "block": "11",
+          "app": "0"
+        },
+        "chain_id": "guru_631-1",
+        "height": "19611674",
+        "time": "2026-10-20T01:49:40.335974962Z",
+        "last_block_id": {
+          "hash": "HJfT6MGbt3YLj3TkGyb1L73U2Nq1TVaS6UNj4Mul08Y=",
+          "part_set_header": {
+            "total": 1,
+            "hash": "IPgP1jmctmBSpuJtigOESBe3PAJT7C42/F0ltDDTYLQ="
+          }
+        },
+        "last_commit_hash": "Fjw0O6v4fHbzFd2QPRf6VTtb8KuIiUVV7efqxpwbyk8=",
+        "data_hash": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=",
+        "validators_hash": "3xhf3X+scnNWNLYuO8j4/c34ehuPndJC/Vff/le2sA4=",
+        "next_validators_hash": "3xhf3X+scnNWNLYuO8j4/c34ehuPndJC/Vff/le2sA4=",
+        "consensus_hash": "vml94SL+cPwUT5B4L5ZAe/3n0gSLsv2tqMpUVEVA8gg=",
+        "app_hash": "92RDnsytKEoPJkRxyydNX8vpoMRJMB9mVjEZ+csAXsE=",
+        "last_results_hash": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=",
+        "evidence_hash": "47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU=",
+        "proposer_address": "guruvalcons1w556lch33xv9p5m2hqmvn0qyeqhs2wdx784uaz"
+      },
+      "data": {
+        "txs": []
+      },
+      "evidence": {
+        "evidence": []
+      },
+      "last_commit": {
+        "height": "19611673",
+        "round": 0,
+        "block_id": {
+          "hash": "HJfT6MGbt3YLj3TkGyb1L73U2Nq1TVaS6UNj4Mul08Y=",
+          "part_set_header": {
+            "total": 1,
+            "hash": "IPgP1jmctmBSpuJtigOESBe3PAJT7C42/F0ltDDTYLQ="
+          }
+        },
+        "signatures": [
+          {
+            "block_id_flag": "BLOCK_ID_FLAG_COMMIT",
+            "validator_address": "OuFSKoxflKFRPCNwe9uSEHc4dSE=",
+            "timestamp": "2026-10-20T01:49:40.431617695Z",
+            "signature": "42L4d40Rf5GORL9Ob6YAMHNcbpEH9rdfJN/J7WvuEoDcx/M/VPli9BPHRj2n+aFijOnN5g0WDBvrh9zEdhADDg=="
+          },
+          {
+            "block_id_flag": "BLOCK_ID_FLAG_COMMIT",
+            "validator_address": "dSmv4vGJmFDTarg2ybwEyC8FOaY=",
+            "timestamp": "2026-10-20T01:49:40.432008635Z",
+            "signature": "JVG2JacQsEuu7uLTmXXLA4RySnv+LvWqA4RR0w4rrj+HTmgMGVkZTi1arRk6nII/NabbDxtDI2v96jsE6fdcAA=="
+          },
+          {
+            "block_id_flag": "BLOCK_ID_FLAG_COMMIT",
+            "validator_address": "ynFcLdZBXeEwsgqJM7Za2moYGbg=",
+            "timestamp": "2026-10-20T01:49:40.332537520Z",
+            "signature": "DcnHCTJ32xWW0MMqVOKmyXZozSL/nl9UpnINqZqTc6fup9khHFd9yIfLiBs6GBlPatKPkH875/yKnvlR0l0GAw=="
+          },
+          {
+            "block_id_flag": "BLOCK_ID_FLAG_COMMIT",
+            "validator_address": "7EVXSpbcLW7le5ESaaWx+8Nr1uk=",
+            "timestamp": "2026-10-20T01:49:40.335974962Z",
+            "signature": "CrIkFY0/IeyFVo50Sm4hpgr8IYkJ2fuBfJqlfz17D5vtJPjuWqCOsXflMXqHvv9WMXEOScxysxAZo4WSOkqKCQ=="
+          }
+        ]
+      }
+    }
+  }
+}

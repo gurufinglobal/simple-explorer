@@ -1,8 +1,8 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import Link from "@/components/layout/chain-link";
+import { usePathname, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState, type ReactNode } from "react";
 import {
   Alert,
   AppBar,
@@ -30,10 +30,11 @@ import LocalAtmOutlinedIcon from "@mui/icons-material/LocalAtmOutlined";
 import QueryStatsOutlinedIcon from "@mui/icons-material/QueryStatsOutlined";
 import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
+import { WalletPortfolioHydrator } from "@/components/wallet/wallet-portfolio-hydrator";
 import { HeaderWalletMenu } from "@/components/wallet/header-wallet-menu";
 import { ChainSelector } from "@/components/layout/chain-selector";
 import { TopNavSearch } from "@/components/search/top-nav-search";
-import { getActiveChainConfigFromClientCookie } from "@/lib/chain-selection";
+import { getActiveChainConfigFromClientCookie, synchronizeRouteChain, withChain } from "@/lib/chain-selection";
 import { type ChainConfig } from "@/lib/env";
 
 const drawerWidth = 240;
@@ -62,6 +63,12 @@ const menus: MenuItem[] = [
 ];
 
 export function ExplorerShell({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<Alert severity="info">체인 설정 확인 중…</Alert>}><ExplorerShellContent>{children}</ExplorerShellContent></Suspense>;
+}
+
+function ExplorerShellContent({ children }: { children: ReactNode }) {
+  const search = useSearchParams();
+  const routeChain = search.get("chain");
   const pathname = usePathname();
   const [activeChain, setActiveChain] = useState<ChainConfig | null>(null);
   const [configError, setConfigError] = useState<string | null>(null);
@@ -72,9 +79,21 @@ export function ExplorerShell({ children }: { children: ReactNode }) {
       try { setActiveChain(getActiveChainConfigFromClientCookie()); setConfigError(null); }
       catch (e) { setActiveChain(null); setConfigError(e instanceof Error ? e.message : "체인 설정 오류"); }
     };
-    sync(); window.addEventListener("explorer:chain-changed", sync);
-    return () => window.removeEventListener("explorer:chain-changed", sync);
-  }, []);
+    synchronizeRouteChain();
+    sync();
+    if (routeChain === null) {
+      try { window.history.replaceState(null, "", withChain(window.location.pathname + window.location.search + window.location.hash)); } catch { /* Configuration error is shown below. */ }
+    }
+    const onPopState = () => { synchronizeRouteChain(); sync(); };
+    window.addEventListener("explorer:chain-changed", sync);
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("explorer:chain-changed", sync);
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, [routeChain]);
+
+  const ready = activeChain && (routeChain === null || routeChain === activeChain.key);
 
   const visibleMenus = menus.filter((menu) => {
     if (menu.requiresBex && activeChain?.features?.bex !== true) {
@@ -96,7 +115,7 @@ export function ExplorerShell({ children }: { children: ReactNode }) {
     <Box sx={{ overflow: "auto" }}>
       <List>
         {visibleMenus.map((menu) => (
-          <ListItemButton key={menu.href} component={Link} href={menu.href}
+          <ListItemButton key={menu.href} component={Link} href={activeChain ? withChain(menu.href, activeChain.key) : menu.href}
             selected={pathname.startsWith(menu.href)} onClick={() => setMenuOpen(false)}>
             <ListItemIcon>{menu.icon}</ListItemIcon>
             <ListItemText primary={menu.label} />
@@ -125,10 +144,10 @@ export function ExplorerShell({ children }: { children: ReactNode }) {
             Guru Chain Explorer
           </Typography>
           <Box sx={{ flex: { xs: "1 1 100%", md: 1 }, minWidth: 0, maxWidth: { md: 640 }, order: { xs: 1, md: 0 } }}>
-            {activeChain && <TopNavSearch />}
+            {ready && <TopNavSearch />}
           </Box>
           <Box sx={{ minWidth: 0, flex: { xs: 1, md: "initial" }, overflowWrap: "anywhere" }}>
-            {activeChain && <HeaderWalletMenu />}
+            {ready && <HeaderWalletMenu />}
           </Box>
         </Toolbar>
       </AppBar>
@@ -151,7 +170,7 @@ export function ExplorerShell({ children }: { children: ReactNode }) {
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, minWidth: 0, p: { xs: 2, md: 3 }, ml: 0 }}>
         <Toolbar sx={{ display: { xs: "none", md: "flex" } }} />
-        {configError ? <Alert severity="error">{configError} 탐색 메뉴에서 체인을 선택하세요.</Alert> : activeChain ? <Box key={activeChain.key}>{children}</Box> : <Alert severity="info">체인 설정 확인 중…</Alert>}
+        {configError ? <Alert severity="error">{configError} 탐색 메뉴에서 체인을 선택하세요.</Alert> : ready ? <Box key={activeChain.key}><WalletPortfolioHydrator />{children}</Box> : <Alert severity="info">체인 설정 확인 중…</Alert>}
       </Box>
     </Box>
   );

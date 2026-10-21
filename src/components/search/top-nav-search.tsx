@@ -1,88 +1,51 @@
 "use client";
+import { useState, type FormEvent } from "react";
+import { useRouter } from "next/navigation";
+import { Alert, Button, Paper, Stack, TextField, Typography } from "@mui/material";
+import { classifyQuery, searchHref, type SearchResolution, type ResolvedType } from "@/services/search/query-classifier";
+import { getActiveChainConfig } from "@/lib/chain-selection";
 
-import { FormEvent, useMemo, useState } from "react";
-import { usePathname, useRouter } from "next/navigation";
-import SearchIcon from "@mui/icons-material/Search";
-import { Alert, IconButton, InputAdornment, Snackbar, TextField } from "@mui/material";
-import { classifyQuery } from "@/services/search/query-classifier";
-
-function resolveHrefFromQuery(query: string): { href: string | null; error: string | null } {
-  const trimmed = query.trim();
-  if (!trimmed) {
-    return { href: null, error: "검색어를 입력해주세요." };
-  }
-
-  const resolved = classifyQuery(trimmed);
-  if (resolved.resolvedType === "blockHeight") {
-    return { href: `/blocks/${encodeURIComponent(trimmed)}`, error: null };
-  }
-  if (resolved.resolvedType === "txHash") {
-    return { href: `/tx/${encodeURIComponent(trimmed)}`, error: null };
-  }
-  if (resolved.resolvedType === "address") {
-    return { href: `/address/${encodeURIComponent(trimmed)}`, error: null };
-  }
-  return { href: null, error: "block height, tx hash, account address만 지원합니다." };
-}
-
+const labels: Record<ResolvedType, string> = {
+  txHash: "Cosmos tx hash (hex)", blockHeight: "블록 높이 (정수)", address: "계정 주소 (Bech32)", validator: "validator", token: "token",
+};
 export function TopNavSearch() {
   const router = useRouter();
-  const pathname = usePathname();
   const [query, setQuery] = useState("");
+  const [choice, setChoice] = useState<{ resolution: SearchResolution; chainKey: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
-
-  const placeholder = useMemo(
-    () => "Block Height / Tx Hash / Account Address",
-    [],
-  );
-
-  function onSubmit(event: FormEvent) {
-    event.preventDefault();
-    const target = resolveHrefFromQuery(query);
-    if (!target.href) {
-      setError(target.error ?? "검색 대상을 판별할 수 없습니다.");
-      return;
-    }
-    setError(null);
-    if (pathname === target.href) {
-      return;
-    }
-    router.push(target.href);
+  function navigate(resolution: SearchResolution, candidate: ResolvedType, expectedChain: string) {
+    const chain = getActiveChainConfig();
+    if (chain.key !== expectedChain) { setChoice(null); setError("체인이 변경되었습니다. 다시 검색하세요."); return; }
+    router.push(searchHref(resolution, candidate, chain));
+    setChoice(null);
   }
-
-  return (
-    <>
-      <form onSubmit={onSubmit} style={{ width: "100%" }}>
-        <TextField
-          fullWidth
-          size="small"
-          placeholder={placeholder}
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          slotProps={{
-            input: {
-              endAdornment: (
-                <InputAdornment position="end">
-                  <IconButton type="submit" size="small" aria-label="search">
-                    <SearchIcon fontSize="small" />
-                  </IconButton>
-                </InputAdornment>
-              ),
-            },
-          }}
-        />
-      </form>
-
-      <Snackbar
-        open={Boolean(error)}
-        autoHideDuration={2500}
-        onClose={() => setError(null)}
-        anchorOrigin={{ vertical: "top", horizontal: "center" }}
-      >
-        <Alert severity="warning" onClose={() => setError(null)} variant="filled">
-          {error}
-        </Alert>
-      </Snackbar>
-    </>
-  );
+  function submit(event: FormEvent) {
+    event.preventDefault(); setChoice(null); setError(null);
+    try {
+      const chain = getActiveChainConfig();
+      const resolution = classifyQuery(query, chain);
+      if (resolution.error || !resolution.resolvedType) { setError(resolution.error); return; }
+      if (resolution.hasConflict) { setChoice({ resolution, chainKey: chain.key }); return; }
+      navigate(resolution, resolution.resolvedType, chain.key);
+    } catch (e) { setError((e as Error).message); }
+  }
+  return <Stack sx={{ position: "relative" }}>
+    <form onSubmit={submit}>
+      <Stack direction="row" spacing={1}>
+        <TextField fullWidth size="small" label="블록 높이 / Cosmos tx hash (hex) / 계정 주소" value={query}
+          onChange={event => { setQuery(event.target.value); setChoice(null); setError(null); }} />
+        <Button type="submit" aria-label="search">검색</Button>
+      </Stack>
+    </form>
+    {(error || choice) && <Paper elevation={8} sx={{ position: "absolute", top: "100%", left: 0, right: 0, mt: 1, p: 1, zIndex: 1 }}>
+    {error && <Alert severity="warning">{error}</Alert>}
+    {choice && <Stack role="group" aria-label="검색 후보 선택">
+      <Typography>여러 의미로 해석되는 입력입니다. 조회 대상을 선택하세요.</Typography>
+      {choice.resolution.candidates.map(candidate => <Button key={candidate}
+        onClick={() => navigate(choice.resolution, candidate, choice.chainKey)}>{labels[candidate]}</Button>)}
+    </Stack>}
+    <Typography variant="caption">Cosmos tx hash만 조회합니다. EVM hash 대응·블록 hash 검색·validator/token 검색은 미지원입니다.</Typography>
+    <Button size="small" onClick={() => { setError(null); setChoice(null); }}>닫기</Button>
+    </Paper>}
+  </Stack>;
 }

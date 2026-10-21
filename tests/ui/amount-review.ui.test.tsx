@@ -7,12 +7,12 @@ import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared
 import AddressDetailPage from '@/app/(explorer)/address/[address]/page';
 import { ValidatorsTable } from '@/components/staking/validators-table';
 import { getTopValidators } from '@/services/guru/staking.service';
-import { mockQueryHttp } from '../helpers/query-http';
+import { mockQueryHttp, fixtureAddress } from '../helpers/query-http';
 import { restoreHttpBoundary } from '../helpers/network-summary';
 import { amountReviewResponse, delegatedCoins, reviewMetadata } from '../helpers/amount-review';
 afterEach(() => { cleanup(); restoreHttpBoundary(); });
 function addressPage() {
-  render(<PathParamsContext.Provider value={{ address: 'public-address' }}><AddressDetailPage /></PathParamsContext.Provider>);
+  render(<PathParamsContext.Provider value={{ address: fixtureAddress }}><AddressDetailPage /></PathParamsContext.Provider>);
 }
 it.each([false, true])('R1 address retry restores metadata-only full/page failure and clears warning: later page %s', async later => {
   let failed = true;
@@ -22,7 +22,7 @@ it.each([false, true])('R1 address retry restores metadata-only full/page failur
     return new Response('', { status: 503 });
   });
   addressPage();
-  const query = (await screen.findByText(/fixture · address-portfolio:public-address/)).closest('[data-query-status]') as HTMLElement;
+  const query = (await screen.findByText(new RegExp("fixture · address-portfolio:" + fixtureAddress))).closest('[data-query-status]') as HTMLElement;
   expect(query.getAttribute('data-query-status')).toBe('partial');
   expect(within(query).getByRole('alert').textContent).toContain('Metadata 조회 실패');
   const staking = screen.getByRole('region', { name: '위임 원본 금액' });
@@ -68,5 +68,5 @@ it('R3 validator original toggles by pointer/keyboard without navigation; ordina
   expect(push).not.toHaveBeenCalled();
   await userEvent.click(screen.getByText('Validator'));
   expect(push).toHaveBeenCalledTimes(1);
-  expect(push).toHaveBeenCalledWith('/staking/v');
+  expect(push).toHaveBeenCalledWith('/staking/v?chain=fixture');
 });

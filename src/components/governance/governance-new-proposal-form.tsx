@@ -1,7 +1,7 @@
 "use client";
 
 import { useAmountEntry } from "@/components/amount/amount-entry";
-import Link from "next/link";
+import Link from "@/components/layout/chain-link";
 import { useState } from "react";
 import { Alert, Button, Card, CardContent, Stack, TextField, Typography } from "@mui/material";
 import { prepareGovernanceTx, governanceBlockReason } from "@/services/guru/governance-tx.client";

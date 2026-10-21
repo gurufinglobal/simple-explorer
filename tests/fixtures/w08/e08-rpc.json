@@ -1,0 +1,89 @@
+{
+  "observedAt": "2026-10-21T00:03:15Z",
+  "chain": "guru_631-1",
+  "endpoint": "https://tgxn.gurufin.io:26657/block?height=19611674",
+  "source": "GURA-32 plan E08/E09; W08 public read re-observation",
+  "limitation": "Existing public history only. No signing/broadcast, EVM receipt or mapping verification. Terminal access does not prove browser RPC CORS.",
+  "response": {
+    "jsonrpc": "2.0",
+    "id": -1,
+    "result": {
+      "block_id": {
+        "hash": "CBA4D52C72B3604EBCAEB8DF3C93A2C90EBC1381769F1715A02326AFB1CA65F5",
+        "parts": {
+          "total": 1,
+          "hash": "93245E2E1875C8FD3D6873DA197194F673C62635214C171A82BB467BDBFB5A4D"
+        }
+      },
+      "block": {
+        "header": {
+          "version": {
+            "block": "11"
+          },
+          "chain_id": "guru_631-1",
+          "height": "19611674",
+          "time": "2026-10-20T01:49:40.335974962Z",
+          "last_block_id": {
+            "hash": "1C97D3E8C19BB7760B8F74E41B26F52FBDD4D8DAB54D5692E94363E0CBA5D3C6",
+            "parts": {
+              "total": 1,
+              "hash": "20F80FD6399CB66052A6E26D8A03844817B73C0253EC2E36FC5D25B430D360B4"
+            }
+          },
+          "last_commit_hash": "163C343BABF87C76F315DD903D17FA553B5BF0AB88894555EDE7EAC69C1BCA4F",
+          "data_hash": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+          "validators_hash": "DF185FDD7FAC72735634B62E3BC8F8FDCDF87A1B8F9DD242FD57DFFE57B6B00E",
+          "next_validators_hash": "DF185FDD7FAC72735634B62E3BC8F8FDCDF87A1B8F9DD242FD57DFFE57B6B00E",
+          "consensus_hash": "BE697DE122FE70FC144F90782F96407BFDE7D2048BB2FDADA8CA54544540F208",
+          "app_hash": "F764439ECCAD284A0F264471CB274D5FCBE9A0C449301F66563119F9CB005EC1",
+          "last_results_hash": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+          "evidence_hash": "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855",
+          "proposer_address": "7529AFE2F1899850D36AB836C9BC04C82F0539A6"
+        },
+        "data": {
+          "txs": []
+        },
+        "evidence": {
+          "evidence": []
+        },
+        "last_commit": {
+          "height": "19611673",
+          "round": 0,
+          "block_id": {
+            "hash": "1C97D3E8C19BB7760B8F74E41B26F52FBDD4D8DAB54D5692E94363E0CBA5D3C6",
+            "parts": {
+              "total": 1,
+              "hash": "20F80FD6399CB66052A6E26D8A03844817B73C0253EC2E36FC5D25B430D360B4"
+            }
+          },
+          "signatures": [
+            {
+              "block_id_flag": 2,
+              "validator_address": "3AE1522A8C5F94A1513C23707BDB921077387521",
+              "timestamp": "2026-10-20T01:49:40.431617695Z",
+              "signature": "42L4d40Rf5GORL9Ob6YAMHNcbpEH9rdfJN/J7WvuEoDcx/M/VPli9BPHRj2n+aFijOnN5g0WDBvrh9zEdhADDg=="
+            },
+            {
+              "block_id_flag": 2,
+              "validator_address": "7529AFE2F1899850D36AB836C9BC04C82F0539A6",
+              "timestamp": "2026-10-20T01:49:40.432008635Z",
+              "signature": "JVG2JacQsEuu7uLTmXXLA4RySnv+LvWqA4RR0w4rrj+HTmgMGVkZTi1arRk6nII/NabbDxtDI2v96jsE6fdcAA=="
+            },
+            {
+              "block_id_flag": 2,
+              "validator_address": "CA715C2DD6415DE130B20A8933B65ADA6A1819B8",
+              "timestamp": "2026-10-20T01:49:40.33253752Z",
+              "signature": "DcnHCTJ32xWW0MMqVOKmyXZozSL/nl9UpnINqZqTc6fup9khHFd9yIfLiBs6GBlPatKPkH875/yKnvlR0l0GAw=="
+            },
+            {
+              "block_id_flag": 2,
+              "validator_address": "EC45574A96DC2D6EE57B911269A5B1FBC36BD6E9",
+              "timestamp": "2026-10-20T01:49:40.335974962Z",
+              "signature": "CrIkFY0/IeyFVo50Sm4hpgr8IYkJ2fuBfJqlfz17D5vtJPjuWqCOsXflMXqHvv9WMXEOScxysxAZo4WSOkqKCQ=="
+            }
+          ]
+        }
+      }
+    }
+  }
+}

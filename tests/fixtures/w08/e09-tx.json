@@ -1,0 +1,779 @@
+{
+  "observedAt": "2026-10-21T00:03:15Z",
+  "chain": "guru_631-1",
+  "endpoint": "https://tgxn.gurufin.io:1317/cosmos/tx/v1beta1/txs/233FEE46D8D6D0811A783734114F2EEABBA272CD9771C0AFED1F077A972C671F",
+  "source": "GURA-32 plan E08/E09; W08 public read re-observation",
+  "limitation": "Existing public history only. No signing/broadcast, EVM receipt or mapping verification. Terminal access does not prove browser RPC CORS.",
+  "response": {
+    "tx": {
+      "body": {
+        "messages": [
+          {
+            "@type": "/cosmos.evm.vm.v1.MsgEthereumTx",
+            "from": "xDuIhcGUvNRDpjGDI+++PtQpqTA=",
+            "raw": "0xf86d81938601f6907d122583011f0b9493007a2a6ad75fc14c238b45ae5c57683c53f8148084183ff085820512a0479edc1806fb5c8341ac097da69bb6db7945d9556db5ba327cd6c6b18583b311a07afe08716ae10d5664565f2af39f559754ea2f34c4a0f7578ed1a28d209f34d3"
+          }
+        ],
+        "memo": "",
+        "timeout_height": "0",
+        "unordered": false,
+        "timeout_timestamp": null,
+        "extension_options": [
+          {
+            "@type": "/cosmos.evm.vm.v1.ExtensionOptionsEthereumTx"
+          }
+        ],
+        "non_critical_extension_options": []
+      },
+      "auth_info": {
+        "signer_infos": [],
+        "fee": {
+          "amount": [
+            {
+              "denom": "agxn",
+              "amount": "158612886367191703"
+            }
+          ],
+          "gas_limit": "73483",
+          "payer": "",
+          "granter": ""
+        },
+        "tip": null
+      },
+      "signatures": []
+    },
+    "tx_response": {
+      "height": "19611783",
+      "txhash": "233FEE46D8D6D0811A783734114F2EEABBA272CD9771C0AFED1F077A972C671F",
+      "codespace": "",
+      "code": 0,
+      "data": "1286040A272F636F736D6F732E65766D2E766D2E76312E4D7367457468657265756D5478526573706F6E736512DA030A4230783232323066386362643033343538643131643537323038323961613236383836393431613631643261643233653335393465656334353633633536323864613312E3020A2A307839333030374132413641643735466331344332333842343541453563353736383343353366383134124230786464646236653134663766323130313339376136353236616162393565393634646537663166343465643036616134376131633961306536623939323434353612423078303030303030303030303030303030303030303030303030633433623838383563313934626364343433613633313833323365666265336564343239613933301A20000000000000000000000000000000000000000000000000000000006AD6C90D208781AD092A423078303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303A4230783030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303030303028EFEA0330EFEA033A204D5F71D7855B21D0F94438A403E37D172423CB490BE52B0EF5F0B7F4A76CEE94408D92DBD606",
+      "raw_log": "",
+      "logs": [],
+      "info": "",
+      "gas_wanted": "73483",
+      "gas_used": "62831",
+      "tx": {
+        "@type": "/cosmos.tx.v1beta1.Tx",
+        "body": {
+          "messages": [
+            {
+              "@type": "/cosmos.evm.vm.v1.MsgEthereumTx",
+              "from": "xDuIhcGUvNRDpjGDI+++PtQpqTA=",
+              "raw": "0xf86d81938601f6907d122583011f0b9493007a2a6ad75fc14c238b45ae5c57683c53f8148084183ff085820512a0479edc1806fb5c8341ac097da69bb6db7945d9556db5ba327cd6c6b18583b311a07afe08716ae10d5664565f2af39f559754ea2f34c4a0f7578ed1a28d209f34d3"
+            }
+          ],
+          "memo": "",
+          "timeout_height": "0",
+          "unordered": false,
+          "timeout_timestamp": null,
+          "extension_options": [
+            {
+              "@type": "/cosmos.evm.vm.v1.ExtensionOptionsEthereumTx"
+            }
+          ],
+          "non_critical_extension_options": []
+        },
+        "auth_info": {
+          "signer_infos": [],
+          "fee": {
+            "amount": [
+              {
+                "denom": "agxn",
+                "amount": "158612886367191703"
+              }
+            ],
+            "gas_limit": "73483",
+            "payer": "",
+            "granter": ""
+          },
+          "tip": null
+        },
+        "signatures": []
+      },
+      "timestamp": "2026-10-20T01:51:09Z",
+      "events": [
+        {
+          "type": "coin_spent",
+          "attributes": [
+            {
+              "key": "spender",
+              "value": "guru1csac3pwpjj7dgsaxxxpj8ma78m2zn2fs0rtvhu",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "158612886367191703agxn",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "coin_received",
+          "attributes": [
+            {
+              "key": "receiver",
+              "value": "guru17xpfvakm2amg962yls6f84z3kell8c5lgrrm6r",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "158612886367191703agxn",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "transfer",
+          "attributes": [
+            {
+              "key": "recipient",
+              "value": "guru17xpfvakm2amg962yls6f84z3kell8c5lgrrm6r",
+              "index": true
+            },
+            {
+              "key": "sender",
+              "value": "guru1csac3pwpjj7dgsaxxxpj8ma78m2zn2fs0rtvhu",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "158612886367191703agxn",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "attributes": [
+            {
+              "key": "sender",
+              "value": "guru1csac3pwpjj7dgsaxxxpj8ma78m2zn2fs0rtvhu",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "fractional_balance_change",
+          "attributes": [
+            {
+              "key": "address",
+              "value": "guru1csac3pwpjj7dgsaxxxpj8ma78m2zn2fs0rtvhu",
+              "index": true
+            },
+            {
+              "key": "delta",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "fractional_balance_change",
+          "attributes": [
+            {
+              "key": "address",
+              "value": "guru17xpfvakm2amg962yls6f84z3kell8c5lgrrm6r",
+              "index": true
+            },
+            {
+              "key": "delta",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "tx",
+          "attributes": [
+            {
+              "key": "fee",
+              "value": "158612886367191703agxn",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "ethereum_tx",
+          "attributes": [
+            {
+              "key": "ethereumTxHash",
+              "value": "0x2220f8cbd03458d11d5720829aa26886941a61d2ad23e3594eec4563c5628da3",
+              "index": true
+            },
+            {
+              "key": "txIndex",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "attributes": [
+            {
+              "key": "action",
+              "value": "/cosmos.evm.vm.v1.MsgEthereumTx",
+              "index": true
+            },
+            {
+              "key": "sender",
+              "value": "guru1csac3pwpjj7dgsaxxxpj8ma78m2zn2fs0rtvhu",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "coin_spent",
+          "attributes": [
+            {
+              "key": "spender",
+              "value": "guru1jvq852n26a0uznpr3dz6uhzhdq7987q5ryym52",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "15000000000000000000agxn",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "coin_received",
+          "attributes": [
+            {
+              "key": "receiver",
+              "value": "guru1vqu8rska6swzdmnhf90zuv0xmelej4lq4g909k",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "15000000000000000000agxn",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "transfer",
+          "attributes": [
+            {
+              "key": "recipient",
+              "value": "guru1vqu8rska6swzdmnhf90zuv0xmelej4lq4g909k",
+              "index": true
+            },
+            {
+              "key": "sender",
+              "value": "guru1jvq852n26a0uznpr3dz6uhzhdq7987q5ryym52",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "15000000000000000000agxn",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "attributes": [
+            {
+              "key": "sender",
+              "value": "guru1jvq852n26a0uznpr3dz6uhzhdq7987q5ryym52",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "fractional_balance_change",
+          "attributes": [
+            {
+              "key": "address",
+              "value": "guru1jvq852n26a0uznpr3dz6uhzhdq7987q5ryym52",
+              "index": true
+            },
+            {
+              "key": "delta",
+              "value": "0",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "fractional_balance_change",
+          "attributes": [
+            {
+              "key": "address",
+              "value": "guru1vqu8rska6swzdmnhf90zuv0xmelej4lq4g909k",
+              "index": true
+            },
+            {
+              "key": "delta",
+              "value": "0",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "coin_spent",
+          "attributes": [
+            {
+              "key": "spender",
+              "value": "guru1vqu8rska6swzdmnhf90zuv0xmelej4lq4g909k",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "15000000000000000000agxn",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "burn",
+          "attributes": [
+            {
+              "key": "burner",
+              "value": "guru1vqu8rska6swzdmnhf90zuv0xmelej4lq4g909k",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "15000000000000000000agxn",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "fractional_balance_change",
+          "attributes": [
+            {
+              "key": "address",
+              "value": "guru1vqu8rska6swzdmnhf90zuv0xmelej4lq4g909k",
+              "index": true
+            },
+            {
+              "key": "delta",
+              "value": "0",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "coin_received",
+          "attributes": [
+            {
+              "key": "receiver",
+              "value": "guru1vqu8rska6swzdmnhf90zuv0xmelej4lq4g909k",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "15000000000000000000agxn",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "coinbase",
+          "attributes": [
+            {
+              "key": "minter",
+              "value": "guru1vqu8rska6swzdmnhf90zuv0xmelej4lq4g909k",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "15000000000000000000agxn",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "fractional_balance_change",
+          "attributes": [
+            {
+              "key": "address",
+              "value": "guru1vqu8rska6swzdmnhf90zuv0xmelej4lq4g909k",
+              "index": true
+            },
+            {
+              "key": "delta",
+              "value": "0",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "coin_spent",
+          "attributes": [
+            {
+              "key": "spender",
+              "value": "guru1vqu8rska6swzdmnhf90zuv0xmelej4lq4g909k",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "15000000000000000000agxn",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "coin_received",
+          "attributes": [
+            {
+              "key": "receiver",
+              "value": "guru1csac3pwpjj7dgsaxxxpj8ma78m2zn2fs0rtvhu",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "15000000000000000000agxn",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "transfer",
+          "attributes": [
+            {
+              "key": "recipient",
+              "value": "guru1csac3pwpjj7dgsaxxxpj8ma78m2zn2fs0rtvhu",
+              "index": true
+            },
+            {
+              "key": "sender",
+              "value": "guru1vqu8rska6swzdmnhf90zuv0xmelej4lq4g909k",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "15000000000000000000agxn",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "attributes": [
+            {
+              "key": "sender",
+              "value": "guru1vqu8rska6swzdmnhf90zuv0xmelej4lq4g909k",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "fractional_balance_change",
+          "attributes": [
+            {
+              "key": "address",
+              "value": "guru1vqu8rska6swzdmnhf90zuv0xmelej4lq4g909k",
+              "index": true
+            },
+            {
+              "key": "delta",
+              "value": "0",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "fractional_balance_change",
+          "attributes": [
+            {
+              "key": "address",
+              "value": "guru1csac3pwpjj7dgsaxxxpj8ma78m2zn2fs0rtvhu",
+              "index": true
+            },
+            {
+              "key": "delta",
+              "value": "0",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "coin_spent",
+          "attributes": [
+            {
+              "key": "spender",
+              "value": "guru17xpfvakm2amg962yls6f84z3kell8c5lgrrm6r",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "22992317482728332agxn",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "coin_received",
+          "attributes": [
+            {
+              "key": "receiver",
+              "value": "guru1csac3pwpjj7dgsaxxxpj8ma78m2zn2fs0rtvhu",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "22992317482728332agxn",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "transfer",
+          "attributes": [
+            {
+              "key": "recipient",
+              "value": "guru1csac3pwpjj7dgsaxxxpj8ma78m2zn2fs0rtvhu",
+              "index": true
+            },
+            {
+              "key": "sender",
+              "value": "guru17xpfvakm2amg962yls6f84z3kell8c5lgrrm6r",
+              "index": true
+            },
+            {
+              "key": "amount",
+              "value": "22992317482728332agxn",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "attributes": [
+            {
+              "key": "sender",
+              "value": "guru17xpfvakm2amg962yls6f84z3kell8c5lgrrm6r",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "fractional_balance_change",
+          "attributes": [
+            {
+              "key": "address",
+              "value": "guru17xpfvakm2amg962yls6f84z3kell8c5lgrrm6r",
+              "index": true
+            },
+            {
+              "key": "delta",
+              "value": "0",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "fractional_balance_change",
+          "attributes": [
+            {
+              "key": "address",
+              "value": "guru1csac3pwpjj7dgsaxxxpj8ma78m2zn2fs0rtvhu",
+              "index": true
+            },
+            {
+              "key": "delta",
+              "value": "0",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "ethereum_tx",
+          "attributes": [
+            {
+              "key": "amount",
+              "value": "0",
+              "index": true
+            },
+            {
+              "key": "ethereumTxHash",
+              "value": "0x2220f8cbd03458d11d5720829aa26886941a61d2ad23e3594eec4563c5628da3",
+              "index": true
+            },
+            {
+              "key": "txIndex",
+              "value": "0",
+              "index": true
+            },
+            {
+              "key": "txGasUsed",
+              "value": "62831",
+              "index": true
+            },
+            {
+              "key": "txHash",
+              "value": "233fee46d8d6d0811a783734114f2eeabba272cd9771c0afed1f077a972c671f",
+              "index": true
+            },
+            {
+              "key": "recipient",
+              "value": "0x93007A2A6Ad75Fc14C238B45AE5c57683C53f814",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        },
+        {
+          "type": "message",
+          "attributes": [
+            {
+              "key": "module",
+              "value": "evm",
+              "index": true
+            },
+            {
+              "key": "sender",
+              "value": "0xc43b8885c194bcd443a6318323efbe3ed429a930",
+              "index": true
+            },
+            {
+              "key": "txType",
+              "value": "0",
+              "index": true
+            },
+            {
+              "key": "msg_index",
+              "value": "0",
+              "index": true
+            }
+          ]
+        }
+      ]
+    }
+  }
+}

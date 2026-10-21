@@ -1,12 +1,14 @@
 "use client";
 
-import Link from "next/link";
+import { CopyPageLink, CopyValue } from "@/components/explorer/copy-value";
+import Link from "@/components/layout/chain-link";
 import { useMemo, useState } from "react";
 import { useQuery } from "@/hooks/use-query";
 import { QueryStatus } from "@/components/query/query-status";
 
 import { useParams } from "next/navigation";
 import {
+  Alert,
   Card,
   CardContent,
   Chip,
@@ -29,11 +31,18 @@ import { CoinAmount } from "@/components/amount/coin-amount";
 import { getDenomsMetadata } from "@/services/guru/token-metadata.service";
 import { getWalletPortfolio } from "@/services/guru/wallet-portfolio.service";
 import { UnbondingDetails } from "@/components/amount/unbonding-details";
+import { canonicalAccountAddress } from "@/lib/canonical-address";
+import { getActiveChainConfig } from "@/lib/chain-selection";
 const TRANSACTIONS_PAGE_SIZE = 15;
 
 export default function AddressDetailPage() {
   const params = useParams<{ address: string }>();
-  const address = params.address ?? "";
+  let address: string;
+  try { address = canonicalAccountAddress(params.address ?? "", getActiveChainConfig()); }
+  catch (error) { return <Alert severity="error">{(error as Error).message}</Alert>; }
+  return <AddressDetailContent key={address} address={address} />;
+}
+function AddressDetailContent({ address }: { address: string }) {
   const bank = useQuery(`balances:${address}`, client => getAddressBalances(address, client));
   const account = useQuery(`account:${address}`, client => getAddressAccountInfo(address, client));
   const txQuery = useQuery(`address-transactions:${address}`, client => getTransactionsByAddress(address, 200, client));
@@ -57,6 +66,7 @@ export default function AddressDetailPage() {
 
   return (
     <Stack spacing={2}>
+      <CopyPageLink />
       <QueryStatus {...txQuery} />
       <Typography variant="h5" fontWeight={700}>
         Address Details
@@ -64,7 +74,8 @@ export default function AddressDetailPage() {
       <Card variant="outlined">
         <CardContent>
           <Stack spacing={1}>
-            <Typography>Address: {address}</Typography>
+            <Typography>Address (canonical Bech32): {address}</Typography>
+            <CopyValue label="계정 주소 Bech32 복사" value={address} />
             <QueryStatus {...account} />
             <Typography>Account Number: {accountInfo.accountNumber ?? "-"}</Typography>
             <Typography>Sequence: {accountInfo.sequence ?? "-"}</Typography>

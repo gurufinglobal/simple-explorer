@@ -1,6 +1,6 @@
 "use client";
 
-import Link from "next/link";
+import Link from "@/components/layout/chain-link";
 import { useQuery } from "@/hooks/use-query";
 import { QueryStatus } from "@/components/query/query-status";
 
@@ -10,6 +10,8 @@ import { useNowTick } from "@/hooks/use-now-tick";
 import { formatRelativePastFromIso } from "@/lib/relative-time";
 import type { BlockDetail } from "@/services/guru/block-details.service";
 import { fetchBlocksNewerThan } from "@/services/guru/blocks.service";
+
+import { lcdBytesToHex } from "@/lib/bytes";
 
 const POLL_MS = 3000;
 const MAX_BLOCKS = 100;
@@ -125,7 +127,7 @@ export function BlocksLiveList() {
                     lineHeight: 1.3,
                   }}
                 >
-                  {block.hash.slice(0, 10)}…
+                  블록 hash (hex): {lcdBytesToHex(block.hash)?.slice(0, 10) ?? "미확인"}…
                 </Typography>
               </CardContent>
             </Card>

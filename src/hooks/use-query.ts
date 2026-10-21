@@ -45,7 +45,11 @@ export function useQuery<T>(target: string, load: (client: QueryClient, previous
     const change = () => {
       if (pinned.current) return;
       // Initial cookie hydration may announce the already selected default chain.
-      if (getActiveChainConfig().key === chainRef.current.key) return;
+      try { if (getActiveChainConfig().key === chainRef.current.key) return; }
+      catch {
+        // The route boundary will show the configuration error; stop old requests now.
+        active.current?.controller.abort(); active.current = null; return;
+      }
       active.current?.controller.abort();
       active.current = null;
       chainChanged(n => n + 1);

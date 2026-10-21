@@ -14,13 +14,13 @@ describe("evm to bech32", () => {
     expect(addr).toBe("guru1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqpk053t3");
   });
 
-  it("resolves effective cosmos from EVM only with an explicit prefix", () => {
+  it("does not treat a configured prefix as verified EVM mapping", () => {
     vi.stubEnv("NEXT_PUBLIC_BECH32_PREFIX", "guru");
     const cosmos = getEffectiveCosmosAddress({
       bech32Address: null,
       evmAddress: "0x0000000000000000000000000000000000000001",
     });
-    expect(cosmos).toBe("guru1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqpk053t3");
+    expect(cosmos).toBeNull();
   });
 
   it("does not guess an unconfigured prefix", () => {
@@ -28,11 +28,11 @@ describe("evm to bech32", () => {
     expect(getEffectiveCosmosAddress({ bech32Address: null, evmAddress: "0x0000000000000000000000000000000000000001" })).toBeNull();
   });
 
-  it("prefers explicit bech32 over EVM derivation", () => {
+  it("rejects invalid explicit bech32 instead of deriving an EVM address", () => {
     const cosmos = getEffectiveCosmosAddress({
       bech32Address: "guru1explicit",
       evmAddress: "0x0000000000000000000000000000000000000001",
     });
-    expect(cosmos).toBe("guru1explicit");
+    expect(cosmos).toBeNull();
   });
 });
