@@ -136,3 +136,12 @@ export function mergeAddressTransactions(sender: TxDetail[], recipient: TxDetail
   }
   return rows;
 }
+
+/** Live lists bound each height to one SDK page and disclose incomplete totals. */
+export async function getTransactionsAtHeight(height: number, client: QueryClient): Promise<{ rows: TxDetail[]; limited: boolean }> {
+  const response = await client.lcdGet<TxsResponse>(`/cosmos/tx/v1beta1/txs?query=${encodeURIComponent(`tx.height=${height}`)}&page=1&limit=150&order_by=ORDER_BY_DESC`);
+  const rows = mapTxRows(response);
+  if (rows.some(row => row.height !== String(height) || !row.hash || row.hash === '-')) schemaError('요청한 거래 높이와 응답이 다릅니다.');
+  const total = response.total;
+  return { rows: rows.slice(0, 150), limited: typeof total !== 'string' || !/^\d+$/.test(total) || BigInt(total) !== BigInt(rows.length) || rows.length > 150 };
+}
