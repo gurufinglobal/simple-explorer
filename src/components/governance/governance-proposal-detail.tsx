@@ -149,7 +149,7 @@ export function GovernanceProposalDetail({
       {flow.phase === "signing" && <Alert severity="info" role="status">지갑 서명 대기 중</Alert>}
       {flow.receipt && <TransactionResult key={`${flow.receipt.hash}:${flow.receipt.status}`} receipt={flow.receipt} />}
       <SavedTransactions chainKey={chain.key} excludeHash={flow.receipt?.hash} />
-      <TransactionConfirmDialog snapshot={flow.prepared?.snapshot ?? null} onCancel={flow.cancel} onConfirm={() => void flow.confirm()} />
+      <TransactionConfirmDialog onExited={flow.restoreFocus} snapshot={flow.prepared?.snapshot ?? null} onCancel={flow.cancel} onConfirm={() => void flow.confirm()} />
 
       <Card variant="outlined">
         <CardContent>

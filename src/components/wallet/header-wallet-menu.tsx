@@ -30,14 +30,14 @@ export function HeaderWalletMenu() {
   };
   return <>
     <Stack spacing={0.5}>
-      <Stack direction="row" spacing={1} alignItems="center">
+      <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
         <Chip size="small" label={label} color={state.status === "connected" ? "success" : "default"} />
         <Typography variant="caption">{selectedChain} · {state.writeStatus === "ready" ? "쓰기 가능" : state.writeStatus === "checking" ? "확인 중" : "조회 전용"}</Typography>
-        <IconButton color="inherit" aria-label="wallet menu" onClick={event => setAnchor(event.currentTarget)}><AccountBalanceWalletOutlinedIcon /></IconButton>
+        <IconButton color="inherit" aria-label="wallet menu" aria-haspopup="menu" aria-expanded={Boolean(anchor)} onClick={event => setAnchor(event.currentTarget)}><AccountBalanceWalletOutlinedIcon /></IconButton>
       </Stack>
       {state.writeReason && <Typography variant="caption" role="status">{state.writeReason}</Typography>}
     </Stack>
-    <Menu anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
+    <Menu slotProps={{ paper: { sx: { overflowWrap: "anywhere" } } }} anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
       <MenuItem disabled={state.status === "connecting"} onClick={() => void startQr()}><ListItemText primary="WalletConnect" secondary="QR / mobile wallet" /></MenuItem>
       <MenuItem disabled={state.status === "connecting"} onClick={() => extension("keplr")}><ListItemText primary="Keplr" /></MenuItem>
       <MenuItem disabled={state.status === "connecting"} onClick={() => extension("metamask")}><ListItemText primary="MetaMask" /></MenuItem>

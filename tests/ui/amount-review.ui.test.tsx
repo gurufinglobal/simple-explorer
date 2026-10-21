@@ -48,7 +48,7 @@ it('R2 public address exposes each 6/18-place delegation original, including the
     expect(button.getAttribute('aria-expanded')).toBe('true');
   }
 });
-it('R3 validator original toggles by pointer/keyboard without navigation; ordinary row still navigates', async () => {
+it('R3 validator original toggles by pointer/keyboard without navigation; detail is a chain-preserving native link', async () => {
   mockQueryHttp(amountReviewResponse);
   const validators = await getTopValidators();
   const push = vi.fn();
@@ -66,7 +66,8 @@ it('R3 validator original toggles by pointer/keyboard without navigation; ordina
   await userEvent.keyboard(' ');
   expect(raw.parentElement!.hidden).toBe(true);
   expect(push).not.toHaveBeenCalled();
-  await userEvent.click(screen.getByText('Validator'));
-  expect(push).toHaveBeenCalledTimes(1);
-  expect(push).toHaveBeenCalledWith('/staking/v?chain=fixture');
+  const link = screen.getByRole('link', { name: 'Validator' });
+  expect(link.getAttribute('href')).toBe('/staking/v?chain=fixture');
+  // Actual native link navigation is exercised by mobile-accessibility.browser.mjs.
+  link.focus(); expect(document.activeElement).toBe(link);
 });

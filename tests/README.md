@@ -12,3 +12,11 @@
 `NODE_ENV=test` 반환은 network-summary 서비스 전체 및 getDenomsMetadata에서 제거했다. token 단건, blocks/transactions/staking/governance/IBC/특화 모듈, wallet 연결 등의 기존 분기는 아직 남아 있다. 이 분기를 지나는 테스트의 통과는 제품 응답 변환/실체인/서명 성공의 증거가 아니다. 각 후속 WBS에서 경계 모킹으로 이관한다.
 
 기존 coverage 설정은 일부 handler/store/services만 포함한다. 임계값 85% 설정 또는 기본 테스트 통과를 전체 제품 커버리지 85%로 보고하지 않는다. W01 검증 결과와 AC 판정 원본은 Paperclip GURA-36의 report 문서다.
+
+## W10 모바일·키보드 회귀
+
+- `ui/accessibility.ui.test.tsx`: 검색의 이름·후보 Tab 선택·오류 Escape 복귀, 검증자 native link와 독립 원본 버튼, 조회 상태 이름, 실제 IBC route의 HTTP 대기→오류·조회 전용 UI를 검사한다.
+- `integration/staking-transaction.integration.test.tsx`: Chrome에서 비활성 호출 버튼이 초점을 잃는 상황을 재현하며 4종 행위의 Tab/Shift+Tab·Escape/취소 후 호출 버튼 복귀와 signer/broadcast 0회를 검사한다.
+- `browser/mobile-accessibility.browser.mjs`: 격리 production 빌드에서 desktop Chrome 360/768/1280px, 홈·Dashboard·IBC·검증자 목록/상세·긴 문자열·부분 실패·메뉴·지갑 차단 상태를 실측한다. 키보드로 지원 검색→Staking 목록→상세→합성 Keplr→거래 확인 취소까지 실행한다. `PLAYWRIGHT_MODULE`, `BROWSER_ORIGIN`, `BROWSER_OUTPUT`, 유효 Bech32의 `BROWSER_ACCOUNT`/`BROWSER_VALIDATOR`와 합성 체인 설정이 필요하다. 공개 설정과 실행 runner·화면·실패 이력은 Paperclip [W10 보고](/GURA/issues/GURA-47#document-report) 첨부 증거에 있다.
+
+이 시험은 실제 모바일 기기나 스크린리더 관찰, 실체인 CORS·지갑 서명 지원 판정이 아니다. 실제 환경 확인 절차와 미검증 범위는 같은 보고서의 CP4 항목을 따른다.

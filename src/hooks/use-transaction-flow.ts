@@ -16,6 +16,14 @@ export function useTransactionFlow(contextKey: string, validationKey = "") {
   const active = useRef<PreparedTransaction | null>(null);
   const version = useRef(0);
   const busy = useRef(false);
+  const trigger = useRef<HTMLElement | null>(null);
+  const restoreFocus = () => {
+    // Validation disables the invoking button before the dialog mounts. Chrome
+    // blurs it, so MUI alone would remember body instead of the original trigger.
+    const element = trigger.current;
+    trigger.current = null;
+    if (element?.isConnected && !element.matches(":disabled")) element.focus();
+  };
 
   useEffect(() => {
     const invalidate = (clearReceipt = true) => {
@@ -44,6 +52,7 @@ export function useTransactionFlow(contextKey: string, validationKey = "") {
 
   const begin = async (prepare: (assertCurrent: () => void) => Promise<PreparedTransaction>) => {
     if (busy.current) return;
+    trigger.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     busy.current = true;
     const request = ++version.current;
     const key = contextKey;
@@ -83,6 +92,6 @@ export function useTransactionFlow(contextKey: string, validationKey = "") {
       if (isCurrent()) { busy.current = false; active.current = null; }
     }
   };
-  return { phase, prepared, receipt, error, begin, cancel, confirm,
+  return { phase, prepared, receipt, error, begin, cancel, confirm, restoreFocus,
     busy: phase === "validating" || phase === "signing" || phase === "broadcasting" };
 }

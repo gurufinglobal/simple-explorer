@@ -117,7 +117,7 @@ function stakingInput(action: StakingAction, target = validator): StakingTxInput
   const base = { walletType: 'keplr' as const, sessionTopic: null, bech32Address: sender, validatorAddress: target };
   return action === 'delegate' || action === 'undelegate' ? { ...base, action, amount: '1234567', denom: 'agxn', displayAmount: '1.234567' } : { ...base, action };
 }
-async function open(action: StakingAction) {
+async function open(action: StakingAction, blurDuringValidation = false) {
   render(<StakingForm validatorAddress={validator} isOperator />);
   if (action === 'delegate' || action === 'undelegate') {
     fireEvent.change(screen.getByLabelText('수량 (표시 단위)'), { target: { value: '1.234567' } });
@@ -125,6 +125,8 @@ async function open(action: StakingAction) {
     fireEvent.click(screen.getByRole('checkbox'));
   }
   const trigger = screen.getByRole('button', { name: labels[action] }); trigger.focus(); fireEvent.click(trigger);
+  // Chrome moves focus off the disabled trigger while async validation is pending.
+  if (blurDuringValidation) trigger.blur();
   return screen.findByRole('dialog');
 }
 async function approve() { fireEvent.click(await screen.findByRole('button', { name: '확인하고 지갑 서명' })); }
@@ -155,10 +157,15 @@ describe.each(actions)('W06 %s real UI / service / signing flow', action => {
     const urls = http.mock.calls.map(([u]) => String(u));
     expect(urls.some(u => u.includes('/unbonding_delegations'))).toBe(true); expect(urls.some(u => u.endsWith('/rewards'))).toBe(true);
   });
-  it('Escape cancels with restored focus and zero broadcast', async () => {
-    const user = userEvent.setup(); await open(action);
+  it.each(['Escape', '취소'])('%s cancels after Tab/Shift+Tab trapping with restored focus and zero signing/broadcast', async method => {
+    const user = userEvent.setup(); await open(action, true);
     await waitFor(() => expect(document.activeElement?.textContent).toBe('취소'));
-    await user.keyboard('{Escape}');
+    await user.keyboard('{Shift>}{Tab}{/Shift}');
+    expect(document.activeElement?.textContent).toBe('확인하고 지갑 서명');
+    await user.keyboard('{Tab}'); expect(document.activeElement?.textContent).toBe('취소');
+    await user.keyboard('{Tab}'); expect(document.activeElement?.textContent).toBe('확인하고 지갑 서명');
+    await user.keyboard('{Tab}'); expect(document.activeElement?.textContent).toBe('취소');
+    await user.keyboard(method === 'Escape' ? '{Escape}' : '{Enter}');
     await screen.findByText('앱 확인을 취소했습니다. 전송하지 않았습니다.');
     await waitFor(() => expect(document.activeElement?.textContent).toBe(labels[action]));
     expect(boundary.broadcast).not.toHaveBeenCalled(); expect(boundary.wallet).not.toHaveBeenCalled();
