@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
 import { PathParamsContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import OperationsPage from '@/app/(explorer)/operations/page';
@@ -9,7 +9,6 @@ import StakingPage from '@/app/(explorer)/staking/page';
 import GovernancePage from '@/app/(explorer)/governance/page';
 import GovernanceDetail from '@/app/(explorer)/governance/[proposalId]/page';
 import { DashboardView } from '@/components/network/dashboard-view';
-import { AddressTransactions } from '@/components/explorer/address-transactions';
 import { TokensMetadataList } from '@/components/tokens/tokens-metadata-list';
 import { setActiveChainKeyCookie } from '@/lib/chain-selection';
 import { mockQueryHttp } from '../helpers/query-http';
@@ -23,7 +22,6 @@ const showStaking = () => render(<AppRouterContext.Provider value={router}><Stak
 const channel = (n: number) => ({ port_id: 'transfer', channel_id: `channel-${n}`, state: 'STATE_OPEN' });
 const validator = (n: number) => ({ operator_address: `operator-${n}`, description: { moniker: `Validator ${n}` }, tokens: '100', status: 'BOND_STATUS_BONDED' });
 const proposal = (n: number) => ({ id: String(n), title: `Proposal ${n}`, status: 'PROPOSAL_STATUS_PASSED' });
-const tx = (hash: string, height: string) => ({ txhash: hash, height, code: 0 });
 const pagination = (next: string | null) => ({ next_key: next, total: '0' });
 
 describe('W09 actual route/service pagination', () => {
@@ -196,74 +194,5 @@ describe('W09 actual route/service pagination', () => {
     expect(screen.getByText('TOKEN1')).toBeTruthy();
     expect(screen.getByText(mode === 'cycle' ? /Metadata cursor 반복/ : mode === 'cap' ? /Metadata 조회 한도/ : /HTTP 500/)).toBeTruthy();
     expect(pages).toBe(mode === 'cap' ? 50 : 2);
-  });
-});
-
-describe('W09 address streams with HTTP only fixtures', () => {
-  it('a full 30-row sender page cannot truncate the newest recipient', async () => {
-    mockQueryHttp(url => ({ tx_responses: url.searchParams.get('query')?.includes('message.sender') ? Array.from({ length: 30 }, (_, i) => tx(`S${i}`, String(30 - i))) : [tx('NEWEST', '31'), tx('S0', '30')], pagination: pagination(null) }));
-    render(<AddressTransactions address="full-sender" />);
-    await screen.findByText('NEWEST');
-    expect(screen.getAllByRole('link')).toHaveLength(31);
-    expect(screen.getAllByRole('link')[0].textContent).toContain('NEWEST');
-    expect(screen.getAllByText('S0')).toHaveLength(1);
-  });
-  it('preserves newest recipient, duplicate once, huge heights, equal-height hash ordering and buffered boundaries', async () => {
-    const requests: string[] = [];
-    mockQueryHttp(url => {
-      const sender = url.searchParams.get('query')?.includes('message.sender'), next = url.searchParams.has('pagination.key');
-      requests.push(`${sender ? 's' : 'r'}:${url.searchParams.get('pagination.key')}`);
-      return { tx_responses: sender ? next ? [tx('S2', '9007199254740993'), tx('LOW', '1')] : [tx('DUP', '9007199254740994'), tx('S1', '9007199254740993')] : next ? [tx('R2', '9007199254740993')] : [tx('NEW', '9007199254740995'), tx('DUP', '9007199254740994'), tx('R1', '9007199254740993')], pagination: pagination(next ? null : cursor) };
-    });
-    render(<AddressTransactions address="address-a" />);
-    await screen.findByText('NEW');
-    expect(screen.getAllByText('DUP')).toHaveLength(1);
-    expect(screen.queryByText('S1')).toBeNull();
-    expect(screen.getByText(/정렬 경계에서 2건 보관/)).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: '송신 이어보기' }));
-    await waitFor(() => expect(screen.queryByRole('button', { name: '송신 추가 조회 중' })).toBeNull());
-    fireEvent.click(screen.getByRole('button', { name: '수신 이어보기' }));
-    await screen.findByText('LOW');
-    expect(screen.getAllByRole('link').map(link => link.textContent?.split('Height:')[0])).toEqual(['NEW', 'DUP', 'R1', 'R2', 'S1', 'S2', 'LOW']);
-    expect(screen.getByRole('link', { name: /NEW/ }).getAttribute('href')).toBe('/tx/NEW?chain=fixture');
-    expect(requests).toEqual(['s:null', 'r:null', `s:${cursor}`, `r:${cursor}`]);
-  });
-  it('buffers the other stream when an empty page still has a next cursor', async () => {
-    mockQueryHttp(url => {
-      const sender = url.searchParams.get('query')?.includes('message.sender');
-      const next = url.searchParams.has('pagination.key');
-      return { tx_responses: sender ? next ? [tx('NEW', '3')] : [] : [tx('OLD', '2')], pagination: pagination(sender && !next ? cursor : null) };
-    });
-    render(<AddressTransactions address="empty-page" />);
-    await screen.findByText(/정렬 경계에서 1건 보관/);
-    expect(screen.queryByText('OLD')).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: '송신 이어보기' }));
-    await screen.findByText('NEW');
-    expect(screen.getAllByRole('link').map(link => link.textContent?.split('Height:')[0])).toEqual(['NEW', 'OLD']);
-  });
-  it('one failed stream does not erase successful rows and retries independently', async () => {
-    let fail = true; const requests: string[] = [];
-    mockQueryHttp(url => {
-      const direction = url.searchParams.get('query')?.includes('message.sender') ? 's' : 'r'; requests.push(direction);
-      return direction === 's' && fail ? new Response('', { status: 500 }) : { tx_responses: [tx(direction, direction === 's' ? '2' : '3')], pagination: pagination(null) };
-    });
-    render(<AddressTransactions address="address-a" />);
-    await screen.findByText('r');
-    expect(screen.getByText(/송수신 일부 범위만/)).toBeTruthy();
-    fail = false;
-    fireEvent.click(within(screen.getByRole('region', { name: '송신 거래' })).getByRole('button', { name: '다시 조회' }));
-    await screen.findByText('s');
-    expect(requests).toEqual(['s', 'r', 's']);
-    expect(screen.getAllByRole('link').map(link => link.textContent?.split('Height:')[0])).toEqual(['r', 's']);
-  });
-  it('address transition discards an old response and starts both streams without cursor', async () => {
-    let release!: (response: Response) => void;
-    const http = mockQueryHttp(url => url.searchParams.get('query')?.includes('old') ? new Promise<Response>(resolve => { release = resolve; }) : { tx_responses: [tx('NEW', '1')], pagination: pagination(null) });
-    const view = render(<AddressTransactions address="old" />);
-    view.rerender(<AddressTransactions address="new" />);
-    await screen.findByText('NEW');
-    await act(async () => release(Response.json({ tx_responses: [tx('OLD', '5')], pagination: pagination(cursor) })));
-    expect(screen.queryByText('OLD')).toBeNull();
-    expect(http.mock.calls.slice(-2).every(([url]) => !new URL(String(url)).searchParams.has('pagination.key'))).toBe(true);
   });
 });

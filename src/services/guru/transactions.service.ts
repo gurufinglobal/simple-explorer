@@ -1,11 +1,12 @@
 import { PartialQueryError, collectQuery, queryError, schemaError } from "@/lib/query-result";
-import { cursorParam, queryPage, type LcdPagination } from '@/lib/query-page';
+import { type QueryPage, type LcdPagination } from '@/lib/query-page';
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 import type { TxDetail } from "./tx-details.service";
 import { getLatestBlockHeight } from "./blocks.service";
 
 type TxsResponse = {
-  pagination?: LcdPagination;
+  pagination?: LcdPagination | null;
+  total?: string;
   tx_responses?: Array<{
     txhash?: string;
     code?: number;
@@ -97,14 +98,29 @@ export function compareAddressTransactions(a: TxDetail, b: TxDetail): number {
   const ah = BigInt(a.height), bh = BigInt(b.height);
   return ah > bh ? -1 : ah < bh ? 1 : a.hash < b.hash ? -1 : a.hash > b.hash ? 1 : 0;
 }
-export async function getAddressTransactionsPage(address: string, direction: AddressTxDirection, apiClients: QueryClient = defaultClients, cursor?: string | null, limit = 30) {
+export async function getAddressTransactionsPage(address: string, direction: AddressTxDirection, apiClients: QueryClient = defaultClients, cursor?: string | null, limit = 30): Promise<QueryPage<TxDetail>> {
+  // GetTxsEvent uses 1-based page/limit and top-level total (SDK >= 0.47).
+  // These page numbers are internal cursors, not LCD pagination.next_key values.
+  const page = cursor ?? '1';
+  if (!/^[1-9]\d*$/.test(page) || !Number.isSafeInteger(limit) || limit < 1) schemaError('거래 페이지 요청이 올바르지 않습니다.');
   const query = `${direction === 'sender' ? 'message.sender' : 'transfer.recipient'}='${address}'`;
   const response = await apiClients.lcdGet<TxsResponse>(
-    `/cosmos/tx/v1beta1/txs?query=${encodeURIComponent(query)}&pagination.limit=${limit}&order_by=ORDER_BY_DESC${cursorParam(cursor)}`,
+    `/cosmos/tx/v1beta1/txs?query=${encodeURIComponent(query)}&page=${page}&limit=${limit}&order_by=ORDER_BY_DESC`,
   );
   if (!Array.isArray(response.tx_responses)) schemaError('주소 거래 목록이 올바르지 않습니다.');
   if (response.tx_responses.some(row => !row.txhash || !/^\d+$/.test(row.height ?? ''))) schemaError('거래 hash·높이가 올바르지 않습니다.');
-  return queryPage(mapTxRows(response).sort(compareAddressTransactions), response.pagination, limit);
+  const rows = mapTxRows(response).sort(compareAddressTransactions);
+  const total = typeof response.total === 'string' && /^\d+$/.test(response.total) ? response.total : null;
+  const end = (BigInt(page) - BigInt(1)) * BigInt(limit) + BigInt(rows.length);
+  // Missing/contradictory totals or ignored limits cannot establish progress.
+  // Keep the rows visible but do not claim completion or guess another protocol.
+  const unsupported = total === null || BigInt(total) < end || rows.length > limit
+    || (BigInt(total) > end && rows.length < limit);
+  return {
+    rows, total, totalVerified: false,
+    nextCursor: !unsupported && BigInt(total!) > end ? String(BigInt(page) + BigInt(1)) : null,
+    ...(unsupported ? { stopReason: '거래 페이지 계약을 확인할 수 없어 추가 조회를 중단했습니다. 현재 결과는 일부이며 전체 개수는 미확인입니다.' } : {}),
+  };
 }
 
 /** Merge two ordered streams without discarding either stream's remaining rows. */

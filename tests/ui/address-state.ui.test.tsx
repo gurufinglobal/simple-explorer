@@ -12,7 +12,7 @@ function show() {
 }
 function fixture(path: string) {
   if (path.includes('/auth/')) return { account: { account_number: '1', sequence: '2' } };
-  if (path.includes('/txs')) return { tx_responses: [], txs: [] };
+  if (path.includes('/txs')) return { tx_responses: [], txs: [], pagination: null, total: '0' };
   return { balances: [{ denom: 'agxn', amount: '0' }] };
 }
 describe('address page distinguishes query outcomes on the same screen', () => {
