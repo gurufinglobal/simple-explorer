@@ -1,4 +1,4 @@
-import { QueryError, schemaError } from '@/lib/query-result';
+import { combinedError, QueryError, schemaError } from '@/lib/query-result';
 import type { QueryClient } from '@/services/clients';
 import { getLatestBlockHeight } from './blocks.service';
 import { getBlockDetail, type BlockDetail } from './block-details.service';
@@ -34,8 +34,9 @@ export async function getLiveBlocks(client: QueryClient, previous: LiveHistory<B
       if (!block || Number(block.height) !== h) schemaError('요청한 블록 높이와 응답이 다릅니다.');
       return block;
     }));
-    const failed = settled.find(row => row.status === 'rejected');
-    if (failed?.status === 'rejected') throw failed.reason;
+    const errors = settled.flatMap(row => row.status === 'rejected' ? [row.reason] : []);
+    // Preserve every failure and the latest Retry-After deadline in this batch.
+    if (errors.length) throw new QueryError(combinedError(errors));
     for (const row of settled) if (row.status === 'fulfilled') blocks.set(Number(row.value.height), row.value);
   }
   return { rows: [...blocks.values()].sort((a, b) => Number(b.height) - Number(a.height)), height: String(height), fromHeight, chain: client.chain.key,
