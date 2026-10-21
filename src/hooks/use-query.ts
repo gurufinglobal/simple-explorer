@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getActiveChainConfig } from '@/lib/chain-selection';
-import { initialResult, readQuery, type QueryResult } from '@/lib/query-result';
+import { initialResult, readQuery } from '@/lib/query-result';
 import { createQueryClient, type QueryClient } from '@/services/clients';
 import type { ChainConfig } from '@/lib/env';
 
@@ -9,77 +9,117 @@ export function useQuery<T>(target: string, load: (client: QueryClient, previous
   const [, chainChanged] = useState(0);
   const chain = pinnedChain ?? getActiveChainConfig();
   const key = JSON.stringify([chain.key, target]);
-  const context = { chain: chain.key, target };
-  const [result, setResult] = useState<QueryResult<T>>(() => initialResult(context));
-  const [busy, setBusy] = useState(false);
-  const state = useRef(result);
+  const [view, setView] = useState(() => ({ result: initialResult<T>({ chain: chain.key, target }), busy: false, paused: false, recovered: false, unchanged: false }));
+  const retained = useRef(view.result);
   const loader = useRef(load);
   loader.current = load;
-  const currentKey = useRef(key);
-  currentKey.current = key;
-  const active = useRef<{ key: string; controller: AbortController } | null>(null);
   const chainRef = useRef(chain);
   chainRef.current = chain;
+  const currentKey = useRef(key);
+  currentKey.current = key;
   const pinned = useRef(!!pinnedChain);
   pinned.current = !!pinnedChain;
-
-  const refresh = useCallback(async () => {
-    if (!enabled || active.current?.key === key) return;
-    const previous = state.current.context.chain === chainRef.current.key && state.current.context.target === target ? state.current : undefined;
-    if (previous?.error?.retryAt && previous.error.retryAt > Date.now()) return;
-    active.current?.controller.abort();
-    const controller = new AbortController();
-    active.current = { key, controller };
-    const nextContext = { chain: chainRef.current.key, target };
-    setBusy(true);
-    setResult({ ...(previous ?? initialResult<T>(nextContext)), status: 'loading' });
-    const next = await readQuery(nextContext, () => loader.current(createQueryClient(chainRef.current, controller.signal), previous?.data ?? null), previous);
-    if (controller.signal.aborted || currentKey.current !== key) return;
-    state.current = next;
-    active.current = null;
-    setResult(next);
-    setBusy(false);
-  }, [key, target, enabled]);
+  const runtime = useRef<{ refresh: () => Promise<void>; cancel: () => void } | null>(null);
+  const refresh = useCallback(async () => { await runtime.current?.refresh(); }, []);
 
   useEffect(() => {
     const change = () => {
       if (pinned.current) return;
-      // Initial cookie hydration may announce the already selected default chain.
       try { if (getActiveChainConfig().key === chainRef.current.key) return; }
-      catch {
-        // The route boundary will show the configuration error; stop old requests now.
-        active.current?.controller.abort(); active.current = null; return;
-      }
-      active.current?.controller.abort();
-      active.current = null;
+      catch { runtime.current?.cancel(); return; }
+      runtime.current?.cancel();
       chainChanged(n => n + 1);
     };
     window.addEventListener('explorer:chain-changed', change);
     return () => window.removeEventListener('explorer:chain-changed', change);
   }, []);
+
   useEffect(() => {
+    const context = { chain: chainRef.current.key, target };
+    const selectedChain = chainRef.current;
+    let result = retained.current.context.chain === context.chain && retained.current.context.target === target ? retained.current : initialResult<T>(context);
+    let disposed = false, paused = !!pollMs && document.visibilityState === 'hidden';
+    let active: AbortController | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let version = 0;
+    let failures = 0, queued = false, recovered = false, unchanged = false;
+    const publish = () => {
+      if (!disposed && currentKey.current === key) setView({ result, busy: !!active && !paused, paused, recovered, unchanged });
+    };
+    const clearTimer = () => { clearTimeout(timer); timer = undefined; };
+    const schedule = (delay: number) => {
+      clearTimer();
+      if (!disposed && enabled && !paused) timer = setTimeout(() => void run(), Math.max(0, delay));
+    };
+    const run = async () => {
+      if (disposed || !enabled || paused || active) return;
+      const wait = (result.error?.retryAt ?? 0) - Date.now();
+      if (wait > 0) { if (pollMs) schedule(wait); return; }
+      clearTimer();
+      queued = false;
+      const previous = result;
+      const startedVersion = version;
+      const controller = new AbortController();
+      active = controller;
+      // Preserve the stale/error indication while retrying existing data.
+      if (!pollMs || !previous.error) result = { ...previous, status: 'loading' };
+      publish();
+      const next = await readQuery(context, () => loader.current(createQueryClient(selectedChain, controller.signal), previous.data), previous);
+      active = null;
+      if (disposed || currentKey.current !== key) return;
+      if (!controller.signal.aborted) {
+        if (next.error && next.error.kind !== 'cancelled') {
+          failures++;
+          if (pollMs) next.error = { ...next.error, retryAt: next.error.retryAt && next.error.retryAt > Date.now() ? next.error.retryAt : Date.now() + [3000, 6000, 12000, 30000][Math.min(failures - 1, 3)] };
+        } else if (!next.error) {
+          recovered = failures > 0;
+          unchanged = !!next.blockHeight && next.blockHeight === previous.blockHeight;
+          failures = 0;
+        }
+        result = next;
+        retained.current = next;
+      } else if (version === startedVersion) result = previous;
+      publish();
+      if (queued) { void run(); return; }
+      if (pollMs) schedule(Math.max(0, (result.error?.retryAt ?? Date.now() + pollMs) - Date.now()));
+    };
+    const cancel = () => { clearTimer(); active?.abort(); };
+    const control = { refresh: run, cancel };
+    runtime.current = control;
+    const visibility = () => {
+      const hidden = document.visibilityState === 'hidden';
+      if (hidden === paused) return;
+      paused = hidden;
+      if (hidden) { queued = false; cancel(); }
+      else { queued = true; void run(); }
+      publish();
+    };
     const invalidate = (event: Event) => {
       const detail = (event as CustomEvent<{ chain: string; targets: string[] }>).detail;
-      if (detail.chain !== chainRef.current.key || !detail.targets.includes(target)) return;
-      active.current?.controller.abort(); active.current = null;
-      // Explicit transaction invalidation must not reuse a pre-inclusion response.
-      state.current = initialResult({ chain: chainRef.current.key, target });
-      void refresh();
+      if (detail.chain !== context.chain || !detail.targets.includes(target)) return;
+      cancel();
+      version++;
+      // Wait for the cancelled cycle to settle; coalesce repeated invalidations.
+      // Keep any Retry-After deadline, but discard pre-inclusion data.
+      result = { ...initialResult<T>(context), error: result.error };
+      retained.current = result;
+      queued = true;
+      publish();
+      void run();
     };
+    if (pollMs) document.addEventListener('visibilitychange', visibility);
     window.addEventListener('explorer:queries-invalidated', invalidate);
-    return () => window.removeEventListener('explorer:queries-invalidated', invalidate);
-  }, [refresh, target]);
-  useEffect(() => {
-    void refresh();
-    const interval = pollMs ? window.setInterval(() => {
-      if (document.visibilityState === "visible") void refresh();
-    }, pollMs) : undefined;
+    publish();
+    void run();
     return () => {
-      active.current?.controller.abort();
-      active.current = null;
-      if (interval) window.clearInterval(interval);
+      disposed = true;
+      cancel();
+      if (runtime.current === control) runtime.current = null;
+      document.removeEventListener('visibilitychange', visibility);
+      window.removeEventListener('explorer:queries-invalidated', invalidate);
     };
-  }, [refresh, pollMs]);
-  const visible = enabled && result.context.chain === context.chain && result.context.target === target ? result : initialResult<T>(context);
-  return { result: visible, refresh, busy: enabled && (busy || visible.status === 'idle') };
+  }, [key, target, enabled, pollMs]);
+  const matches = enabled && view.result.context.chain === chain.key && view.result.context.target === target;
+  const result = matches ? view.result : initialResult<T>({ chain: chain.key, target });
+  return { result, refresh, busy: enabled && !view.paused && (matches ? view.busy || result.status === 'idle' : true), paused: matches && view.paused, recovered: matches && view.recovered, unchanged: matches && view.unchanged };
 }

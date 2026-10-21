@@ -2,19 +2,18 @@
 
 import Link from "@/components/layout/chain-link";
 import { useQuery } from "@/hooks/use-query";
-import { QueryStatus } from "@/components/query/query-status";
+import { PollingInfo } from "@/components/query/polling-info";
+import { getLiveBlocks, type LiveHistory } from "@/services/guru/live-history.service";
 
-import { Box, Card, CardContent, Chip, Stack, Typography } from "@mui/material";
+import { Box, Card, CardContent, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { useNowTick } from "@/hooks/use-now-tick";
 import { formatRelativePastFromIso } from "@/lib/relative-time";
 import type { BlockDetail } from "@/services/guru/block-details.service";
-import { fetchBlocksNewerThan } from "@/services/guru/blocks.service";
 
 import { lcdBytesToHex } from "@/lib/bytes";
 
 const POLL_MS = 3000;
-const MAX_BLOCKS = 100;
 
 function hasTransactions(txCount: number | string): boolean {
   if (typeof txCount === "number") {
@@ -25,12 +24,8 @@ function hasTransactions(txCount: number | string): boolean {
 }
 
 export function BlocksLiveList() {
-  const query = useQuery<BlockDetail[]>("blocks", async (client, previous) => {
-    const fresh = await fetchBlocksNewerThan(previous?.[0]?.height ?? "0", 50, client);
-    const seen = new Set((previous ?? []).map(block => block.height));
-    return [...fresh.filter(block => !seen.has(block.height)), ...(previous ?? [])].slice(0, MAX_BLOCKS);
-  }, POLL_MS);
-  const blocks = query.result.data ?? [];
+  const query = useQuery<LiveHistory<BlockDetail>>("blocks", getLiveBlocks, POLL_MS);
+  const blocks = query.result.data?.rows ?? [];
   const nowMs = useNowTick(POLL_MS);
 
   const averageBlockTimeSec = (() => {
@@ -64,18 +59,13 @@ export function BlocksLiveList() {
         <Typography variant="h5" fontWeight={700}>
           Blocks
         </Typography>
-        <Chip
-          size="small"
-          color={query.result.status === "success" ? "success" : "warning"}
-          label={query.result.status === "success" ? "Live (3s)" : query.busy ? "불러오는 중" : "Live paused"}
-        />
       </Stack>
       <Typography variant="body2" color="text.secondary">
         현재 목록 평균 블록 생성 시간: {averageBlockTimeSec !== null ? `${averageBlockTimeSec.toFixed(2)}s` : "-"}
       </Typography>
-      <QueryStatus {...query} />
+      <PollingInfo {...query} />
       {blocks.length === 0 ? (
-        query.result.status === "empty" ? <Typography variant="body2">조회한 블록이 없습니다.</Typography> : null
+        (query.result.status === "success" || query.result.status === "empty") ? <Typography variant="body2">조회한 블록이 없습니다.</Typography> : null
       ) : (
         <Box
           sx={{

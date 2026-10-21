@@ -18,25 +18,24 @@ function AddressRead({ address }: { address: string }) {
   return <><QueryStatus {...query} />{query.result.data?.map(row => <span key={row.denom}>{row.amount} {row.denom}</span>)}</>;
 }
 describe('real service and query DOM', () => {
-  it('does not show Live or empty before the first block response, then recovers after failure', async () => {
-    let resolve!: (response: Response) => void;
-    const http = mockQueryHttp(() => new Promise<Response>(done => { resolve = done; }));
+  it('shows HTTP polling state and preserves stale blocks after the retry deadline', async () => {
+    vi.useFakeTimers();
+    const http = mockQueryHttp(() => new Response('', { status: 500 }));
     render(<BlocksLiveList />);
-    expect(screen.queryByText('Live (3s)')).toBeNull();
     expect(screen.queryByText('조회한 블록이 없습니다.')).toBeNull();
-    expect(screen.getAllByText('불러오는 중').length).toBeGreaterThan(0);
-    await act(async () => resolve(new Response('', { status: 500 })));
-    expect(await screen.findByText(/HTTP 500/)).toBeTruthy();
-    expect(screen.queryByText('Live (3s)')).toBeNull();
-    http.mockImplementation(async input => Response.json(block(String(input).endsWith('/latest') ? '1' : '1')));
-    fireEvent.click(screen.getByRole('button', { name: '다시 조회' }));
-    expect(await screen.findByText('#1')).toBeTruthy();
-    expect(screen.getByText('Live (3s)')).toBeTruthy();
-    http.mockResolvedValue(new Response('', { status: 500 }));
-    fireEvent.click(screen.getByRole('button', { name: '다시 조회' }));
-    expect(await screen.findByText('갱신 실패: 마지막 조회 데이터')).toBeTruthy();
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.getByText(/HTTP 500/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: '목록 다시 조회' }) as HTMLButtonElement).disabled).toBe(true);
+    http.mockImplementation(async () => Response.json(block('1')));
+    await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
     expect(screen.getByText('#1')).toBeTruthy();
-    expect(screen.queryByText('Live (3s)')).toBeNull();
+    expect(screen.getByText('조회 복구')).toBeTruthy();
+    http.mockResolvedValue(new Response('', { status: 500 }));
+    fireEvent.click(screen.getByRole('button', { name: '목록 다시 조회' }));
+    await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+    expect(screen.getByText('갱신 실패: 마지막 조회 데이터')).toBeTruthy();
+    expect(screen.getByText('#1')).toBeTruthy();
+    expect(screen.getByText('갱신 실패 · 오래된 데이터')).toBeTruthy();
   });
   it('keeps independent Dashboard account and validator metrics when summary fails', async () => {
     const http = mockNetworkSummaryHttp();
