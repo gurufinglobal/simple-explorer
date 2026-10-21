@@ -5,6 +5,8 @@ import { UnbondingDetails } from "@/components/amount/unbonding-details";
 import Link from "@/components/layout/chain-link";
 import { getActiveChainConfig } from "@/lib/chain-selection";
 import { useMemo, useState } from "react";
+import { usePagedQuery } from "@/hooks/use-paged-query";
+import { PageControls } from "@/components/query/page-controls";
 import { useQuery } from "@/hooks/use-query";
 import { QueryStatus } from "@/components/query/query-status";
 import { DashboardQueryInfo } from "./dashboard-query-info";
@@ -32,7 +34,7 @@ import {
   getNetworkSummary,
 } from "@/services/guru/network-summary.service";
 import { useEffectiveCosmosAddress } from "@/hooks/use-effective-cosmos-address";
-import { getTopValidators } from "@/services/guru/staking.service";
+import { getValidatorsPage } from "@/services/guru/staking.service";
 import { SendForm } from "@/components/transactions/send-form";
 import { SavedTransactions } from "@/components/transactions/transaction-result";
 import { StakingForm } from "@/components/transactions/staking-form";
@@ -50,7 +52,7 @@ function formatCompactAmount(value: string | null | undefined): string { return 
 
 export function DashboardView() {
   const summary = useQuery("dashboard-summary", client => getNetworkSummary(client));
-  const validators = useQuery("dashboard-validators", client => getTopValidators(100, client));
+  const validators = usePagedQuery("dashboard-validators", (client, cursor) => getValidatorsPage(100, client, cursor), row => row.operatorAddress);
   const versions = useQuery("application-versions", client => getApplicationVersions(client));
   const accounts = useQuery("accounts-total", client => getAccountsTotal(client));
   const validatorOptions = validators.result.data ?? [];
@@ -122,9 +124,11 @@ export function DashboardView() {
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
               <Typography variant="caption">Validators</Typography>
+              <Typography variant="caption" display="block">현재 조회 bonded 검증자 수</Typography>
               <Typography variant="h6">
                 {validators.busy && !validators.result.data ? <Skeleton variant="text" width={60} /> : (validators.result.data?.length ?? "-")}
               </Typography>
+              <PageControls {...validators} label="검증자" />
             </CardContent>
           </Card>
         </Grid>
@@ -143,6 +147,7 @@ export function DashboardView() {
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
               <Typography variant="caption">Bonded</Typography>
+              <Typography variant="caption" display="block">체인 staking pool 본딩량</Typography>
               <Typography variant="h6" title={state?.bonded ?? "-"}>
                 {loading ? <Skeleton variant="text" width={130} /> : formatCompactAmount(state?.bonded)}
               </Typography>

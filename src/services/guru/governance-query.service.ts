@@ -1,3 +1,4 @@
+import { cursorParam, pageRows, queryPage, type LcdPagination } from '@/lib/query-page';
 import { PartialQueryError, QueryError, readFields, schemaError } from "@/lib/query-result";
 import { normalizeGovV1Beta1Proposal, normalizeGovV1Proposal } from "@/lib/gov-mapper";
 import type {
@@ -19,6 +20,7 @@ type ProposalOneV1 = { proposal?: Record<string, unknown> };
 type TallyResponse = { tally?: Record<string, unknown> };
 
 type VotesResponse = {
+  pagination?: LcdPagination;
   votes?: unknown[];
 };
 
@@ -123,9 +125,12 @@ async function safeLcdGet<T>(path: string, apiClients: QueryClient = defaultClie
 }
 
 export async function listProposals(limit = 100, apiClients: QueryClient = defaultClients): Promise<NormalizedProposal[]> {
-  const { data, legacy } = await lcdGetWithVersion<ProposalsV1Response>(`/cosmos/gov/v1/proposals?pagination.limit=${limit}&pagination.reverse=true`, apiClients);
+  return pageRows(listProposalsPage(limit, apiClients));
+}
+export async function listProposalsPage(limit = 100, apiClients: QueryClient = defaultClients, cursor?: string | null) {
+  const { data, legacy } = await lcdGetWithVersion<ProposalsV1Response>(`/cosmos/gov/v1/proposals?pagination.limit=${limit}&pagination.reverse=true${cursorParam(cursor)}`, apiClients);
   if (!Array.isArray(data.proposals)) schemaError("제안 목록이 올바르지 않습니다.");
-  return data.proposals.map(legacy ? normalizeGovV1Beta1Proposal : normalizeGovV1Proposal);
+  return queryPage(data.proposals.map(legacy ? normalizeGovV1Beta1Proposal : normalizeGovV1Proposal), data.pagination, limit);
 }
 
 export async function getProposalRaw(proposalId: string, apiClients: QueryClient = defaultClients): Promise<unknown | null> {
@@ -196,8 +201,15 @@ function mapGovernanceRows<T>(raw: unknown, normalize: (item: unknown) => T | nu
 }
 
 export async function listVotes(proposalId: string, apiClients: QueryClient = defaultClients): Promise<GovernanceVoteRow[]> {
-  const response = await safeLcdGet<VotesResponse>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/votes?pagination.limit=200`, apiClients);
-  return mapGovernanceRows(response.votes, normalizeVoteEntry, "투표 내역");
+  return pageRows(listVotesPage(proposalId, apiClients));
+}
+export async function listVotesPage(proposalId: string, apiClients: QueryClient = defaultClients, cursor?: string | null) {
+  const response = await safeLcdGet<VotesResponse>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/votes?pagination.limit=200${cursorParam(cursor)}`, apiClients);
+  try { return queryPage(mapGovernanceRows(response.votes, normalizeVoteEntry, "투표 내역"), response.pagination, 200); }
+  catch (error) {
+    if (error instanceof PartialQueryError) throw new PartialQueryError(queryPage(error.data as GovernanceVoteRow[], response.pagination, 200), error.info);
+    throw error;
+  }
 }
 
 export async function listDeposits(proposalId: string, apiClients: QueryClient = defaultClients): Promise<GovernanceDepositRow[]> {

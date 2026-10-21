@@ -23,7 +23,7 @@ import { useNowTick } from "@/hooks/use-now-tick";
 import { getProposalTally } from "@/services/guru/governance-query.service";
 
 const FILTER_ALL = "all" as const;
-type FilterKey = typeof FILTER_ALL | GovProposalStatus;
+export type FilterKey = typeof FILTER_ALL | GovProposalStatus;
 
 const STATUS_LABEL: Record<GovProposalStatus, string> = {
   deposit_period: "예치",
@@ -50,15 +50,21 @@ function statusColor(status: GovProposalStatus): "default" | "primary" | "succes
   }
 }
 
-type SortKey = "newest" | "ending";
+export type SortKey = "newest" | "ending";
 
 type Props = {
   initialProposals: NormalizedProposal[];
+  available?: boolean;
+  filterValue?: FilterKey;
+  sortValue?: SortKey;
+  onCriteriaChange?: (filter: FilterKey, sort: SortKey) => void;
 };
 
-export function GovernanceProposalsList({ initialProposals }: Props) {
-  const [filter, setFilter] = useState<FilterKey>(FILTER_ALL);
-  const [sort, setSort] = useState<SortKey>("newest");
+export function GovernanceProposalsList({ initialProposals, available = true, filterValue, sortValue, onCriteriaChange }: Props) {
+  const [localFilter, setFilter] = useState<FilterKey>(FILTER_ALL);
+  const [localSort, setSort] = useState<SortKey>("newest");
+  const filter = filterValue ?? localFilter;
+  const sort = sortValue ?? localSort;
   const [liveTallyByProposalId, setLiveTallyByProposalId] = useState<Record<string, NormalizedProposal["finalTally"]>>({});
   const nowMs = useNowTick(1000);
 
@@ -130,6 +136,7 @@ export function GovernanceProposalsList({ initialProposals }: Props) {
   const handleTab = (_: React.SyntheticEvent, value: number) => {
     if (value === 0) {
       setFilter(FILTER_ALL);
+      onCriteriaChange?.(FILTER_ALL, sort);
       return;
     }
     const keys: GovProposalStatus[] = [
@@ -140,10 +147,12 @@ export function GovernanceProposalsList({ initialProposals }: Props) {
       "failed",
     ];
     setFilter(keys[value - 1] ?? FILTER_ALL);
+    onCriteriaChange?.(keys[value - 1] ?? FILTER_ALL, sort);
   };
 
   return (
     <Stack spacing={2}>
+      <Typography variant="body2">필터와 정렬은 현재 조회 목록에만 적용됩니다. 조건 변경 시 첫 페이지부터 다시 조회합니다.</Typography>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
         <Tabs value={tabIndex} onChange={handleTab} variant="scrollable" scrollButtons="auto">
           <Tab label="전체" />
@@ -159,7 +168,7 @@ export function GovernanceProposalsList({ initialProposals }: Props) {
             labelId="gov-sort-label"
             label="정렬"
             value={sort}
-            onChange={(e) => setSort(e.target.value as SortKey)}
+            onChange={(e) => { setSort(e.target.value as SortKey); onCriteriaChange?.(filter, e.target.value as SortKey); }}
           >
             <MenuItem value="newest">최신순</MenuItem>
             <MenuItem value="ending">마감 임박</MenuItem>
@@ -169,7 +178,7 @@ export function GovernanceProposalsList({ initialProposals }: Props) {
 
       {filtered.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          표시할 제안이 없습니다.
+          {available ? "표시할 제안이 없습니다." : "제안 목록 미확인: 조회 상태를 확인하세요."}
         </Typography>
       ) : (
         <Box

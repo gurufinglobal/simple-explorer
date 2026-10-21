@@ -1,15 +1,16 @@
 "use client";
 
-import { useQuery } from "@/hooks/use-query";
+import { usePagedQuery } from "@/hooks/use-paged-query";
+import { PageControls } from "@/components/query/page-controls";
 import { QueryStatus } from "@/components/query/query-status";
 
 import { Card, CardContent, Stack, Typography } from "@mui/material";
 import { ActionConfirmModal } from "@/components/staking/action-confirm-modal";
 import { IbcChannelsPanel } from "@/components/operations/ibc-channels-panel";
-import { getIbcChannels } from "@/services/guru/ibc-channels.service";
+import { getIbcChannelsPage } from "@/services/guru/ibc-channels.service";
 
 export default function OperationsPage() {
-  const query = useQuery("ibc-channels", client => getIbcChannels(client));
+  const query = usePagedQuery("ibc-channels", (client, cursor) => getIbcChannelsPage(client, cursor), row => `${row.portId}:${row.channelId}`);
 
   return (
     <Stack spacing={2}>
@@ -34,6 +35,7 @@ export default function OperationsPage() {
             ID&quot; 자체는 채널 API에 직접 포함되지 않고, connection·client 조회로 이어지는 식별자입니다.
           </Typography>
           <QueryStatus {...query} />
+          <PageControls {...query} />
           {query.result.data && <IbcChannelsPanel channels={query.result.data} />}
         </CardContent>
       </Card>

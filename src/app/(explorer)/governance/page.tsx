@@ -1,15 +1,20 @@
 "use client";
 
+import { useState } from "react";
+import type { NormalizedProposal } from "@/lib/gov-types";
 import Link from "@/components/layout/chain-link";
-import { useQuery } from "@/hooks/use-query";
+import { usePagedQuery } from "@/hooks/use-paged-query";
+import { PageControls } from "@/components/query/page-controls";
 import { QueryStatus } from "@/components/query/query-status";
 
 import { Button, Stack, Typography } from "@mui/material";
-import { GovernanceProposalsList } from "@/components/governance/governance-proposals-list";
-import { listProposals } from "@/services/guru/governance-query.service";
+import { GovernanceProposalsList, type FilterKey, type SortKey } from "@/components/governance/governance-proposals-list";
+import { listProposalsPage } from "@/services/guru/governance-query.service";
 
+const EMPTY: NormalizedProposal[] = [];
 export default function GovernancePage() {
-  const query = useQuery("governance", client => listProposals(100, client));
+  const [criteria, setCriteria] = useState<{ filter: FilterKey; sort: SortKey }>({ filter: "all", sort: "newest" });
+  const query = usePagedQuery("governance", (client, cursor) => listProposalsPage(100, client, cursor), row => row.id, undefined, `${criteria.filter}:${criteria.sort}`);
 
   return (
     <Stack spacing={2}>
@@ -23,7 +28,8 @@ export default function GovernancePage() {
       </Stack>
 
       <QueryStatus {...query} />
-      {query.result.data && <GovernanceProposalsList initialProposals={query.result.data} />}
+      <PageControls {...query} />
+      <GovernanceProposalsList available={query.result.data !== null} initialProposals={query.result.data ?? EMPTY} filterValue={criteria.filter} sortValue={criteria.sort} onCriteriaChange={(filter, sort) => setCriteria({ filter, sort })} />
     </Stack>
   );
 }

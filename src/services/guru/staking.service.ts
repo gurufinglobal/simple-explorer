@@ -1,3 +1,4 @@
+import { cursorParam, pageRows, queryPage, type LcdPagination } from '@/lib/query-page';
 import { sumCoins, type Coin, type AmountMetadata } from "@/lib/cosmos-amount";
 import { withAmountMetadata, getStakingParams } from "./amount-context.service";
 import { getUnbonding, type UnbondingSnapshot } from "./unbonding.service";
@@ -47,6 +48,7 @@ export type DelegatorValidatorPosition = {
 };
 
 type ValidatorsResponse = {
+  pagination?: LcdPagination;
   validators?: Array<{
     operator_address?: string;
     description?: {
@@ -205,13 +207,17 @@ async function fetchValidatorDelegationTotal(operatorAddress: string, apiClients
 }
 
 export async function getTopValidators(limit = 20, apiClients: QueryClient = defaultClients): Promise<ValidatorSummary[]> {
-  return withAmountMetadata(apiClients, async metadata => {
+  return pageRows(getValidatorsPage(limit, apiClients));
+}
 
+export async function getValidatorsPage(limit = 20, apiClients: QueryClient = defaultClients, cursor?: string | null) {
+  return withAmountMetadata(apiClients, async metadata => {
     const response = await apiClients.lcdGet<ValidatorsResponse>(
-      `/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=${limit}`,
+      `/cosmos/staking/v1beta1/validators?status=BOND_STATUS_BONDED&pagination.limit=${limit}${cursorParam(cursor)}`,
     );
     const params = await getStakingParams(apiClients).catch(() => null);
-    return (response.validators ?? schemaError()).map(v => ({ ...toValidatorSummary(v), metadata, bondDenom: params?.bondDenom }));
+    const rows = (response.validators ?? schemaError()).map(v => ({ ...toValidatorSummary(v), metadata, bondDenom: params?.bondDenom }));
+    return queryPage<ValidatorSummary>(rows, response.pagination, limit);
   });
 }
 

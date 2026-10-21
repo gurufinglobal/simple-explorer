@@ -58,9 +58,10 @@ export function ValidatorsTable({ validators }: ValidatorsTableProps) {
   const router = useRouter();
 
   if (validators.length === 0) {
-    return <Typography variant="body2">검증자 데이터를 불러오지 못했습니다.</Typography>;
+    return <Typography variant="body2">조회한 범위에 검증자가 없습니다.</Typography>;
   }
 
+  const comparable = validators.every(v => parseUnsignedBigInt(v.votingPower) !== null && v.bondDenom && v.bondDenom === validators[0].bondDenom);
   const totalVotingPower = validators.reduce((sum, validator) => {
     const value = parseUnsignedBigInt(validator.votingPower);
     if (!value) {
@@ -72,6 +73,7 @@ export function ValidatorsTable({ validators }: ValidatorsTableProps) {
   return (
     <Card variant="outlined">
       <CardContent>
+        <Typography variant="body2">비율은 현재 조회 목록 내 비중입니다. 체인 전체 비중이 아니며 이어보기 시 분모가 늘어납니다.</Typography>
         <Table size="small">
           <TableHead>
             <TableRow>
@@ -100,7 +102,7 @@ export function ValidatorsTable({ validators }: ValidatorsTableProps) {
                 <TableCell>{validator.operatorAddress}</TableCell>
                 <TableCell align="right">
                   <CoinAmount coin={{ amount: validator.votingPower, denom: validator.bondDenom ?? "bond denom 미확인" }} metadata={validator.metadata} /> (
-                  {formatVotingPowerShare(validator.votingPower, totalVotingPower)})
+                  {comparable && totalVotingPower > BigInt(0) ? formatVotingPowerShare(validator.votingPower, totalVotingPower) : "비중 미확인"})
                 </TableCell>
                 <TableCell align="right">{formatCommissionPercent(validator.commission)}</TableCell>
                 <TableCell align="center">

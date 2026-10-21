@@ -1,5 +1,7 @@
 "use client";
 
+import { PageControls } from "@/components/query/page-controls";
+import { usePagedQuery } from "@/hooks/use-paged-query";
 import { useQuery } from "@/hooks/use-query";
 import { QueryStatus } from "@/components/query/query-status";
 
@@ -12,7 +14,7 @@ import {
   getProposalRaw,
   getProposalTally,
   listDeposits,
-  listVotes,
+  listVotesPage,
 } from "@/services/guru/governance-query.service";
 import { Suspense } from "react";
 import { getChainByKey, type ChainConfig } from "@/lib/env";
@@ -31,13 +33,13 @@ function GovernanceContent({ pinnedChain }: { pinnedChain?: ChainConfig }) {
   const proposal = useQuery(`proposal:${proposalId}`, client => getProposal(proposalId, client), undefined, true, pinnedChain);
   const paramsQuery = useQuery(`gov-params:${proposalId}`, client => getGovParams(client), undefined, true, pinnedChain);
   const tally = useQuery(`tally:${proposalId}`, client => getProposalTally(proposalId, client), undefined, true, pinnedChain);
-  const votes = useQuery(`votes:${proposalId}`, client => listVotes(proposalId, client), undefined, true, pinnedChain);
+  const votes = usePagedQuery(`votes:${proposalId}`, (client, cursor) => listVotesPage(proposalId, client, cursor), row => row.voter, pinnedChain);
   const deposits = useQuery(`deposits:${proposalId}`, client => listDeposits(proposalId, client), undefined, true, pinnedChain);
   const raw = useQuery(`proposal-raw:${proposalId}`, client => getProposalRaw(proposalId, client), undefined, true, pinnedChain);
   return <Stack spacing={2}>
     {pinnedChain && <Alert severity="info">제안 링크 체인: {pinnedChain.key} / {pinnedChain.chainId}</Alert>}
     <QueryStatus {...proposal} /><QueryStatus {...paramsQuery} /><QueryStatus {...tally} />
-    <QueryStatus {...votes} /><QueryStatus {...deposits} /><QueryStatus {...raw} />
+    <QueryStatus {...votes} /><PageControls {...votes} label="투표" /><QueryStatus {...deposits} /><QueryStatus {...raw} />
     {proposal.result.data && <GovernanceProposalDetail key={`${pinnedChain?.key ?? proposal.result.context.chain}:${proposalId}`} pinnedChain={pinnedChain}
       proposal={proposal.result.data}
       govParams={paramsQuery.result.data ?? { voting: null, tallying: null, deposit: null }}
