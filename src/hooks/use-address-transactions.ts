@@ -11,7 +11,6 @@ export function useAddressTransactions(address: string) {
   const streams = [sender, recipient];
   const rows = mergeAddressTransactions(sender.result.data ?? [], recipient.result.data ?? []);
   const partial = streams.some(stream => stream.result.error || stream.stopReason);
-  const loading = streams.some(stream => stream.busy && !stream.result.data);
   // A stream's last block can continue on its next page. Keep this block and all
   // lower rows buffered until both streams have passed it, including same-height hashes.
   const frontiers = streams.flatMap(stream => {
@@ -25,7 +24,8 @@ export function useAddressTransactions(address: string) {
   const exposedPartial = useRef({ key: contextKey, value: false });
   if (exposedPartial.current.key !== contextKey) exposedPartial.current = { key: contextKey, value: false };
   if (partial) exposedPartial.current.value = true;
-  const partialRange = partial || (exposedPartial.current.value && streams.some(stream => stream.hasMore));
+  const loading = !exposedPartial.current.value && streams.some(stream => stream.busy && !stream.result.data);
+  const partialRange = partial || (exposedPartial.current.value && streams.some(stream => stream.hasMore || stream.pages === 0));
   const missingCandidate = streams.some(stream => stream.hasMore && !stream.result.data?.length);
   const visible = loading ? [] : partialRange ? rows : missingCandidate ? [] : frontier === null ? rows : rows.filter(row => BigInt(row.height) > frontier);
   return { sender, recipient, rows: visible, buffered: rows.length - visible.length, partial: partialRange, loading };

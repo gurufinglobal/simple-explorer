@@ -1,4 +1,4 @@
-// Run against an isolated Next dev build configured with chain keys a/b and LCD https://a.example / https://b.example.
+// Run against an isolated Next build configured with chain keys a/b and LCD https://a.example / https://b.example.
 // Supply PLAYWRIGHT_MODULE (installed module path), CHROME_EXECUTABLE, BROWSER_ORIGIN and BROWSER_OUTPUT as needed.
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -14,7 +14,8 @@ const requests = [], errors = [], cases = [];
 const cursor = 'a+/==&?';
 const pagination = key => ({ next_key: key, total: '0' });
 const channel = n => ({ port_id: 'transfer', channel_id: `channel-${n}`, state: 'STATE_OPEN' });
-let ibcFail = true;
+let ibcFail = true, addressMode = 'pages', retryPending = false, releaseRetry;
+const retryReady = new Promise(resolve => { releaseRetry = resolve; });
 page.on('pageerror', error => errors.push(error.message));
 await context.route(/https:\/\/[ab]\.example\//, async route => {
   const url = new URL(route.request().url()); requests.push(url.href);
@@ -31,7 +32,15 @@ await context.route(/https:\/\/[ab]\.example\//, async route => {
     json = { validators: next ? [validator(21)] : Array.from({ length: 20 }, (_, i) => validator(i + 1)), pagination: pagination(next ? null : cursor) };
   } else if (url.pathname.endsWith('/txs')) {
     const tx = (hash, height) => ({ txhash: hash, height: String(height), code: 0 });
-    json = { tx_responses: url.searchParams.get('query').includes('message.sender') ? Array.from({ length: 30 }, (_, i) => tx(`S${i}`, 30 - i)) : [tx('NEWEST', 31), tx('S0', 30)], pagination: pagination(null) };
+    const sender = url.searchParams.get('query').includes('message.sender');
+    if (addressMode === 'retry' && sender) {
+      if (!retryPending) { await route.fulfill({ status: 500, body: '' }); return; }
+      await retryReady;
+    }
+    const rows = addressMode === 'retry' ? sender ? [tx('SENDER', 2)] : [tx('RECIPIENT', 3)]
+      : sender ? Array.from({ length: 101 }, (_, i) => tx(`S${i}`, 101 - i)) : [tx('NEWEST', 102), tx('S0', 101)];
+    const pageNumber = Number(url.searchParams.get('page') || 1), limit = Number(url.searchParams.get('limit') || 100);
+    json = { tx_responses: rows.slice((pageNumber - 1) * limit, pageNumber * limit), txs: [], pagination: null, total: String(rows.length) };
   } else if (url.pathname.includes('/balances/')) json = { balances: [] };
   else if (url.pathname.includes('/accounts/')) json = { account: { account_number: '1', sequence: '1' } };
   else if (url.pathname.endsWith('/proposals')) {
@@ -82,12 +91,33 @@ try {
   await newest.waitFor();
   assert.equal(await newest.getAttribute('href'), '/tx/NEWEST?chain=a');
   assert.equal(await page.getByText('S0', { exact: true }).count(), 1);
+  for (const count of [60, 90, 101]) {
+    await page.getByRole('button', { name: '송신 이어보기', exact: true }).click();
+    await page.getByText(`송신: 현재 조회 ${count}건 · 전체 개수 미확인`, { exact: true }).waitFor();
+  }
   const txLinks = await page.locator('a[href^="/tx/"]').allTextContents();
-  assert.equal(txLinks.length, 31); assert(txLinks[0].startsWith('NEWEST'));
-  cases.push('address sender 30 + latest recipient / duplicate once / chain link');
+  assert.equal(txLinks.length, 102); assert(txLinks[0].startsWith('NEWEST'));
+  cases.push('SDK address sender 101 / page 1-4 / latest recipient / duplicate once / chain link');
   await page.screenshot({ path: path.join(output, 'address.png') });
+  const senderPages = requests.filter(value => value.includes('/txs?') && new URL(value).searchParams.get('query').includes('message.sender')).map(value => new URL(value).searchParams.get('page'));
+  assert.deepEqual(senderPages.slice(-3), ['2', '3', '4']);
+  addressMode = 'retry';
+  await page.reload();
+  await page.getByText('RECIPIENT', { exact: true }).waitFor();
+  await page.getByRole('region', { name: '송신 거래' }).getByText(/HTTP 500/).waitFor();
+  retryPending = true;
+  await page.getByRole('region', { name: '송신 거래' }).getByRole('button', { name: '다시 조회', exact: true }).click();
+  await page.getByRole('region', { name: '송신 거래' }).getByText('불러오는 중', { exact: true }).waitFor();
+  assert(await page.getByText('RECIPIENT', { exact: true }).isVisible());
+  assert(await page.getByText(/송수신 일부 범위만/).isVisible());
+  await page.screenshot({ path: path.join(output, 'address-delayed-retry.png') });
+  releaseRetry();
+  await page.getByText('SENDER', { exact: true }).waitFor();
+  assert(await page.getByText('RECIPIENT', { exact: true }).isVisible());
+  assert.equal(await page.getByText(/송수신 일부 범위만/).count(), 0);
+  cases.push('sender initial failure / delayed retry keeps recipient and partial notice / success');
   assert.deepEqual(errors, []);
-  const result = { passed: true, origin, build: 'isolated Next dev / unchanged product sources', chain: ['a', 'b'], fixture: 'HTTP intercepted at browser boundary; no live signing', at: new Date().toISOString(), cases, requestCount: requests.length, errors };
+  const result = { passed: true, origin, build: process.env.BROWSER_BUILD || 'isolated Next build / unchanged product sources', chain: ['a', 'b'], fixture: 'HTTP intercepted at browser boundary; no live signing', at: new Date().toISOString(), cases, requestCount: requests.length, errors };
   fs.writeFileSync(path.join(output, 'result.json'), JSON.stringify(result, null, 2));
   console.log(JSON.stringify(result, null, 2));
 } finally { await browser.close(); }
