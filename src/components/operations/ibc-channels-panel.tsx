@@ -44,7 +44,7 @@ export function IbcChannelsPanel({ channels }: Props) {
   }
 
   return (
-    <TableContainer component={Paper} variant="outlined">
+    <TableContainer component={Paper} variant="outlined" role="region" aria-label="IBC 채널 목록 가로 스크롤" tabIndex={0}>
       <Table size="small" sx={{ minWidth: 720 }}>
         <TableHead>
           <TableRow>

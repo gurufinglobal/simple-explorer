@@ -95,3 +95,16 @@ npm run build
 ```
 
 환경·쿠키·요청 대상 회귀 검사는 `tests/integration/dev-chain-config.integration.test.tsx`와 `tests/contract/dev-chain-server.contract.test.ts`에 있습니다. 네트워크 경계 모킹 검사이며 실제 브라우저 CORS나 지갑 브로드캐스트 검증을 의미하지 않습니다.
+
+## 개발자 탐색 안내
+
+홈은 사용자 탐색 안내를 제공한다. 개발 시 `/dashboard` → `/blocks` → `/transactions` → `/tx/[hash]` 흐름과 `src/components/layout/explorer-shell.tsx`를 먼저 확인한다.
+
+조회 로직은 `src/services/guru`와 query client에 두고 화면은 `src/app` route와 `src/components`에 구성한다. 예를 들어 블록 목록은 `getLatestBlocks`, 거래 목록은 `getRecentTransactions`를 해당 서비스에서 제공한다. 체인 문맥을 포함하는 클라이언트와 현재 함수 인자를 확인한 뒤 연결한다.
+
+```ts
+import { getLatestBlocks } from "@/services/guru/blocks.service";
+import { getRecentTransactions } from "@/services/guru/transactions.service";
+```
+
+내부 탐색은 `ChainLink`로 URL의 체인을 보존한다. 지갑 세션/포트폴리오는 Zustand store, 조회 상태는 `useQuery`/`usePagedQuery`가 관리한다. 네트워크·지갑 경계에 fixture를 주입하고 실제 route/component/service 흐름을 실행하는 테스트를 추가한다.

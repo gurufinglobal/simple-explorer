@@ -1,5 +1,5 @@
 "use client";
-import { useState, type FormEvent } from "react";
+import { useId, useRef, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { Alert, Button, Paper, Stack, TextField, Typography } from "@mui/material";
 import { classifyQuery, searchHref, type SearchResolution, type ResolvedType } from "@/services/search/query-classifier";
@@ -10,6 +10,8 @@ const labels: Record<ResolvedType, string> = {
 };
 export function TopNavSearch() {
   const router = useRouter();
+  const input = useRef<HTMLInputElement>(null);
+  const feedbackId = useId();
   const [query, setQuery] = useState("");
   const [choice, setChoice] = useState<{ resolution: SearchResolution; chainKey: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -29,23 +31,26 @@ export function TopNavSearch() {
       navigate(resolution, resolution.resolvedType, chain.key);
     } catch (e) { setError((e as Error).message); }
   }
-  return <Stack sx={{ position: "relative" }}>
+  function closeFeedback() { setError(null); setChoice(null); input.current?.focus(); }
+  return <Stack sx={{ position: "relative", minWidth: 0 }} onKeyDown={event => {
+    if (event.key === "Escape" && (error || choice)) { event.stopPropagation(); closeFeedback(); }
+  }}>
     <form onSubmit={submit}>
       <Stack direction="row" spacing={1}>
-        <TextField fullWidth size="small" label="블록 높이 / Cosmos tx hash (hex) / 계정 주소" value={query}
+        <TextField inputRef={input} slotProps={{ htmlInput: { "aria-describedby": error || choice ? feedbackId : undefined } }} fullWidth size="small" label="블록 높이 / Cosmos tx hash (hex) / 계정 주소" value={query}
           onChange={event => { setQuery(event.target.value); setChoice(null); setError(null); }} />
         <Button type="submit" aria-label="search">검색</Button>
       </Stack>
     </form>
-    {(error || choice) && <Paper elevation={8} sx={{ position: "absolute", top: "100%", left: 0, right: 0, mt: 1, p: 1, zIndex: 1 }}>
-    {error && <Alert severity="warning">{error}</Alert>}
+    {(error || choice) && <Paper id={feedbackId} elevation={8} sx={{ position: "absolute", top: "100%", left: 0, right: 0, mt: 1, p: 1, zIndex: 1, overflowWrap: "anywhere", maxHeight: "60vh", overflowY: "auto" }}>
+    {error && <Alert severity="warning" aria-label="검색 오류">{error}</Alert>}
     {choice && <Stack role="group" aria-label="검색 후보 선택">
       <Typography>여러 의미로 해석되는 입력입니다. 조회 대상을 선택하세요.</Typography>
       {choice.resolution.candidates.map(candidate => <Button key={candidate}
         onClick={() => navigate(choice.resolution, candidate, choice.chainKey)}>{labels[candidate]}</Button>)}
     </Stack>}
     <Typography variant="caption">Cosmos tx hash만 조회합니다. EVM hash 대응·블록 hash 검색·validator/token 검색은 미지원입니다.</Typography>
-    <Button size="small" onClick={() => { setError(null); setChoice(null); }}>닫기</Button>
+    <Button size="small" onClick={closeFeedback}>닫기</Button>
     </Paper>}
   </Stack>;
 }

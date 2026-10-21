@@ -9,6 +9,7 @@ import {
   Box,
   Drawer,
   IconButton,
+  Button,
   List,
   ListItemButton,
   ListItemIcon,
@@ -59,7 +60,7 @@ const menus: MenuItem[] = [
   { href: "/oracle", label: "Oracle", icon: <QueryStatsOutlinedIcon />, requiresOracle: true },
   { href: "/params", label: "Params", icon: <TuneOutlinedIcon /> },
   { href: "/tokens", label: "Tokens", icon: <TokenOutlinedIcon /> },
-  { href: "/operations", label: "IBC Channels / CCMs", icon: <SettingsOutlinedIcon /> },
+  { href: "/operations", label: "IBC Channels", icon: <SettingsOutlinedIcon /> },
 ];
 
 export function ExplorerShell({ children }: { children: ReactNode }) {
@@ -108,7 +109,7 @@ function ExplorerShellContent({ children }: { children: ReactNode }) {
     return true;
   });
 
-  const navigation = <>
+  const navigation = <Box component="nav" aria-label="탐색 메뉴">
     <Toolbar sx={{ px: 0 }}>
       <Box sx={{ width: "100%" }}><ChainSelector /></Box>
     </Toolbar>
@@ -123,7 +124,7 @@ function ExplorerShellContent({ children }: { children: ReactNode }) {
         ))}
       </List>
     </Box>
-  </>;
+  </Box>;
 
   return (
     <Box sx={{ display: "flex", flexDirection: { xs: "column", md: "row" }, minHeight: "100vh" }}>
@@ -166,9 +167,10 @@ function ExplorerShellContent({ children }: { children: ReactNode }) {
         {navigation}
       </Drawer>
       <Drawer open={menuOpen && !desktop} onClose={() => setMenuOpen(false)} sx={{ display: { md: "none" }, "& .MuiDrawer-paper": { width: drawerWidth } }}>
+        <Button onClick={() => setMenuOpen(false)}>탐색 메뉴 닫기</Button>
         {navigation}
       </Drawer>
-      <Box component="main" sx={{ flexGrow: 1, minWidth: 0, p: { xs: 2, md: 3 }, ml: 0 }}>
+      <Box component="main" sx={{ flexGrow: 1, minWidth: 0, overflowWrap: "anywhere", p: { xs: 2, md: 3 }, ml: 0 }}>
         <Toolbar sx={{ display: { xs: "none", md: "flex" } }} />
         {configError ? <Alert severity="error">{configError} 탐색 메뉴에서 체인을 선택하세요.</Alert> : ready ? <Box key={activeChain.key}><WalletPortfolioHydrator />{children}</Box> : <Alert severity="info">체인 설정 확인 중…</Alert>}
       </Box>

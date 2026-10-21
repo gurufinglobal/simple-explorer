@@ -2,10 +2,11 @@
 import { Alert, Button, Dialog, DialogActions, DialogContent, DialogTitle, Stack, Typography } from "@mui/material";
 import type { TransactionSnapshot } from "@/services/transactions/transaction";
 
-export function TransactionConfirmDialog({ snapshot, onCancel, onConfirm }: {
-  snapshot: TransactionSnapshot | null; onCancel: () => void; onConfirm: () => void;
+export function TransactionConfirmDialog({ snapshot, onCancel, onConfirm, onExited }: {
+  snapshot: TransactionSnapshot | null; onCancel: () => void; onConfirm: () => void; onExited?: () => void;
 }) {
   return <Dialog open={snapshot !== null} onClose={onCancel} fullWidth maxWidth="sm"
+    slotProps={{ transition: { onExited } }}
     aria-labelledby="transaction-confirm-title" aria-describedby="transaction-confirm-description">
     <DialogTitle id="transaction-confirm-title">거래 실행 전 확인</DialogTitle>
     {snapshot && <DialogContent sx={{ overflowWrap: "anywhere" }}>

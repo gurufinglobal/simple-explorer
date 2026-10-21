@@ -1,8 +1,7 @@
 "use client";
-import { withChain } from "@/lib/chain-selection";
+import Link from "@/components/layout/chain-link";
 
 import { CoinAmount } from "@/components/amount/coin-amount";
-import { useRouter } from "next/navigation";
 import {
   Card,
   CardContent,
@@ -11,6 +10,7 @@ import {
   TableBody,
   TableCell,
   TableHead,
+  TableContainer,
   TableRow,
   Typography,
 } from "@mui/material";
@@ -55,8 +55,6 @@ function formatVotingPowerShare(votingPower: string, totalVotingPower: bigint): 
 }
 
 export function ValidatorsTable({ validators }: ValidatorsTableProps) {
-  const router = useRouter();
-
   if (validators.length === 0) {
     return <Typography variant="body2">조회한 범위에 검증자가 없습니다.</Typography>;
   }
@@ -74,48 +72,43 @@ export function ValidatorsTable({ validators }: ValidatorsTableProps) {
     <Card variant="outlined">
       <CardContent>
         <Typography variant="body2">비율은 현재 조회 목록 내 비중입니다. 체인 전체 비중이 아니며 이어보기 시 분모가 늘어납니다.</Typography>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Moniker</TableCell>
-              <TableCell>Operator</TableCell>
-              <TableCell align="right">Voting Power</TableCell>
-              <TableCell align="right">Commission</TableCell>
-              <TableCell align="center">Status</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {validators.map((validator) => (
-              <TableRow
-                key={validator.operatorAddress}
-                hover
-                sx={{ cursor: "pointer" }}
-                onClick={() => {
-                  router.push(withChain(`/staking/${encodeURIComponent(validator.operatorAddress)}`));
-                }}
-              >
-                <TableCell>
-                  <Typography variant="body2" color="primary" sx={{ "&:hover": { textDecoration: "underline" } }}>
-                    {validator.moniker}
-                  </Typography>
-                </TableCell>
-                <TableCell>{validator.operatorAddress}</TableCell>
-                <TableCell align="right">
-                  <CoinAmount coin={{ amount: validator.votingPower, denom: validator.bondDenom ?? "bond denom 미확인" }} metadata={validator.metadata} /> (
-                  {comparable && totalVotingPower > BigInt(0) ? formatVotingPowerShare(validator.votingPower, totalVotingPower) : "비중 미확인"})
-                </TableCell>
-                <TableCell align="right">{formatCommissionPercent(validator.commission)}</TableCell>
-                <TableCell align="center">
-                  <Chip
-                    size="small"
-                    label={validator.jailed ? "Jailed" : "Active"}
-                    color={validator.jailed ? "warning" : "success"}
-                  />
-                </TableCell>
+        <TableContainer role="region" aria-label="검증자 목록 가로 스크롤" tabIndex={0}>
+          <Table size="small" sx={{ minWidth: 720 }}>
+            <TableHead>
+              <TableRow>
+                <TableCell>Moniker</TableCell>
+                <TableCell>Operator</TableCell>
+                <TableCell align="right">Voting Power</TableCell>
+                <TableCell align="right">Commission</TableCell>
+                <TableCell align="center">Status</TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
+            </TableHead>
+            <TableBody>
+              {validators.map((validator) => (
+                <TableRow key={validator.operatorAddress} hover>
+                  <TableCell>
+                    <Typography component={Link} href={`/staking/${encodeURIComponent(validator.operatorAddress)}`} variant="body2" color="primary" sx={{ "&:hover": { textDecoration: "underline" } }}>
+                      {validator.moniker || validator.operatorAddress}
+                    </Typography>
+                  </TableCell>
+                  <TableCell>{validator.operatorAddress}</TableCell>
+                  <TableCell align="right">
+                    <CoinAmount coin={{ amount: validator.votingPower, denom: validator.bondDenom ?? "bond denom 미확인" }} metadata={validator.metadata} /> (
+                    {comparable && totalVotingPower > BigInt(0) ? formatVotingPowerShare(validator.votingPower, totalVotingPower) : "비중 미확인"})
+                  </TableCell>
+                  <TableCell align="right">{formatCommissionPercent(validator.commission)}</TableCell>
+                  <TableCell align="center">
+                    <Chip
+                      size="small"
+                      label={validator.jailed ? "Jailed" : "Active"}
+                      color={validator.jailed ? "warning" : "success"}
+                    />
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
       </CardContent>
     </Card>
   );

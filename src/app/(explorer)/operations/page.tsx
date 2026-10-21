@@ -5,7 +5,6 @@ import { PageControls } from "@/components/query/page-controls";
 import { QueryStatus } from "@/components/query/query-status";
 
 import { Card, CardContent, Stack, Typography } from "@mui/material";
-import { ActionConfirmModal } from "@/components/staking/action-confirm-modal";
 import { IbcChannelsPanel } from "@/components/operations/ibc-channels-panel";
 import { getIbcChannelsPage } from "@/services/guru/ibc-channels.service";
 
@@ -15,13 +14,13 @@ export default function OperationsPage() {
   return (
     <Stack spacing={2}>
       <Typography variant="h5" fontWeight={700}>
-        IBC Channels / CCMs
+        IBC Channels
       </Typography>
 
       <Typography variant="body2" color="text.secondary" sx={{ maxWidth: 720 }}>
-        이 메뉴는 <strong>체인 운영·연동(Operations)</strong>과 관련된 정보를 모아 둔 영역입니다. 지금은{" "}
-        <strong>IBC(Inter-Blockchain Communication) 채널</strong> 목록을 LCD에서 불러와 표시합니다. 거버넌스·스테이킹
-        실행은 각각 <strong>Governance</strong>, <strong>Staking</strong> 메뉴에서 다룹니다.
+        선택한 체인의 IBC(Inter-Blockchain Communication) 채널을 조회합니다.
+        지갑 연결 없이 채널 상태와 상대 포트·채널 정보를 확인할 수 있습니다.
+        거래 실행은 제공하지 않습니다.
       </Typography>
 
       <Card variant="outlined">
@@ -40,10 +39,7 @@ export default function OperationsPage() {
         </CardContent>
       </Card>
 
-      <ActionConfirmModal
-        summary="체인 서명이 필요한 작업 전에는 지갑에서 내용을 다시 확인하세요."
-        warning="서명 후 되돌릴 수 없습니다."
-      />
+
     </Stack>
   );
 }

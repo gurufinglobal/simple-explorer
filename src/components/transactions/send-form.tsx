@@ -49,6 +49,6 @@ export function SendForm() {
     {flow.error && <Alert severity="warning" role="status">{flow.error}</Alert>}
     {flow.phase === "signing" && <Alert severity="info" role="status">지갑 서명 대기 중 · 입력이나 계정을 바꾸면 이 확인은 무효화됩니다.</Alert>}
     {flow.receipt && <TransactionResult key={`${flow.receipt.hash}:${flow.receipt.status}`} receipt={flow.receipt} />}
-    <TransactionConfirmDialog snapshot={flow.prepared?.snapshot ?? null} onCancel={flow.cancel} onConfirm={() => void flow.confirm()} />
+    <TransactionConfirmDialog onExited={flow.restoreFocus} snapshot={flow.prepared?.snapshot ?? null} onCancel={flow.cancel} onConfirm={() => void flow.confirm()} />
   </Stack>;
 }

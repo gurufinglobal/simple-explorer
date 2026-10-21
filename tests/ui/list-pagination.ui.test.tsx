@@ -122,8 +122,7 @@ describe('W09 actual route/service pagination', () => {
     fireEvent.click(screen.getByRole('button', { name: '목록 이어보기' }));
     await screen.findByText('Validator 21');
     expect(screen.getAllByText(/4.76%/)).toHaveLength(21);
-    fireEvent.click(screen.getByText('Validator 21'));
-    expect(router.push).toHaveBeenCalledWith('/staking/operator-21?chain=fixture');
+    expect(screen.getByRole('link', { name: 'Validator 21' }).getAttribute('href')).toBe('/staking/operator-21?chain=fixture');
     expect(screen.queryByText('체인 전체 비중')).toBeNull();
   });
   it('Dashboard 101 labels fetched bonded count separately from the chain pool', async () => {
