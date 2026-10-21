@@ -3,8 +3,38 @@ import { getLiveBlocks, getLiveTransactions } from '@/services/guru/live-history
 import { createQueryClient } from '@/services/clients';
 import { getActiveChainConfig } from '@/lib/chain-selection';
 import { block, mockQueryHttp } from '../helpers/query-http';
+import { queryError } from '@/lib/query-result';
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 const header = (height: number) => ({ ...block('1'), block: { ...block('1').block, header: { ...block('1').block.header, height: String(height) } } });
+it.each([
+  ['20', 'Wed, 21 Oct 2099 00:01:00 GMT'],
+  ['Wed, 21 Oct 2099 00:01:00 GMT', '20'],
+  ['invalid', 'Wed, 21 Oct 2099 00:01:00 GMT'],
+])('waits for all siblings and preserves the latest valid deadline (%s, %s) without advancing the snapshot', async (firstRetry, secondRetry) => {
+  let height = 1, finish!: (value: unknown) => void, completed = false;
+  const http = mockQueryHttp(url => {
+    if (url.pathname.endsWith('/latest')) return header(height);
+    const h = Number(url.pathname.split('/').at(-1));
+    if (h === 11 || h === 10) return new Response('', { status: 429, headers: { 'Retry-After': h === 11 ? firstRetry : secondRetry } });
+    if (h === 9) return new Promise(resolve => { finish = resolve; });
+    return header(h);
+  });
+  const client = createQueryClient(getActiveChainConfig());
+  const prior = await getLiveBlocks(client, null), snapshot = structuredClone(prior);
+  height = 11;
+  const pending = getLiveBlocks(client, prior).then(
+    () => { completed = true; throw new Error('Expected batch failure'); },
+    error => { completed = true; return queryError(error); },
+  );
+  await vi.waitFor(() => expect(http).toHaveBeenCalledTimes(13));
+  expect(completed).toBe(false);
+  finish(header(9));
+  const error = await pending;
+  expect(error.retryAt).toBe(Date.parse('2099-10-21T00:01:00Z'));
+  expect(error.causes).toHaveLength(2);
+  expect(error.causes?.map(cause => cause.status)).toEqual([429, 429]);
+  expect(prior).toEqual(snapshot);
+});
 it('recovers 60 new blocks in <=10 concurrent HTTP requests, then bounds a >100 gap explicitly', async () => {
   let height = 150, active = 0, peak = 0;
   const http = mockQueryHttp(async url => {

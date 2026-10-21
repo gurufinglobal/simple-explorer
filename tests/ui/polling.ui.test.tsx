@@ -104,6 +104,49 @@ it.each(['20', 'Wed, 21 Oct 2026 00:00:20 GMT'])('honors 429 Retry-After %s acro
   await tick(19000); expect(http).toHaveBeenCalledTimes(1);
   http.mockResolvedValue(Response.json(block('1'))); await tick(1000); expect(http).toHaveBeenCalledTimes(2);
 });
+it.each([
+  { status: 503, retry: undefined },
+  { status: 429, retry: '20' },
+].flatMap(error => ['automatic', 'manual', 'visibility', 'invalidation'].map(trigger => ({ ...error, trigger }))))(
+  'AC07-4: batch $status/$retry + 429/60 respects the longest deadline through $trigger',
+  async ({ status, retry, trigger }) => {
+    let height = 1, failing = false, cycles = 0;
+    const atHeight = (h: number) => ({ ...block('1'), block: { ...block('1').block, header: { ...block('1').block.header, height: String(h) } } });
+    const http = mockQueryHttp(url => {
+      if (url.pathname.endsWith('/latest')) { cycles++; return atHeight(height); }
+      const h = Number(url.pathname.split('/').at(-1));
+      if (failing && h === 11) return new Response('', { status, headers: retry ? { 'Retry-After': retry } : {} });
+      if (failing && h === 10) return new Response('', { status: 429, headers: { 'Retry-After': '60' } });
+      return atHeight(h);
+    });
+    render(<BlocksLiveList />); await tick();
+    const observed = screen.getByText(/마지막 API 성공:/).textContent;
+    height = 11; failing = true;
+    await tick(3000);
+    expect(cycles).toBe(2);
+    expect(screen.getByText('갱신 실패 · 오래된 데이터')).toBeTruthy();
+    expect(screen.getByText('#1')).toBeTruthy();
+    expect(screen.queryByText('#11')).toBeNull();
+    expect(screen.getByText(/마지막 API 성공:/).textContent).toBe(observed);
+    expect(screen.getByRole('button', { name: '목록 다시 조회' }).textContent).toContain('60초');
+    const calls = http.mock.calls.length;
+    if (trigger === 'manual') fireEvent.click(screen.getByRole('button', { name: '목록 다시 조회' }));
+    if (trigger === 'visibility') { visibility('hidden'); visibility('visible'); visibility('visible'); }
+    if (trigger === 'invalidation') act(() => {
+      for (let i = 0; i < 2; i++) window.dispatchEvent(new CustomEvent('explorer:queries-invalidated', { detail: { chain: 'fixture', targets: ['blocks'] } }));
+    });
+    await tick(59999);
+    expect(cycles).toBe(2); expect(http).toHaveBeenCalledTimes(calls);
+    expect(screen.queryByText('조회 완료')).toBeNull();
+    failing = false; await tick(1);
+    expect(cycles).toBe(3); expect(screen.getByText('조회 복구')).toBeTruthy();
+    expect(screen.getByText(/마지막 API 성공:/).textContent).toContain('높이 11');
+    for (let h = 1; h <= 11; h++) expect(screen.getByText(`#${h}`)).toBeTruthy();
+    const recoveredCalls = http.mock.calls.length;
+    await tick(2999); expect(cycles).toBe(3);
+    await tick(1); expect(cycles).toBe(4); expect(http).toHaveBeenCalledTimes(recoveredCalls + 1);
+  },
+);
 it('timeout is an error after 10s, while cancellation does not count as a failure', async () => {
   const http = mockQueryHttp(() => block('1'));
   http.mockImplementation((_input, init) => new Promise((_resolve, reject) => init?.signal?.addEventListener('abort', () => reject(new DOMException('abort', 'AbortError')))));
