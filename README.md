@@ -53,11 +53,11 @@ NEXT_PUBLIC_RPC_URL=https://tgxn.gurufin.io:26657 npm run dev
 
 기존 `NEXT_PUBLIC_CHAINS`가 있다면 위 단일 endpoint 명령보다 JSON 목록이 우선합니다. 유효하지 않은 JSON/URL, 빈 목록, 중복 key, 목록에 없는 기본 key는 설정 오류입니다. 오류를 TGXN으로 조용히 대체하지 않습니다.
 
-JSON의 `key`, `name`, `lcdUrl`은 필수입니다. `rpcUrl`, `evmRpcUrl`, `wsUrl`, `evmChainId`, `bech32Prefix` 등은 선택 필드이며 확인한 값만 지정하세요. JSON 체인에서 RPC/EVM URL이 빠지면 해당 요청은 구성 오류가 됩니다(TGXN key와 LCD가 일치할 때의 기존 RPC 보강 예외).
+JSON의 `key`, `name`, `lcdUrl`은 필수입니다. `rpcUrl`, `evmRpcUrl`, `wsUrl`, `evmChainId`, `bech32Prefix` 등은 선택 필드이며 확인한 값만 지정하세요. LCD만으로 가능한 공개 조회에는 RPC가 필요 없습니다. RPC/EVM URL이 빠지면 해당 endpoint가 필요한 조회·쓰기만 구성 오류/차단으로 표시됩니다(TGXN key와 LCD가 일치할 때의 기존 RPC 보강 예외). 지갑 쓰기는 URL 존재 외에도 chain ID·지갑/서명 방식·origin POST/OPTIONS·메시지별 수수료 검증이 필요합니다.
 
 ## 저장된 체인 선택 복구
 
-브라우저의 `gf_chain` 쿠키는 기본 선택보다 우선합니다. 등록된 다른 체인이 저장되어 있으면 그 선택을 유지하고, 예전 `default` 등 현재 목록에 없는 key 또는 손상된 쿠키는 재선택 오류를 표시합니다. 자동으로 쿠키를 지우지 않습니다.
+명시적 URL `?chain=`이 최우선이고, 그다음 `gf_chain` 쿠키, 마지막으로 기본 선택을 사용합니다. URL의 unknown/빈 chain은 쿠키로 대체하지 않고 차단합니다. 브라우저의 `gf_chain` 쿠키는 기본 선택보다 우선합니다. 등록된 다른 체인이 저장되어 있으면 그 선택을 유지하고, 예전 `default` 등 현재 목록에 없는 key 또는 손상된 쿠키는 재선택 오류를 표시합니다. 자동으로 쿠키를 지우지 않습니다.
 
 - 왼쪽 **Select Chain**에서 `TGXN`을 선택하면 쿠키를 갱신하고 조회를 전환합니다.
 - 수동 초기화가 필요하면 개발자 도구 → Application/Storage → Cookies → 현재 앱 호스트에서 **`gf_chain`만 삭제**한 뒤 새로고침합니다. 시크릿 창으로 확인할 수도 있습니다. 쿠키는 포트별로 구분되지 않아 같은 localhost의 다른 포트와 공유될 수 있습니다.
@@ -108,3 +108,18 @@ import { getRecentTransactions } from "@/services/guru/transactions.service";
 ```
 
 내부 탐색은 `ChainLink`로 URL의 체인을 보존한다. 지갑 세션/포트폴리오는 Zustand store, 조회 상태는 `useQuery`/`usePagedQuery`가 관리한다. 네트워크·지갑 경계에 fixture를 주입하고 실제 route/component/service 흐름을 실행하는 테스트를 추가한다.
+
+
+## 특화 모듈과 검색 범위
+
+BEX·Oracle·FeePolicy는 체인의 `features.bex/oracle/feepolicy: true`가 있어야 메뉴와 직접 URL에서 조회됩니다. false 또는 생략은 설정상 미지원이며 HTTP를 보내지 않습니다. true는 조회 허용 설정이지 live 계약 검증 완료를 뜻하지 않습니다. HTTP 404는 endpoint/계약 미확인, timeout·500은 조회 오류, 정상 빈 배열은 빈 결과, 손상된 일부 행은 부분 실패로 표시합니다. 지갑 연결은 공개 조회 조건이 아닙니다.
+
+BEX fee/limit, FeePolicy discount_type/amount, Oracle nonce·결과 시각·report는 원문을 보존합니다. 미확정 비율·단위·우선순위·nonce=0의 최신 의미·서명 검증 여부를 추정하지 않습니다. `percent`와 합성 fixture의 `percentage`는 별개 원문입니다. 각 성공한 클라이언트 조회는 endpoint·관찰시각·응답 헤더 높이를 보관하며 높이가 노출되지 않으면 미확인입니다. 서로 다른 요청을 동일 snapshot으로 해석하지 마세요.
+
+상단 검색은 양의 정수 블록 높이, Cosmos tx hash, 설정 prefix/checksum에 맞는 계정 주소를 지원합니다. 64자리 숫자는 높이/hash 후보 선택을 요구합니다. EVM hash 대응, 블록 hash, validator/token 검색은 미지원이며 입력 오류 안내 후 HTTP를 보내지 않습니다. 중복 GlobalSearchBar와 미사용 검색 store는 제거했습니다.
+
+## 구현 경계
+
+`src/server/handlers`는 내부 함수입니다. Next route handler 등록 없이 공개 HTTP API라고 해석하지 않습니다. Faucet 지급·WebSocket 연결·재위임 제출·서버 지갑 세션의 미사용 모의 성공 경로는 제거했습니다. 실제 조회 갱신은 HTTP polling, 지갑 상태는 클라이언트 wallet lifecycle/store, 구현된 staking 행위는 실제 signer guard를 사용합니다. Faucet·WS·재위임을 향후 제품에 연결하려면 별도 범위와 수용 기준이 필요합니다.
+
+개별 token metadata는 bank metadata/IBC trace 응답만 사용합니다. 응답 없는 symbol·name·decimals는 추정하지 않으며 EVM token metadata는 미지원입니다. IBC trace의 base denom만으로 원체인 symbol·name을 확정하지 않습니다.

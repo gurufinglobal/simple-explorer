@@ -67,8 +67,8 @@ async function fetchNativeTokenMetadata(tokenRef: string, apiClients: QueryClien
 
   return {
     tokenType: "native",
-    name: response.metadata.name ?? tokenRef,
-    symbol: response.metadata.symbol ?? response.metadata.display ?? tokenRef,
+    name: response.metadata.name ?? "미확인",
+    symbol: response.metadata.symbol ?? "미확인",
     decimals: getDisplayDecimals(response.metadata),
     sourceChain: null,
     sourceChannel: null,
@@ -76,7 +76,7 @@ async function fetchNativeTokenMetadata(tokenRef: string, apiClients: QueryClien
 }
 
 async function fetchIbcTokenMetadata(tokenRef: string, apiClients: QueryClient = defaultClients): Promise<TokenMetadata | null> {
-  const hash = tokenRef.replace("ibc/", "");
+  const hash = tokenRef.replace(/^ibc[:/]/, "");
   const response = await apiClients.lcdGet<DenomTraceResponse>(
     `/ibc/apps/transfer/v1/denom_traces/${encodeURIComponent(hash)}`,
   );
@@ -89,8 +89,8 @@ async function fetchIbcTokenMetadata(tokenRef: string, apiClients: QueryClient =
 
   return {
     tokenType: "ibc",
-    name: response.denom_trace.base_denom ?? tokenRef,
-    symbol: response.denom_trace.base_denom ?? tokenRef,
+    name: "미확인",
+    symbol: "미확인",
     decimals: null,
     sourceChain: "unknown",
     sourceChannel: channelId,

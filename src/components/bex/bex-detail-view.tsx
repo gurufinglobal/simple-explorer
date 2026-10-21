@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@/hooks/use-query";
-import { QueryStatus } from "@/components/query/query-status";
+import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
 
 import { useParams } from "next/navigation";
 import {
@@ -21,19 +21,6 @@ import {
 import type { BexCoin } from "@/services/guru/bex.service";
 import { getBexExchangeById, getBexExchangeFees } from "@/services/guru/bex.service";
 
-function formatFeePercent(rawFee: string): string {
-  const trimmed = rawFee.trim();
-  if (trimmed.endsWith("%")) {
-    return trimmed;
-  }
-  const numeric = Number(trimmed);
-  if (!Number.isFinite(numeric)) {
-    return rawFee;
-  }
-  const percent = numeric * 100;
-  const formatted = percent.toFixed(4).replace(/\.?0+$/, "");
-  return `${formatted}%`;
-}
 
 function FeesTable({ title, coins, hasError }: { title: string; coins: BexCoin[]; hasError: boolean }) {
   return (
@@ -48,7 +35,7 @@ function FeesTable({ title, coins, hasError }: { title: string; coins: BexCoin[]
             {hasError ? "조회 결과를 확인할 수 없습니다." : "데이터가 없습니다."}
           </Typography>
         ) : (
-          <Table size="small">
+          <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
             <TableHead>
               <TableRow>
                 <TableCell>Denom</TableCell>
@@ -63,7 +50,7 @@ function FeesTable({ title, coins, hasError }: { title: string; coins: BexCoin[]
                 </TableRow>
               ))}
             </TableBody>
-          </Table>
+          </Table></div>
         )}
       </CardContent>
     </Card>
@@ -80,7 +67,8 @@ export function BexDetailView() {
   if (!exchange) return <><QueryStatus {...query} /><QueryStatus {...feeQuery} /></>;
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
+      <Typography variant="body2">fee·limit는 원문입니다. 비율·금액 단위와 적용 의미는 미확인입니다. 수수료 잔액은 denom별 최소 단위 원문입니다.</Typography>
       <QueryStatus {...query} /><QueryStatus {...feeQuery} />
       <Typography variant="h5" fontWeight={700}>
         BEX Exchange #{exchange.id}
@@ -88,7 +76,7 @@ export function BexDetailView() {
 
       <Card variant="outlined">
         <CardContent>
-          <Stack spacing={2}>
+          <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
             <Typography variant="subtitle1" fontWeight={700}>
               기본 정보
             </Typography>
@@ -115,7 +103,7 @@ export function BexDetailView() {
                 <Typography variant="caption" color="text.secondary">
                   Fee
                 </Typography>
-                <Typography>{formatFeePercent(exchange.fee)}</Typography>
+                <Typography>{exchange.fee}</Typography>
               </Grid>
               <Grid size={{ xs: 12, md: 6 }}>
                 <Typography variant="caption" color="text.secondary">

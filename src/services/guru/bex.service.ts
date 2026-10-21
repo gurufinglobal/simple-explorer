@@ -1,3 +1,4 @@
+import { moduleDetail, moduleRows, rawText, requiredText, record } from "./module-contract";
 import { PartialQueryError, QueryError, combinedError } from "@/lib/query-result";
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
@@ -65,30 +66,29 @@ type BexCoinsResponse = {
 };
 
 function normalizeExchange(raw: BexExchangeRaw): BexExchange {
+  if (!record(raw)) throw new Error("Invalid exchange");
   return {
-    id: raw.id ?? "0",
-    adminAddress: raw.admin_address ?? "-",
-    reserveAddress: raw.reserve_address ?? "-",
-    denomA: raw.denom_a ?? "-",
-    ibcDenomA: raw.ibc_denom_a ?? "-",
-    portA: raw.port_a ?? "-",
-    channelA: raw.channel_a ?? "-",
-    denomB: raw.denom_b ?? "-",
-    ibcDenomB: raw.ibc_denom_b ?? "-",
-    portB: raw.port_b ?? "-",
-    channelB: raw.channel_b ?? "-",
-    fee: raw.fee ?? "0",
-    limit: raw.limit ?? "0",
-    oracleRequestId: raw.oracle_request_id ?? "0",
-    status: raw.status ?? "-",
+    id: requiredText(raw.id),
+    adminAddress: rawText(raw.admin_address),
+    reserveAddress: rawText(raw.reserve_address),
+    denomA: rawText(raw.denom_a),
+    ibcDenomA: rawText(raw.ibc_denom_a),
+    portA: rawText(raw.port_a),
+    channelA: rawText(raw.channel_a),
+    denomB: rawText(raw.denom_b),
+    ibcDenomB: rawText(raw.ibc_denom_b),
+    portB: rawText(raw.port_b),
+    channelB: rawText(raw.channel_b),
+    fee: rawText(raw.fee),
+    limit: rawText(raw.limit),
+    oracleRequestId: rawText(raw.oracle_request_id),
+    status: rawText(raw.status),
     metadata: raw.metadata ?? null,
   };
 }
 
 function normalizeCoins(coins: BexCoinsResponse["coins"]): BexCoin[] {
-  return (coins ?? [])
-    .map((coin) => ({ denom: coin.denom ?? "", amount: coin.amount ?? "0" }))
-    .filter((coin) => coin.denom.length > 0);
+  return moduleRows(coins, coin => ({ denom: requiredText(coin.denom), amount: requiredText(coin.amount) }));
 }
 
 async function safeLcdGet<T>(path: string, apiClients: QueryClient = defaultClients): Promise<T | null> {
@@ -96,24 +96,14 @@ async function safeLcdGet<T>(path: string, apiClients: QueryClient = defaultClie
   return await apiClients.lcdGet<T>(path);
 }
 
-export async function isBexAvailable(apiClients: QueryClient = defaultClients): Promise<boolean> {
-
-  const response = await safeLcdGet<BexExchangesResponse>("/guru/bex/v1/exchanges", apiClients);
-  return response !== null;
-}
-
 export async function listBexExchanges(apiClients: QueryClient = defaultClients): Promise<BexExchange[]> {
 
   const response = await safeLcdGet<BexExchangesResponse>("/guru/bex/v1/exchanges", apiClients);
-  if (!response?.exchanges) {
-    return [];
-  }
-  return response.exchanges.map(normalizeExchange);
+  return moduleRows(response?.exchanges, normalizeExchange);
 }
 
 export async function getBexExchangeById(id: string, apiClients: QueryClient = defaultClients): Promise<BexExchange | null> {
-  const exchanges = await listBexExchanges(apiClients);
-  return exchanges.find((exchange) => exchange.id === id) ?? null;
+  return moduleDetail(() => listBexExchanges(apiClients), exchange => exchange.id === id);
 }
 
 export async function getBexExchangeFees(exchangeId: string, apiClients: QueryClient = defaultClients): Promise<BexExchangeFees> {
@@ -130,21 +120,21 @@ export async function getBexExchangeFees(exchangeId: string, apiClients: QueryCl
 
   const query = `exchange_id=${encodeURIComponent(exchangeId)}`;
   const [collected, locked, available] = await Promise.allSettled([
-    apiClients.lcdGet<BexCoinsResponse>(`/guru/bex/v1/collected_fees?${query}`),
-    apiClients.lcdGet<BexCoinsResponse>(`/guru/bex/v1/locked_fees?${query}`),
-    apiClients.lcdGet<BexCoinsResponse>(`/guru/bex/v1/available_fees?${query}`),
+    apiClients.lcdGet<BexCoinsResponse>(`/guru/bex/v1/collected_fees?${query}`).then(response => normalizeCoins(response.coins)),
+    apiClients.lcdGet<BexCoinsResponse>(`/guru/bex/v1/locked_fees?${query}`).then(response => normalizeCoins(response.coins)),
+    apiClients.lcdGet<BexCoinsResponse>(`/guru/bex/v1/available_fees?${query}`).then(response => normalizeCoins(response.coins)),
   ]);
 
   const data = {
-    collected: collected.status === "fulfilled" ? normalizeCoins(collected.value.coins) : [],
-    locked: locked.status === "fulfilled" ? normalizeCoins(locked.value.coins) : [],
-    available: available.status === "fulfilled" ? normalizeCoins(available.value.coins) : [],
+    collected: collected.status === "fulfilled" ? collected.value : collected.reason instanceof PartialQueryError ? collected.reason.data as BexCoin[] : [],
+    locked: locked.status === "fulfilled" ? locked.value : locked.reason instanceof PartialQueryError ? locked.reason.data as BexCoin[] : [],
+    available: available.status === "fulfilled" ? available.value : available.reason instanceof PartialQueryError ? available.reason.data as BexCoin[] : [],
     hasCollectedError: collected.status !== "fulfilled",
     hasLockedError: locked.status !== "fulfilled",
     hasAvailableError: available.status !== "fulfilled",
   };
   const failures = [collected, locked, available].flatMap(r => r.status === "rejected" ? [r.reason] : []);
-  if (failures.length === 3) throw new QueryError(combinedError(failures));
+  if (failures.length === 3 && !data.collected.length && !data.locked.length && !data.available.length) throw new QueryError(combinedError(failures));
   if (failures.length) throw new PartialQueryError(data, combinedError(failures));
   return data;
 }

@@ -30,6 +30,12 @@ export function validateLcdJson<T>(path: string, value: T): T {
   for (const field of objectRows) {
     // Governance history validates individual rows in its mapper to retain partial data.
     if ((field === 'votes' || field === 'deposits') && /^\/cosmos\/gov\/v1(?:beta1)?\/proposals\/[^/]+\/(?:votes|deposits)$/.test(route)) continue;
+    // These exact response rows are checked by moduleRows/field mappers to preserve valid siblings.
+    if ((field === 'exchanges' && route === '/guru/bex/v1/exchanges') ||
+      (field === 'coins' && /^\/guru\/bex\/v1\/(collected|locked|available)_fees$/.test(route)) ||
+      (field === 'discounts' && route === '/guru/feepolicy/v1/discounts') ||
+      (field === 'requests' && route === '/guru/oracle/v2/requests') ||
+      (['reports', 'results'].includes(field) && new RegExp('^/guru/oracle/v2/requests/[^/]+/' + field + '$').test(route))) continue;
     if (Array.isArray(body[field]) && (body[field] as unknown[]).some(row => !row || typeof row !== 'object' || Array.isArray(row))) schemaError(`응답의 ${field} 항목이 올바르지 않습니다.`);
   }
   const rows = (field: string) => (body[field] ?? []) as Record<string, unknown>[];
@@ -38,10 +44,6 @@ export function validateLcdJson<T>(path: string, value: T): T {
   if (rows('validators').some(row => typeof row.operator_address !== 'string')) schemaError('검증자 주소가 없습니다.');
   if (rows('proposals').some(row => row.id === undefined && row.proposal_id === undefined)) schemaError('제안 ID가 없습니다.');
   if (rows('channels').some(row => typeof row.channel_id !== 'string' || typeof row.port_id !== 'string')) schemaError('IBC 채널 식별자가 없습니다.');
-  if (rows('exchanges').some(row => row.id === undefined)) schemaError('Exchange ID가 없습니다.');
-  if (rows('requests').some(row => row.id === undefined)) schemaError('Oracle request ID가 없습니다.');
-  if (rows('discounts').some(row => typeof row.address !== 'string')) schemaError('할인 대상 주소가 없습니다.');
-  if (rows('coins').some(row => typeof row.denom !== 'string' || typeof row.amount !== 'string')) schemaError('Coin 응답이 올바르지 않습니다.');
   const txs = body.tx_response ? [body.tx_response as Record<string, unknown>] : rows('tx_responses');
   if (txs.some(row => typeof row.txhash !== 'string' || typeof row.code !== 'number' || !Number.isInteger(row.code) || typeof row.height !== 'string')) schemaError('거래 상태/해시/높이가 올바르지 않습니다.');
   if (/\/moderator_address$/.test(route) && typeof (body.moderator_address ?? body.moderatorAddress) !== 'string') schemaError('Moderator 응답이 올바르지 않습니다.');

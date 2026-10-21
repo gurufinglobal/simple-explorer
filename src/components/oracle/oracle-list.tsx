@@ -3,9 +3,9 @@ import { withChain } from "@/lib/chain-selection";
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@/hooks/use-query";
-import { QueryStatus } from "@/components/query/query-status";
+import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -36,13 +36,7 @@ function formatEnumLabel(value: string): string {
   return value.replace(/^CATEGORY_/, "").replace(/^STATUS_/, "").toLowerCase().replaceAll("_", " ");
 }
 
-function parseSortKey(value: string): number {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
 export function OracleList() {
-  const router = useRouter();
   const [page, setPage] = useState(1);
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -51,7 +45,7 @@ export function OracleList() {
   const moderator = useQuery("oracle-moderator", client => getOracleModeratorAddress(client));
   const categoriesQuery = useQuery("oracle-categories", client => getOracleCategories(client));
   const whitelist = useQuery("oracle-whitelist", client => getOracleWhitelist(client));
-  const requests = useMemo(() => [...(query.result.data ?? [])].sort((a, b) => parseSortKey(b.id) - parseSortKey(a.id)), [query.result.data]);
+  const requests = useMemo(() => [...(query.result.data ?? [])].sort((a, b) => /^\d+$/.test(a.id) && /^\d+$/.test(b.id) ? (BigInt(b.id) > BigInt(a.id) ? 1 : BigInt(b.id) < BigInt(a.id) ? -1 : 0) : b.id.localeCompare(a.id)), [query.result.data]);
   const params = paramsQuery.result.data;
   const moderatorAddress = moderator.result.data;
   const categories = categoriesQuery.result.data ?? [];
@@ -70,12 +64,12 @@ export function OracleList() {
   }, [categoryFilter, statusFilter]);
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
       <Typography variant="h5" fontWeight={700}>
         Oracle Requests
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        `/guru/oracle/v2/*` 엔드포인트를 기반으로 표시합니다.
+        Oracle 필드는 원문입니다. period·quorum 단위와 nonce 최신 규칙은 미확인입니다.
       </Typography>
 
       <QueryStatus {...query} /><QueryStatus {...paramsQuery} /><QueryStatus {...moderator} /><QueryStatus {...categoriesQuery} /><QueryStatus {...whitelist} />
@@ -88,7 +82,7 @@ export function OracleList() {
                 <Typography variant="caption" color="text.secondary">
                   Enabled
                 </Typography>
-                <Typography variant="body1">{params ? String(params.enable) : "-"}</Typography>
+                <Typography variant="body1">{params ? params.enable === null ? "미확인" : String(params.enable) : "-"}</Typography>
               </CardContent>
             </Card>
           </Grid>
@@ -197,7 +191,7 @@ export function OracleList() {
       {loading ? (
         <Card variant="outlined">
           <CardContent>
-            <Table size="small">
+            <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>ID</TableCell>
@@ -220,7 +214,7 @@ export function OracleList() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
           </CardContent>
         </Card>
       ) : !supported ? null : requests.length === 0 ? (
@@ -228,7 +222,7 @@ export function OracleList() {
       ) : (
         <Card variant="outlined">
           <CardContent>
-            <Table size="small">
+            <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>ID</TableCell>
@@ -243,13 +237,8 @@ export function OracleList() {
                 {pagedRequests.map((request) => (
                   <TableRow
                     key={request.id}
-                    hover
-                    sx={{ cursor: "pointer" }}
-                    onClick={() => {
-                      router.push(withChain(`/oracle/${encodeURIComponent(request.id)}`));
-                    }}
                   >
-                    <TableCell>{request.id}</TableCell>
+                    <TableCell><Link href={withChain(`/oracle/${encodeURIComponent(request.id)}`)}>{request.id}</Link></TableCell>
                     <TableCell>{request.symbol}</TableCell>
                     <TableCell>{formatEnumLabel(request.category)}</TableCell>
                     <TableCell>{formatEnumLabel(request.status)}</TableCell>
@@ -258,7 +247,7 @@ export function OracleList() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
             <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
               <Pagination page={page} count={pageCount} onChange={(_, nextPage) => setPage(nextPage)} size="small" />
             </Stack>

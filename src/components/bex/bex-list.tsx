@@ -2,9 +2,9 @@
 import { withChain } from "@/lib/chain-selection";
 
 import { useQuery } from "@/hooks/use-query";
-import { QueryStatus } from "@/components/query/query-status";
+import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -19,26 +19,13 @@ import {
 } from "@mui/material";
 import { listBexExchanges } from "@/services/guru/bex.service";
 
-function parseNumericId(id: string): number | null {
+function parseNumericId(id: string): bigint | null {
   if (!/^[0-9]+$/.test(id)) {
     return null;
   }
-  return Number.parseInt(id, 10);
+  return BigInt(id);
 }
 
-function formatFeePercent(rawFee: string): string {
-  const trimmed = rawFee.trim();
-  if (trimmed.endsWith("%")) {
-    return trimmed;
-  }
-  const numeric = Number(trimmed);
-  if (!Number.isFinite(numeric)) {
-    return rawFee;
-  }
-  const percent = numeric * 100;
-  const formatted = percent.toFixed(4).replace(/\.?0+$/, "");
-  return `${formatted}%`;
-}
 
 function isActiveStatus(status: string): boolean {
   const normalized = status.trim().toUpperCase();
@@ -46,7 +33,6 @@ function isActiveStatus(status: string): boolean {
 }
 
 export function BexList() {
-  const router = useRouter();
   const query = useQuery("bex-exchanges", client => listBexExchanges(client));
   const loading = query.busy && !query.result.data;
   const supported = query.result.data !== null;
@@ -66,15 +52,15 @@ export function BexList() {
     if (right === null) {
       return -1;
     }
-    return left - right;
+    return left < right ? -1 : left > right ? 1 : 0;
   });
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
       <Typography variant="h5" fontWeight={700}>
         BEX Exchanges
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        `/guru/bex/v1/exchanges` 결과를 기반으로 표시합니다.
+        fee·limit는 원문입니다. 비율·금액 단위와 적용 의미는 미확인입니다.
       </Typography>
 
       <QueryStatus {...query} />
@@ -82,7 +68,7 @@ export function BexList() {
       {loading ? (
         <Card variant="outlined">
           <CardContent>
-            <Table size="small">
+            <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>ID</TableCell>
@@ -103,7 +89,7 @@ export function BexList() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
           </CardContent>
         </Card>
       ) : !supported ? null : items.length === 0 ? (
@@ -111,7 +97,7 @@ export function BexList() {
       ) : (
         <Card variant="outlined">
           <CardContent>
-            <Table size="small">
+            <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>ID</TableCell>
@@ -125,23 +111,18 @@ export function BexList() {
                 {items.map((item) => (
                   <TableRow
                     key={item.id}
-                    hover
-                    sx={{ cursor: "pointer" }}
-                    onClick={() => {
-                      router.push(withChain(`/bex/${encodeURIComponent(item.id)}`));
-                    }}
                   >
-                    <TableCell>{item.id}</TableCell>
+                    <TableCell><Link href={withChain(`/bex/${encodeURIComponent(item.id)}`)}>{item.id}</Link></TableCell>
                     <TableCell>{item.denomA} / {item.denomB}</TableCell>
                     <TableCell sx={isActiveStatus(item.status) ? { color: "primary.main", fontWeight: 600 } : undefined}>
                       {item.status}
                     </TableCell>
-                    <TableCell>{formatFeePercent(item.fee)}</TableCell>
+                    <TableCell>{item.fee}</TableCell>
                     <TableCell>{item.oracleRequestId}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
           </CardContent>
         </Card>
       )}

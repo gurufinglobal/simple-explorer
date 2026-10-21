@@ -3,7 +3,7 @@
 import Link from "@/components/layout/chain-link";
 import { useMemo, useState } from "react";
 import { useQuery } from "@/hooks/use-query";
-import { QueryStatus } from "@/components/query/query-status";
+import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
 
 import { useParams } from "next/navigation";
 import {
@@ -26,7 +26,7 @@ import {
   Typography,
 } from "@mui/material";
 import {
-  getOracleLatestResult,
+  getOracleResultAtNonceZero,
   getOracleRequestById,
   listOracleReports,
   listOracleResults,
@@ -38,17 +38,15 @@ function formatEnumLabel(value: string): string {
   return value.replace(/^CATEGORY_/, "").replace(/^STATUS_/, "").toLowerCase().replaceAll("_", " ");
 }
 
-function formatUnixSecondsWithTimezone(value: string): string {
-  const seconds = Number(value);
-  if (!Number.isFinite(seconds) || seconds <= 0) return "-";
-  const date = new Date(seconds * 1000);
-  const local = date.toLocaleString(undefined, { timeZoneName: "short" });
-  const utc = date.toISOString().replace("T", " ").replace("Z", " UTC");
-  return `Local: ${local} | UTC: ${utc}`;
+function formatResultTime(value: string): string {
+  return `${value} (원문 · 시간 단위 미확인)`;
 }
 
 function sortByNonceDesc<T extends { nonce: string }>(rows: T[]): T[] {
-  return [...rows].sort((a, b) => Number(b.nonce) - Number(a.nonce));
+  return [...rows].sort((a, b) => {
+    if (!/^\d+$/.test(a.nonce) || !/^\d+$/.test(b.nonce)) return b.nonce.localeCompare(a.nonce);
+    return BigInt(a.nonce) > BigInt(b.nonce) ? -1 : BigInt(a.nonce) < BigInt(b.nonce) ? 1 : 0;
+  });
 }
 
 function takeLatestRows<T extends { nonce: string }>(rows: T[]): { rows: T[]; truncated: boolean } {
@@ -77,7 +75,7 @@ export function OracleDetailView() {
   const [reportFilter, setReportFilter] = useState({ nonce: "", provider: "" });
   const [tab, setTab] = useState(0);
   const query = useQuery(`oracle-request:${requestId}`, client => getOracleRequestById(requestId, client));
-  const latestQuery = useQuery(`oracle-latest:${requestId}`, client => getOracleLatestResult(requestId, client));
+  const latestQuery = useQuery(`oracle-nonce-zero:${requestId}`, client => getOracleResultAtNonceZero(requestId, client));
   const reportQuery = useQuery(`oracle-reports:${requestId}:${reportFilter.nonce}:${reportFilter.provider}`, client => listOracleReports({ requestId, nonce: reportFilter.nonce || undefined, provider: reportFilter.provider || undefined }, client));
   const resultsQuery = useQuery(`oracle-results:${requestId}`, client => listOracleResults(requestId, client));
   const request = query.result.data;
@@ -141,7 +139,7 @@ export function OracleDetailView() {
   if (!request) return <QueryStatus {...query} />;
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Typography variant="h5" fontWeight={700}>
           Oracle Request #{request.id}
@@ -150,6 +148,7 @@ export function OracleDetailView() {
           목록
         </Button>
       </Stack>
+      <Typography variant="body2">nonce=0 조회의 최신 의미와 결과 시각 단위는 미확인입니다. Report·signature는 LCD 원문이며 서명·집계 검증을 수행하지 않았습니다.</Typography>
       <QueryStatus {...query} /><QueryStatus {...latestQuery} /><QueryStatus {...reportQuery} /><QueryStatus {...resultsQuery} />
 
       <Card variant="outlined">
@@ -187,11 +186,11 @@ export function OracleDetailView() {
             </Grid>
             <Grid size={{ xs: 12 }}>
               <Typography variant="caption" color="text.secondary">
-                Latest Result
+                Result (query nonce=0 · 최신 의미 미확인)
               </Typography>
               <Typography>
                 {latestResult
-                  ? `${latestResult.aggregatedData} (nonce ${latestResult.nonce}, height ${latestResult.aggregatedHeight}, ${formatUnixSecondsWithTimezone(latestResult.aggregatedTime)})`
+                  ? `${latestResult.aggregatedData} (nonce ${latestResult.nonce}, height ${latestResult.aggregatedHeight}, ${formatResultTime(latestResult.aggregatedTime)})`
                   : latestQuery.result.status === "not-found" ? "확인된 결과 없음" : "결과 미확인"}
               </Typography>
             </Grid>
@@ -219,7 +218,7 @@ export function OracleDetailView() {
                 <Card variant="outlined">
                   <CardContent>
                     <Typography variant="subtitle2" fontWeight={700}>
-                      Aggregated Data Trend (Latest {MAX_ORACLE_ROWS})
+                      Aggregated Data Trend (근삿값 · 표시된 {MAX_ORACLE_ROWS}건 이내)
                     </Typography>
                     {trendData === null || trendData.points.length < 2 ? (
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
@@ -269,7 +268,7 @@ export function OracleDetailView() {
               <Stack spacing={1.5}>
                 {reportsTruncated ? (
                   <Alert severity="info">
-                    Oracle Reports API는 서버 페이징을 지원하지 않아 최근 {MAX_ORACLE_ROWS}건만 표시합니다.
+                    현재 응답에서 nonce 내림차순 {MAX_ORACLE_ROWS}건만 표시합니다. 전체 이력 여부는 미확인입니다.
                   </Alert>
                 ) : null}
                 <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
@@ -291,7 +290,7 @@ export function OracleDetailView() {
                   </Button>
                 </Stack>
                 {reportsLoading ? (
-                  <Table size="small">
+                  <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
                     <TableBody>
                       {Array.from({ length: 6 }).map((_, index) => (
                         <TableRow key={`oracle-report-skeleton-${index}`}>
@@ -302,11 +301,11 @@ export function OracleDetailView() {
                         </TableRow>
                       ))}
                     </TableBody>
-                  </Table>
+                  </Table></div>
                 ) : reports.length === 0 ? (
                   <Typography variant="body2">{reportQuery.result.status === "empty" ? "표시할 report가 없습니다." : "Report 조회 결과 미확인"}</Typography>
                 ) : (
-                  <Table size="small">
+                  <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
                     <TableHead>
                       <TableRow>
                         <TableCell>Provider</TableCell>
@@ -327,7 +326,7 @@ export function OracleDetailView() {
                         </TableRow>
                       ))}
                     </TableBody>
-                  </Table>
+                  </Table></div>
                 )}
               </Stack>
             ) : null}
@@ -336,19 +335,19 @@ export function OracleDetailView() {
               <Stack spacing={1}>
                 {resultsTruncated ? (
                   <Alert severity="info">
-                    Oracle Results API는 서버 페이징을 지원하지 않아 최근 {MAX_ORACLE_ROWS}건만 표시합니다.
+                    현재 응답에서 nonce 내림차순 {MAX_ORACLE_ROWS}건만 표시합니다. 전체 이력 여부는 미확인입니다.
                   </Alert>
                 ) : null}
                 {resultsSorted.length === 0 ? (
                   <Typography variant="body2">{resultsQuery.result.status === "empty" ? "표시할 결과 이력이 없습니다." : "결과 이력 미확인"}</Typography>
                 ) : (
-                  <Table size="small">
+                  <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
                     <TableHead>
                       <TableRow>
                         <TableCell align="right">Nonce</TableCell>
                         <TableCell align="right">Aggregated Data</TableCell>
                         <TableCell align="right">Height</TableCell>
-                        <TableCell>Time (Local / UTC)</TableCell>
+                        <TableCell>Time (원문)</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -357,11 +356,11 @@ export function OracleDetailView() {
                           <TableCell align="right">{result.nonce}</TableCell>
                           <TableCell align="right">{result.aggregatedData}</TableCell>
                           <TableCell align="right">{result.aggregatedHeight}</TableCell>
-                          <TableCell>{formatUnixSecondsWithTimezone(result.aggregatedTime)}</TableCell>
+                          <TableCell>{formatResultTime(result.aggregatedTime)}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
-                  </Table>
+                  </Table></div>
                 )}
               </Stack>
             ) : null}

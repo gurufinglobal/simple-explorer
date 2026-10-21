@@ -2,7 +2,7 @@
 
 import Link from "@/components/layout/chain-link";
 import { useQuery } from "@/hooks/use-query";
-import { QueryStatus } from "@/components/query/query-status";
+import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
 
 import { useParams } from "next/navigation";
 import {
@@ -30,7 +30,8 @@ export function FeePolicyDetailView() {
   if (!detail) return <QueryStatus {...query} />;
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
+      <Typography variant="body2">할인 유형·amount는 원문입니다. 적용 범위·단위·우선순위는 미확인입니다. ALL은 빈 address 원문의 표시명이며 전체 계정 적용을 확정하지 않습니다.</Typography>
       <QueryStatus {...query} />
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Typography variant="h5" fontWeight={700}>
@@ -66,7 +67,7 @@ export function FeePolicyDetailView() {
                   등록된 할인 항목이 없습니다.
                 </Typography>
               ) : (
-                <Table size="small">
+                <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
                   <TableHead>
                     <TableRow>
                       <TableCell>Discount Type</TableCell>
@@ -83,7 +84,7 @@ export function FeePolicyDetailView() {
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table>
+                </Table></div>
               )}
             </CardContent>
           </Card>

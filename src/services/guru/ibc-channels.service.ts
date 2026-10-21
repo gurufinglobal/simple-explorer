@@ -22,35 +22,16 @@ type IbcChannelsResponse = {
   channels?: Array<Record<string, unknown>>;
 };
 
+// Exact protobuf enum values; unknown strings/numbers remain unchanged.
 function normalizeState(raw: string): string {
-  const u = raw.toUpperCase();
-  if (u.includes("OPEN") && !u.includes("TRY")) {
-    return "OPEN";
-  }
-  if (u.includes("TRYOPEN") || u.includes("TRY_OPEN")) {
-    return "TRYOPEN";
-  }
-  if (u.includes("INIT")) {
-    return "INIT";
-  }
-  if (u.includes("CLOSED")) {
-    return "CLOSED";
-  }
-  if (u.includes("UNINITIALIZED")) {
-    return "UNINITIALIZED";
-  }
-  return raw || "UNKNOWN";
+  if (raw === 'STATE_UNINITIALIZED_UNSPECIFIED') return 'UNINITIALIZED';
+  const names = ['UNINITIALIZED', 'INIT', 'TRYOPEN', 'OPEN', 'CLOSED'];
+  return names.find((name, index) => raw === name || raw === `STATE_${name}` || raw === String(index)) ?? (raw || 'UNKNOWN');
 }
 
 function normalizeOrdering(raw: string): string {
-  const u = raw.toUpperCase();
-  if (u.includes("UNORDERED")) {
-    return "UNORDERED";
-  }
-  if (u.includes("ORDERED")) {
-    return "ORDERED";
-  }
-  return raw || "—";
+  const names = ['NONE_UNSPECIFIED', 'UNORDERED', 'ORDERED'];
+  return names.find((name, index) => raw === name || raw === `ORDER_${name}` || raw === String(index)) ?? (raw || '—');
 }
 
 function mapChannelEntry(entry: Record<string, unknown>): IbcChannel | null {

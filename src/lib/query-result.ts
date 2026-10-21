@@ -8,7 +8,9 @@ export type QueryErrorInfo = {
   retryAt?: number;
   causes?: QueryErrorInfo[];
 };
+export type QueryObservation = { endpoint: string; observedAt: string; blockHeight: string | null };
 export type QueryResult<T> = {
+  observations?: QueryObservation[];
   data: T | null;
   status: QueryStatus;
   error: QueryErrorInfo | null;
@@ -53,7 +55,7 @@ export async function readQuery<T>(context: QueryContext, load: () => Promise<T>
     const info = queryError(error);
     if (error instanceof PartialQueryError && !prior?.observedAt && info.kind !== "cancelled") return { data: error.data, context, status: 'partial', error: info, observedAt: new Date().toISOString(), blockHeight: observedHeight(error.data) };
     return {
-      data: prior?.data ?? null, context, observedAt: prior?.observedAt ?? (info.kind === "not-found" ? new Date().toISOString() : null), blockHeight: prior?.blockHeight,
+      data: prior?.data ?? null, observations: prior?.observations, context, observedAt: prior?.observedAt ?? (info.kind === "not-found" ? new Date().toISOString() : null), blockHeight: prior?.blockHeight,
       status: info.kind === 'cancelled' ? 'cancelled' : prior?.observedAt ? 'stale' : info.kind === 'unsupported' ? 'unsupported' : info.kind === 'not-found' ? 'not-found' : 'error', error: info
     };
   }

@@ -1,3 +1,5 @@
+import { requireModule } from "@/lib/module-capability";
+import type { QueryObservation } from "@/lib/query-result";
 import { validateLcdJson } from "@/services/lcd-schema";
 import { QueryError, queryError } from "@/lib/query-result";
 import {
@@ -72,6 +74,7 @@ function getActiveChainConfigForRuntime(): ChainConfig {
 }
 
 async function readObserved<T>(chain: ChainConfig, path: string, signal?: AbortSignal, height?: string) {
+  requireModule(chain, path);
   let blockHeight: string | null = null;
   const data = await requestJson<T>(toUrl(chain.lcdUrl, path), height ? { headers: { "x-cosmos-block-height": height } } : {}, {
     signal, onResponse: response => {
@@ -94,6 +97,7 @@ export const apiClients = {
   evmRpcUrl: (path: string) => toUrl(readPublicEnv().NEXT_PUBLIC_EVM_RPC_URL, path),
   lcdGet: async <T>(pathOrUrl: string) => {
     const chain = getActiveChainConfigForRuntime();
+    requireModule(chain, pathOrUrl);
     return validateLcdJson(pathOrUrl, await requestJson<T>(toUrl(chain.lcdUrl, pathOrUrl)));
   },
   rpcGet: async <T>(pathOrUrl: string) => {
@@ -124,14 +128,21 @@ export async function getActiveChainRpcUrl(): Promise<string> {
 
 /** Pins every request in a read to the same chain and cancellation signal. */
 export function createQueryClient(chain: ChainConfig, signal?: AbortSignal) {
+  const observations: QueryObservation[] = [];
+  const observed = async <T>(path: string, height?: string) => {
+    const result = await readObserved<T>(chain, path, signal, height);
+    observations.push({ endpoint: toUrl(chain.lcdUrl, path), observedAt: new Date().toISOString(), blockHeight: result.blockHeight });
+    return result;
+  };
   return {
+    observations,
     ...apiClients,
     chain,
-    lcdGetObserved: <T>(path: string, height?: string) => readObserved<T>(chain, path, signal, height),
-    lcdGet: async <T>(path: string) => validateLcdJson(path, await requestJson<T>(toUrl(chain.lcdUrl, path), {}, { signal })),
+    lcdGetObserved: observed,
+    lcdGet: async <T>(path: string) => (await observed<T>(path)).data,
     rpcGet: <T>(path: string) => requestJson<T>(toUrl(resolveRpcBaseUrl(chain), path), {}, { signal }),
     evmRpcGet: <T>(path: string) => requestJson<T>(toUrl(resolveEvmRpcBaseUrl(chain), path), {}, { signal }),
     rpcJson: <T>(method: string, params: unknown[] = []) => requestJson<T>(resolveRpcBaseUrl(chain), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) }, { signal }),
   };
 }
-export type QueryClient = ReturnType<typeof createQueryClient>;
+export type QueryClient = Omit<ReturnType<typeof createQueryClient>, "observations"> & { observations?: QueryObservation[] };

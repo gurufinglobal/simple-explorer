@@ -1,3 +1,5 @@
+import { schemaError } from "@/lib/query-result";
+import { moduleDetail, moduleRows, rawText, requiredText, record } from "./module-contract";
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
 export type FeePolicyDiscountItem = {
@@ -55,28 +57,30 @@ type DiscountResponse = {
 
 function normalizeDiscount(raw: DiscountRaw): FeePolicyDiscountItem {
   return {
-    discountType: raw.discount_type ?? raw.discountType ?? "-",
-    msgType: raw.msg_type ?? raw.msgType ?? "-",
-    amount: raw.amount ?? "0",
+    discountType: rawText(raw.discount_type ?? raw.discountType),
+    msgType: rawText(raw.msg_type ?? raw.msgType),
+    amount: rawText(raw.amount),
   };
 }
 
 function normalizeModuleDiscount(raw: ModuleDiscountRaw): FeePolicyModuleDiscount {
+  if (!record(raw) || !Array.isArray(raw.discounts) || !raw.discounts.every(record)) schemaError();
   return {
-    module: raw.module ?? "-",
-    discounts: (raw.discounts ?? []).map(normalizeDiscount),
+    module: requiredText(raw.module),
+    discounts: raw.discounts.map(normalizeDiscount),
   };
 }
 
 function normalizeAccountDiscount(raw: AccountDiscountRaw): FeePolicyAccountDiscount {
+  if (!record(raw) || typeof raw.address !== "string" || !Array.isArray(raw.modules)) schemaError();
   return {
-    address: raw.address?.trim() ?? "",
-    modules: (raw.modules ?? []).map(normalizeModuleDiscount),
+    address: raw.address,
+    modules: raw.modules.map(normalizeModuleDiscount),
   };
 }
 
 export function isFeePolicyGlobalAddress(address: string): boolean {
-  return address.trim().length === 0;
+  return address.length === 0;
 }
 
 export function toFeePolicyAddressLabel(address: string): string {
@@ -86,12 +90,6 @@ export function toFeePolicyAddressLabel(address: string): string {
 async function safeLcdGet<T>(path: string, apiClients: QueryClient = defaultClients): Promise<T | null> {
 
   return await apiClients.lcdGet<T>(path);
-}
-
-export async function isFeePolicyAvailable(apiClients: QueryClient = defaultClients): Promise<boolean> {
-
-  const response = await safeLcdGet<ModeratorAddressResponse>("/guru/feepolicy/v1/moderator_address", apiClients);
-  return response !== null;
 }
 
 export async function getFeePolicyModeratorAddress(apiClients: QueryClient = defaultClients): Promise<string | null> {
@@ -106,18 +104,14 @@ export async function getFeePolicyModeratorAddress(apiClients: QueryClient = def
 export async function listFeePolicyDiscounts(apiClients: QueryClient = defaultClients): Promise<FeePolicyAccountDiscount[]> {
 
   const response = await safeLcdGet<DiscountsResponse>("/guru/feepolicy/v1/discounts", apiClients);
-  if (!response?.discounts) {
-    return [];
-  }
-  return response.discounts.map(normalizeAccountDiscount);
+  return moduleRows(response?.discounts, normalizeAccountDiscount);
 }
 
 export async function getFeePolicyDiscountByAddress(
   address: string, apiClients: QueryClient = defaultClients
 ): Promise<FeePolicyAccountDiscount | null> {
   if (address === FEEPOLICY_ALL_ROUTE_PARAM) {
-    const discounts = await listFeePolicyDiscounts(apiClients);
-    return discounts.find((item) => isFeePolicyGlobalAddress(item.address)) ?? null;
+    return moduleDetail(() => listFeePolicyDiscounts(apiClients), item => isFeePolicyGlobalAddress(item.address));
   }
 
   if (!address.trim()) {
