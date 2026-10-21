@@ -6,6 +6,7 @@ export type QueryErrorInfo = {
   message: string;
   status?: number;
   retryAt?: number;
+  endpoint?: string;
   causes?: QueryErrorInfo[];
 };
 export type QueryObservation = { endpoint: string; observedAt: string; blockHeight: string | null };

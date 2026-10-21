@@ -36,8 +36,9 @@ export function usePagedQuery<T>(target: string, load: (client: QueryClient, cur
     setBusy(true);
     setState({ ...previous, result: { ...previous.result, status: 'loading' } });
     try {
+      const client = createQueryClient(current.chain, controller.signal);
       let page: QueryPage<T>;
-      try { page = await current.load(createQueryClient(current.chain, controller.signal), previous.nextCursor); }
+      try { page = await current.load(client, previous.nextCursor); }
       catch (error) {
         if (!(error instanceof PartialQueryError)) throw error;
         page = { ...(error.data as QueryPage<T>), warning: error.info };
@@ -53,6 +54,7 @@ export function usePagedQuery<T>(target: string, load: (client: QueryClient, cur
       const partial = page.warning ?? previous.warning;
       const next: State<T> = { key, seen, pages, nextCursor: page.nextCursor, stopReason, warning: partial, result: {
         context: previous.result.context, data: rows, observedAt: new Date().toISOString(),
+        observations: [...(previous.result.observations ?? []), ...client.observations],
         error: partial ?? null, status: partial || stopReason ? 'partial' : rows.length ? 'success' : 'empty',
       } };
       stateRef.current = next; setState(next);

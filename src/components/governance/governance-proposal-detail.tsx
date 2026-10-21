@@ -6,7 +6,7 @@ import { getDenomsMetadata } from "@/services/guru/token-metadata.service";
 import Link from "@/components/layout/chain-link";
 import { useQuery } from "@/hooks/use-query";
 import { QueryStatus } from "@/components/query/query-status";
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import {
   Alert,
   Box,
@@ -59,6 +59,7 @@ type Props = {
   votes: GovernanceVoteRow[];
   deposits: GovernanceDepositRow[];
   rawJson: unknown;
+  votesControls?: ReactNode;
   votesAvailable?: boolean;
   depositsAvailable?: boolean;
 };
@@ -78,6 +79,7 @@ export function GovernanceProposalDetail({
   votes,
   deposits,
   rawJson,
+  votesControls,
   votesAvailable = true,
   depositsAvailable = true,
 }: Props) {
@@ -368,6 +370,7 @@ export function GovernanceProposalDetail({
             <Tab label="예치 내역" />
             <Tab label="Raw JSON" />
           </Tabs>
+          {tab === 0 && votesControls}
           <Box sx={{ mt: 2 }}>
             {tab === 0 ? (
               <Table size="small">
@@ -387,7 +390,7 @@ export function GovernanceProposalDetail({
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
                             아직 아무도 투표하지 않았거나, 예치 단계에서는 투표가 없을 수 있습니다. 투표가 있으면 LCD
-                            응답에 포함되며, 이 목록은 최대 200건까지 불러옵니다 (추가 페이지는 미구현).
+                            응답에 포함되며, 현재 조회한 범위와 추가 페이지 여부는 투표 목록의 조회 안내를 확인하세요.
                           </Typography>
                         </Stack>
                       </TableCell>

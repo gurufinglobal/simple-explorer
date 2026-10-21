@@ -4,7 +4,7 @@ import { ModuleTable, moduleTextCellSx } from "@/components/query/module-table";
 import Link from "@/components/layout/chain-link";
 import { useMemo, useState } from "react";
 import { useQuery } from "@/hooks/use-query";
-import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
+import { QueryInfo } from "@/components/query/query-info";
 
 import { useParams } from "next/navigation";
 import {
@@ -136,7 +136,7 @@ export function OracleDetailView() {
     };
   }, [resultsSorted]);
 
-  if (!request) return <QueryStatus {...query} />;
+  if (!request) return <QueryInfo queries={[{ ...query, label: "Oracle 요청" }, { ...latestQuery, label: "최근 결과" }, { ...reportQuery, label: "보고서" }, { ...resultsQuery, label: "결과 이력" }]} />;
 
   return (
     <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
@@ -149,7 +149,7 @@ export function OracleDetailView() {
         </Button>
       </Stack>
       <Typography variant="body2">nonce=0 조회의 최신 의미와 결과 시각 단위는 미확인입니다. Report·signature는 LCD 원문이며 서명·집계 검증을 수행하지 않았습니다.</Typography>
-      <QueryStatus {...query} /><QueryStatus {...latestQuery} /><QueryStatus {...reportQuery} /><QueryStatus {...resultsQuery} />
+      <QueryInfo queries={[{ ...query, label: "Oracle 요청" }, { ...latestQuery, label: "최근 결과" }, { ...reportQuery, label: "보고서" }, { ...resultsQuery, label: "결과 이력" }]} />
 
       <Card variant="outlined">
         <CardContent>

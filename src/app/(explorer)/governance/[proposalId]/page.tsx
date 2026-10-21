@@ -3,7 +3,7 @@
 import { PageControls } from "@/components/query/page-controls";
 import { usePagedQuery } from "@/hooks/use-paged-query";
 import { useQuery } from "@/hooks/use-query";
-import { QueryStatus } from "@/components/query/query-status";
+import { QueryInfo } from "@/components/query/query-info";
 
 import { useParams, useSearchParams } from "next/navigation";
 import { Alert, Stack } from "@mui/material";
@@ -38,14 +38,14 @@ function GovernanceContent({ pinnedChain }: { pinnedChain?: ChainConfig }) {
   const raw = useQuery(`proposal-raw:${proposalId}`, client => getProposalRaw(proposalId, client), undefined, true, pinnedChain);
   return <Stack spacing={2}>
     {pinnedChain && <Alert severity="info">제안 링크 체인: {pinnedChain.key} / {pinnedChain.chainId}</Alert>}
-    <QueryStatus {...proposal} /><QueryStatus {...paramsQuery} /><QueryStatus {...tally} />
-    <QueryStatus {...votes} /><PageControls {...votes} label="투표" /><QueryStatus {...deposits} /><QueryStatus {...raw} />
+    <QueryInfo queries={[{ ...proposal, label: "제안" }, { ...paramsQuery, label: "거버넌스 파라미터" }, { ...tally, label: "집계" }, { ...votes, label: "투표" }, { ...deposits, label: "예치" }, { ...raw, label: "제안 원문" }]} />
     {proposal.result.data && <GovernanceProposalDetail key={`${pinnedChain?.key ?? proposal.result.context.chain}:${proposalId}`} pinnedChain={pinnedChain}
       proposal={proposal.result.data}
       govParams={paramsQuery.result.data ?? { voting: null, tallying: null, deposit: null }}
       liveTally={tally.result.data}
       votesAvailable={votes.result.data !== null}
       depositsAvailable={deposits.result.data !== null}
+      votesControls={<PageControls {...votes} label="투표" />}
       votes={votes.result.data ?? []}
       deposits={deposits.result.data ?? []}
       rawJson={raw.result.data ?? {}}

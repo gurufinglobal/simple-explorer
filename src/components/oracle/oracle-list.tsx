@@ -4,7 +4,7 @@ import { withChain } from "@/lib/chain-selection";
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@/hooks/use-query";
-import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
+import { QueryInfo } from "@/components/query/query-info";
 
 import Link from "next/link";
 import {
@@ -72,7 +72,7 @@ export function OracleList() {
         Oracle 필드는 원문입니다. period·quorum 단위와 nonce 최신 규칙은 미확인입니다.
       </Typography>
 
-      <QueryStatus {...query} /><QueryStatus {...paramsQuery} /><QueryStatus {...moderator} /><QueryStatus {...categoriesQuery} /><QueryStatus {...whitelist} />
+      <QueryInfo queries={[{ ...query, label: "요청 목록" }, { ...paramsQuery, label: "Oracle 파라미터" }, { ...moderator, label: "관리자" }, { ...categoriesQuery, label: "카테고리" }, { ...whitelist, label: "허용 목록" }]} />
 
       {!loading && supported ? (
         <Grid container spacing={2}>

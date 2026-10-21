@@ -27,12 +27,12 @@ export function FeePolicyDetailView() {
   const address = params.address ?? "";
   const query = useQuery(`feepolicy:${address}`, client => getFeePolicyDiscountByAddress(address, client));
   const detail = query.result.data;
-  if (!detail) return <QueryStatus {...query} />;
+  if (!detail) return <QueryStatus {...query} label="할인 정책" />;
 
   return (
     <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
       <Typography variant="body2">할인 유형·amount는 원문입니다. 적용 범위·단위·우선순위는 미확인입니다. ALL은 빈 address 원문의 표시명이며 전체 계정 적용을 확정하지 않습니다.</Typography>
-      <QueryStatus {...query} />
+      <QueryStatus {...query} label="할인 정책" />
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Typography variant="h5" fontWeight={700}>
           FeePolicy Discount 상세
