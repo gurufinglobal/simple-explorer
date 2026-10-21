@@ -1,4 +1,5 @@
 "use client";
+import { ModuleTable, moduleTextCellSx } from "@/components/query/module-table";
 
 import { useQuery } from "@/hooks/use-query";
 import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
@@ -11,7 +12,6 @@ import {
   Divider,
   Grid,
   Stack,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -35,7 +35,7 @@ function FeesTable({ title, coins, hasError }: { title: string; coins: BexCoin[]
             {hasError ? "조회 결과를 확인할 수 없습니다." : "데이터가 없습니다."}
           </Typography>
         ) : (
-          <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
+          <ModuleTable>
             <TableHead>
               <TableRow>
                 <TableCell>Denom</TableCell>
@@ -45,12 +45,12 @@ function FeesTable({ title, coins, hasError }: { title: string; coins: BexCoin[]
             <TableBody>
               {coins.map((coin) => (
                 <TableRow key={`${title}-${coin.denom}`}>
-                  <TableCell>{coin.denom}</TableCell>
+                  <TableCell sx={moduleTextCellSx}>{coin.denom}</TableCell>
                   <TableCell align="right">{coin.amount}</TableCell>
                 </TableRow>
               ))}
             </TableBody>
-          </Table></div>
+          </ModuleTable>
         )}
       </CardContent>
     </Card>

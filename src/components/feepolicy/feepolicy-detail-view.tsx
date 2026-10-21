@@ -1,4 +1,5 @@
 "use client";
+import { ModuleTable, moduleTextCellSx } from "@/components/query/module-table";
 
 import Link from "@/components/layout/chain-link";
 import { useQuery } from "@/hooks/use-query";
@@ -10,7 +11,6 @@ import {
   Card,
   CardContent,
   Stack,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -67,7 +67,7 @@ export function FeePolicyDetailView() {
                   등록된 할인 항목이 없습니다.
                 </Typography>
               ) : (
-                <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
+                <ModuleTable>
                   <TableHead>
                     <TableRow>
                       <TableCell>Discount Type</TableCell>
@@ -79,12 +79,12 @@ export function FeePolicyDetailView() {
                     {moduleItem.discounts.map((item, index) => (
                       <TableRow key={`${moduleItem.module}-${item.msgType}-${index}`}>
                         <TableCell>{item.discountType}</TableCell>
-                        <TableCell sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>{item.msgType}</TableCell>
+                        <TableCell sx={{ ...moduleTextCellSx, fontFamily: "monospace" }}>{item.msgType}</TableCell>
                         <TableCell align="right">{item.amount}</TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
-                </Table></div>
+                </ModuleTable>
               )}
             </CardContent>
           </Card>

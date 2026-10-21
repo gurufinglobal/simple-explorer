@@ -1,4 +1,5 @@
 "use client";
+import { ModuleTable, moduleTextCellSx } from "@/components/query/module-table";
 import { withChain } from "@/lib/chain-selection";
 
 import { useQuery } from "@/hooks/use-query";
@@ -10,7 +11,6 @@ import {
   CardContent,
   Skeleton,
   Stack,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -68,7 +68,7 @@ export function BexList() {
       {loading ? (
         <Card variant="outlined">
           <CardContent>
-            <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
+            <ModuleTable>
               <TableHead>
                 <TableRow>
                   <TableCell>ID</TableCell>
@@ -89,7 +89,7 @@ export function BexList() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table></div>
+            </ModuleTable>
           </CardContent>
         </Card>
       ) : !supported ? null : items.length === 0 ? (
@@ -97,7 +97,7 @@ export function BexList() {
       ) : (
         <Card variant="outlined">
           <CardContent>
-            <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
+            <ModuleTable>
               <TableHead>
                 <TableRow>
                   <TableCell>ID</TableCell>
@@ -113,7 +113,7 @@ export function BexList() {
                     key={item.id}
                   >
                     <TableCell><Link href={withChain(`/bex/${encodeURIComponent(item.id)}`)}>{item.id}</Link></TableCell>
-                    <TableCell>{item.denomA} / {item.denomB}</TableCell>
+                    <TableCell sx={moduleTextCellSx}>{item.denomA} / {item.denomB}</TableCell>
                     <TableCell sx={isActiveStatus(item.status) ? { color: "primary.main", fontWeight: 600 } : undefined}>
                       {item.status}
                     </TableCell>
@@ -122,7 +122,7 @@ export function BexList() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table></div>
+            </ModuleTable>
           </CardContent>
         </Card>
       )}
