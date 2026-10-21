@@ -143,6 +143,7 @@ export async function getDenomsMetadata(apiClients: QueryClient = defaultClients
   try {
     let nextKey: string | null | undefined = undefined;
     let pageCount = 0;
+    const seen = new Set<string>();
 
     do {
       const query: string = nextKey
@@ -158,14 +159,18 @@ export async function getDenomsMetadata(apiClients: QueryClient = defaultClients
 
       nextKey = response.pagination?.next_key;
       pageCount += 1;
+      if (nextKey && seen.has(nextKey)) {
+        throw new QueryError({ kind: "incomplete", message: "Metadata cursor 반복·순환을 감지하여 중단했습니다. 현재 결과는 일부입니다." });
+      }
+      if (nextKey) seen.add(nextKey);
       if (pageCount >= 50 && nextKey) {
         throw new QueryError({ kind: "incomplete", message: "Metadata 조회 한도(50페이지)에 도달했습니다. 현재 결과는 일부입니다." });
       }
     } while (nextKey);
 
-    return metadatas.sort((a, b) => a.symbol.localeCompare(b.symbol) || a.baseDenom.localeCompare(b.baseDenom));
+    return Array.from(new Map(metadatas.map(row => [row.baseDenom, row])).values()).sort((a, b) => a.symbol.localeCompare(b.symbol) || a.baseDenom.localeCompare(b.baseDenom));
   } catch (error) {
-    if (metadatas.length) throw new PartialQueryError(metadatas, queryError(error));
+    if (metadatas.length) throw new PartialQueryError(Array.from(new Map(metadatas.map(row => [row.baseDenom, row])).values()), queryError(error));
     throw error;
   }
 }

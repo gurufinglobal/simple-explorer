@@ -1,6 +1,7 @@
 "use client";
 
-import { useQuery } from "@/hooks/use-query";
+import { usePagedQuery } from "@/hooks/use-paged-query";
+import { PageControls } from "@/components/query/page-controls";
 import { QueryStatus } from "@/components/query/query-status";
 
 import {
@@ -8,10 +9,10 @@ import {
   Typography,
 } from "@mui/material";
 import { ValidatorsTable } from "@/components/staking/validators-table";
-import { getTopValidators } from "@/services/guru/staking.service";
+import { getValidatorsPage } from "@/services/guru/staking.service";
 
 export default function StakingPage() {
-  const query = useQuery("staking", client => getTopValidators(20, client));
+  const query = usePagedQuery("staking", (client, cursor) => getValidatorsPage(20, client, cursor), row => row.operatorAddress);
 
   return (
     <Stack spacing={2}>
@@ -20,6 +21,7 @@ export default function StakingPage() {
       </Typography>
 
       <QueryStatus {...query} />
+      <PageControls {...query} />
       {query.result.data && <ValidatorsTable validators={query.result.data} />}
     </Stack>
   );
