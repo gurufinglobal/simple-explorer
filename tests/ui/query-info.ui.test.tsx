@@ -1,0 +1,72 @@
+// @vitest-environment jsdom
+import '@testing-library/jest-dom/vitest';
+import { afterEach, expect, it } from 'vitest';
+import { cleanup, render, screen, within, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { PathParamsContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
+import GovernanceProposalPage from '@/app/(explorer)/governance/[proposalId]/page';
+import { ParamsView } from '@/components/params/params-view';
+import { mockQueryHttp } from '../helpers/query-http';
+import { restoreHttpBoundary } from '../helpers/network-summary';
+
+afterEach(() => { cleanup(); restoreHttpBoundary(); });
+const raw = { id: '12', title: 'Test proposal', summary: 'Body remains mounted', status: 'PROPOSAL_STATUS_PASSED', total_deposit: [], final_tally_result: { yes_count: '1', no_count: '0', abstain_count: '0', no_with_veto_count: '0' } };
+function body(path: string) {
+  if (path.endsWith('/proposals/12')) return { proposal: raw };
+  if (path.endsWith('/tally')) return { tally: raw.final_tally_result };
+  if (path.endsWith('/votes')) return { votes: [], pagination: { next_key: null } };
+  if (path.endsWith('/deposits')) return { deposits: [] };
+  if (path.endsWith('/params/deposit')) return { deposit_params: { min_deposit: [{ denom: 'agxn', amount: '1' }] } };
+  if (path.endsWith('/params/voting')) return { voting_params: { voting_period: '100s' } };
+  if (path.endsWith('/params/tallying')) return { tally_params: { quorum: '0.3', threshold: '0.5', veto_threshold: '0.33' } };
+  return { params: { enabled: true } };
+}
+it('proposal route collapses all sources, exposes observations with keyboard and retains selected tab through refresh', async () => {
+  const http = mockQueryHttp(url => body(url.pathname));
+  render(<PathParamsContext.Provider value={{ proposalId: '12' }}><GovernanceProposalPage /></PathParamsContext.Provider>);
+  await screen.findByText('4/6개 조회 완료');
+  const info = screen.getByRole('region', { name: '조회 정보' });
+  expect(within(info).queryByText(/대상: proposal:12/)).toBeNull();
+  expect(within(info).getAllByText('조회 완료: 빈 결과')).toHaveLength(2);
+  const toggle = within(info).getByRole('button', { name: '조회 정보' });
+  toggle.focus(); await userEvent.keyboard('{Enter}');
+  expect(toggle).toHaveAttribute('aria-expanded', 'true');
+  expect(document.getElementById(toggle.getAttribute('aria-controls')!)).toContainElement(within(info).getByText(/대상: proposal:12/));
+  expect(within(info).getAllByText(/출처: https:\/\/lcd.example.test/)).toHaveLength(8);
+  await userEvent.keyboard(' ');
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  expect(toggle).toHaveFocus();
+  await userEvent.tab(); expect(screen.getByRole('button', { name: '제안 다시 조회' })).toHaveFocus();
+  await userEvent.click(screen.getByRole('tab', { name: 'Raw JSON' }));
+  http.mockClear();
+  await userEvent.click(screen.getByRole('button', { name: '집계 다시 조회' }));
+  await screen.findByText('4/6개 조회 완료');
+  expect(http).toHaveBeenCalledTimes(1);
+  expect(String(http.mock.calls[0][0])).toContain('/tally');
+  expect(screen.getByRole('tab', { name: 'Raw JSON' })).toHaveAttribute('aria-selected', 'true');
+  await userEvent.click(screen.getByRole('tab', { name: '투표 내역' }));
+  expect(screen.getByText('투표: 현재 조회 0건 · 전체 개수 미확인')).toBeVisible();
+});
+it('Params keeps HTTP501 and failed module visible, reveals every source and preserves successful cards on stale refresh', async () => {
+  let failAll = false;
+  mockQueryHttp(url => failAll ? new Response('', { status: 503 }) : url.pathname.endsWith('/constant_fee') ? new Response('', { status: 501 }) : Response.json(body(url.pathname), { headers: { 'x-cosmos-block-height': '123' } }));
+  render(<ParamsView />);
+  await screen.findByText('일부 조회 실패');
+  const info = screen.getByRole('region', { name: 'Params 조회 정보' });
+  expect(within(info).getByText('Crisis Constant Fee: HTTP 501')).toBeVisible();
+  expect(within(info).getByRole('alert')).toHaveTextContent('HTTP 501');
+  expect(within(info).queryByText(/출처:/)).toBeNull();
+  const card = screen.getByText('Auth Params');
+  const toggle = within(info).getByRole('button', { name: '조회 정보' });
+  await userEvent.click(toggle);
+  expect(within(info).getAllByText(/출처:.*응답 높이: 123/)).toHaveLength(14);
+  expect(within(info).getByText(/실패 출처:.*constant_fee/)).toBeVisible();
+  await userEvent.click(toggle);
+  failAll = true;
+  await userEvent.click(screen.getByRole('button', { name: 'Params 다시 조회' }));
+  await waitFor(() => expect(within(info).getByText('갱신 실패: 마지막 조회 데이터')).toBeVisible());
+  expect(card).toBeVisible();
+  expect(toggle).toHaveAttribute('aria-expanded', 'false');
+  await userEvent.click(toggle);
+  expect(within(info).getAllByText(/출처:.*응답 높이: 123/)).toHaveLength(14);
+});

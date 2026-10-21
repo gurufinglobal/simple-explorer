@@ -6,13 +6,9 @@ import type { QueryResult } from '@/lib/query-result';
 export type QueryStatusProps = { result: QueryResult<unknown>; busy?: boolean; refresh?: () => void };
 
 export function QueryStatus({ result, busy, refresh, compactLabel, showDetails = true }: QueryStatusProps & { compactLabel?: string; showDetails?: boolean }) {
-  const now = useNowTick(1000);
-  const wait = Math.max(0, Math.ceil(((result.error?.retryAt ?? 0) - now) / 1000));
   const labels = { idle: '미조회', loading: '불러오는 중', success: '조회 완료', empty: '조회 완료: 빈 결과', 'not-found': '확인된 미존재', partial: '일부 조회 실패', stale: '갱신 실패: 마지막 조회 데이터', error: '조회 실패', unsupported: '미지원', cancelled: '조회 취소' };
   const status = <Typography variant="body2" role="status" aria-label={compactLabel ? `${compactLabel} 조회 상태` : "조회 상태"}>{result.status === "idle" && busy ? "불러오는 중" : labels[result.status]}</Typography>;
-  const retry = refresh && <Button size="small" onClick={refresh} disabled={busy || wait > 0} aria-label={compactLabel ? `${compactLabel} 다시 조회` : undefined}>
-    {wait > 0 ? `${wait}초 후 재시도` : '다시 조회'}
-  </Button>;
+  const retry = <QueryRetry result={result} busy={busy} refresh={refresh} label={compactLabel} inline />;
   return <Stack spacing={1} data-query-status={result.status} sx={{ minWidth: 0, overflowWrap: 'anywhere' }}>
     {compactLabel ? <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1}>
       <Typography variant="body2" fontWeight={700}>{compactLabel}</Typography>
@@ -28,6 +24,25 @@ export function QueryStatus({ result, busy, refresh, compactLabel, showDetails =
       체인: {result.context.chain} · 대상: {result.context.target}<br />
       데이터 관찰 시각: {result.observedAt ?? '아직 관찰된 데이터 없음'}{result.blockHeight ? ` · 높이 ${result.blockHeight}` : ''}
     </Typography> : !compactLabel && result.observedAt && <Typography variant="caption">조회 시각: {result.observedAt} · {result.context.chain} · {result.context.target}{result.blockHeight ? ` · 높이 ${result.blockHeight}` : ''}</Typography>}
+    {compactLabel && showDetails && result.observations?.map((item, index) => <Typography key={index} variant="caption" color="text.secondary">
+      출처: {item.endpoint} · 관찰: {item.observedAt} · 응답 높이: {item.blockHeight ?? '미확인'}
+    </Typography>)}
+    {compactLabel && showDetails && result.error?.endpoint && <Typography variant="caption">
+      실패 출처: {result.error.endpoint}
+    </Typography>}
+    {compactLabel && showDetails && result.error?.causes?.map((cause, index) => <Typography key={index} variant="caption">
+      실패 원인 {index + 1}: {cause.message} ({cause.kind}){cause.status ? ` · HTTP ${cause.status}` : ''}{cause.endpoint ? ` · 출처: ${cause.endpoint}` : ''}
+    </Typography>)}
     {!compactLabel && retry}
   </Stack>;
+}
+
+/** Shares Retry-After and busy behavior between compact shortcuts and expanded rows. */
+export function QueryRetry({ result, busy, refresh, label, inline }: QueryStatusProps & { label?: string; inline?: boolean }) {
+  const now = useNowTick(1000);
+  const wait = Math.max(0, Math.ceil(((result.error?.retryAt ?? 0) - now) / 1000));
+  if (!refresh) return null;
+  return <Button size="small" onClick={refresh} disabled={busy || wait > 0} aria-label={label ? `${label} 다시 조회` : undefined}>
+    {label && !inline && <>{label} · </>}{wait > 0 ? `${wait}초 후 재시도` : '다시 조회'}
+  </Button>;
 }

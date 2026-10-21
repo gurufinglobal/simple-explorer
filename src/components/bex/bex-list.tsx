@@ -63,7 +63,7 @@ export function BexList() {
         fee·limit는 원문입니다. 비율·금액 단위와 적용 의미는 미확인입니다.
       </Typography>
 
-      <QueryStatus {...query} />
+      <QueryStatus {...query} label="교환 목록" />
 
       {loading ? (
         <Card variant="outlined">

@@ -2,7 +2,7 @@
 import { ModuleTable, moduleTextCellSx } from "@/components/query/module-table";
 
 import { useQuery } from "@/hooks/use-query";
-import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
+import { QueryInfo } from "@/components/query/query-info";
 
 import { useParams } from "next/navigation";
 import {
@@ -64,12 +64,12 @@ export function BexDetailView() {
   const exchange = query.result.data;
   const feeQuery = useQuery(`bex-fees:${id}`, client => getBexExchangeFees(id, client));
   const fees = feeQuery.result.data;
-  if (!exchange) return <><QueryStatus {...query} /><QueryStatus {...feeQuery} /></>;
+  if (!exchange) return <QueryInfo queries={[{ ...query, label: "교환 상세" }, { ...feeQuery, label: "수수료" }]} />;
 
   return (
     <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
       <Typography variant="body2">fee·limit는 원문입니다. 비율·금액 단위와 적용 의미는 미확인입니다. 수수료 잔액은 denom별 최소 단위 원문입니다.</Typography>
-      <QueryStatus {...query} /><QueryStatus {...feeQuery} />
+      <QueryInfo queries={[{ ...query, label: "교환 상세" }, { ...feeQuery, label: "수수료" }]} />
       <Typography variant="h5" fontWeight={700}>
         BEX Exchange #{exchange.id}
       </Typography>

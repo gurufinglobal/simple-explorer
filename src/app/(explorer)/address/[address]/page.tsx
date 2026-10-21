@@ -4,7 +4,7 @@ import { CopyPageLink, CopyValue } from "@/components/explorer/copy-value";
 import { AddressTransactions } from "@/components/explorer/address-transactions";
 
 import { useQuery } from "@/hooks/use-query";
-import { QueryStatus } from "@/components/query/query-status";
+import { QueryInfo } from "@/components/query/query-info";
 
 import { useParams } from "next/navigation";
 import {
@@ -54,16 +54,17 @@ function AddressDetailContent({ address }: { address: string }) {
       <Typography variant="h5" fontWeight={700}>
         Address Details
       </Typography>
+      <QueryInfo label="주소 조회 정보" queries={[{ ...account, label: "계정" }, { ...bank, label: "잔액" }, { ...metadata, label: "토큰 메타데이터" }, { ...portfolio, label: "위임과 보상" }]} />
       <Card variant="outlined">
         <CardContent>
           <Stack spacing={1}>
             <Typography>Address (canonical Bech32): {address}</Typography>
             <CopyValue label="계정 주소 Bech32 복사" value={address} />
-            <QueryStatus {...account} />
+
             <Typography>Account Number: {accountInfo.accountNumber ?? "-"}</Typography>
             <Typography>Sequence: {accountInfo.sequence ?? "-"}</Typography>
             <Typography variant="subtitle2">Balances</Typography>
-            <QueryStatus {...bank} /><QueryStatus {...metadata} />
+
             {profileLoading ? (
               <Stack spacing={1}>
                 <Skeleton variant="text" width={180} />
@@ -85,7 +86,7 @@ function AddressDetailContent({ address }: { address: string }) {
         </CardContent>
       </Card>
 
-      <QueryStatus {...portfolio} />
+
       <Typography>위임: {portfolio.result.data?.staking ?? "미확인"} · 보상: {portfolio.result.data?.reward ?? "미확인"}</Typography>
       <Stack component="section" aria-label="위임 원본 금액">
         {portfolio.result.data?.details?.staking?.map(coin => <CoinAmount key={coin.denom} coin={coin} metadata={portfolio.result.data?.details?.metadata} />)}

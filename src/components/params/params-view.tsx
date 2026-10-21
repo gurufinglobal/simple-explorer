@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@/hooks/use-query";
-import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
+import { QueryInfo } from "@/components/query/query-info";
 
 import {
   Alert,
@@ -34,7 +34,8 @@ export function ParamsView() {
         현재 선택한 체인의 주요 모듈 파라미터를 LCD에서 조회합니다.
       </Typography>
 
-      <QueryStatus {...query} />
+      <QueryInfo label="Params 조회 정보" queries={[{ ...query, label: "Params" }]}
+        notices={rows.filter(row => row.error).map(row => `${row.title}: ${row.error?.status ? `HTTP ${row.error.status}` : row.error?.kind}`)} />
 
       {loading ? (
         <Grid container spacing={2}>

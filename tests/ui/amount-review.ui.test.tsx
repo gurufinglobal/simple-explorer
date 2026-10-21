@@ -22,13 +22,14 @@ it.each([false, true])('R1 address retry restores metadata-only full/page failur
     return new Response('', { status: 503 });
   });
   addressPage();
-  const query = (await screen.findByText(new RegExp("fixture · address-portfolio:" + fixtureAddress))).closest('[data-query-status]') as HTMLElement;
+  await userEvent.click(within(screen.getByRole("region", { name: "주소 조회 정보" })).getByRole("button", { name: "조회 정보" }));
+  const query = (await screen.findByText(new RegExp("fixture · 대상: address-portfolio:" + fixtureAddress))).closest('[data-query-status]') as HTMLElement;
   expect(query.getAttribute('data-query-status')).toBe('partial');
   expect(within(query).getByRole('alert').textContent).toContain('Metadata 조회 실패');
   const staking = screen.getByRole('region', { name: '위임 원본 금액' });
   expect(within(staking).getByText(later ? '1 GXN' : '1000000000000000001 agxn (정밀도 미확인)')).toBeTruthy();
   failed = false;
-  await userEvent.click(within(query).getByRole('button', { name: '다시 조회' }));
+  await userEvent.click(within(query).getByRole('button', { name: '위임과 보상 다시 조회' }));
   await waitFor(() => expect(query.getAttribute('data-query-status')).toBe('success'));
   expect(within(query).queryByRole('alert')).toBeNull();
   expect(within(staking).getByText('1 GXN')).toBeTruthy();

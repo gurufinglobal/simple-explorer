@@ -33,6 +33,8 @@ it('SDK sender 101 rows reaches all pages; latest recipient and hash duplicate a
   expect(screen.getByRole('link', { name: /NEWEST/ }).getAttribute('href')).toBe('/tx/NEWEST?chain=fixture');
   expect(requests.map(url => [url.searchParams.get('page'), url.searchParams.get('limit')])).toEqual([['1', '30'], ['1', '30'], ['2', '30'], ['3', '30'], ['4', '30']]);
   expect(requests.every(url => !url.searchParams.has('pagination.key') && !url.searchParams.has('pagination.limit'))).toBe(true);
+  fireEvent.click(screen.getByRole('button', { name: '조회 정보' }));
+  expect(within(screen.getByRole('region', { name: '송수신 조회 정보' })).getAllByText(/출처:/)).toHaveLength(5);
   expect(screen.queryByRole('button', { name: '송신 이어보기' })).toBeNull();
 });
 
@@ -82,7 +84,7 @@ it.each(['success', 'failure'])('retains successful recipient before/during/afte
   });
   render(<AddressTransactions address="retry" />);
   await screen.findByText('RECIPIENT');
-  fireEvent.click(within(screen.getByRole('region', { name: '송신 거래' })).getByRole('button', { name: '다시 조회' }));
+  fireEvent.click(within(screen.getByRole('region', { name: '송수신 조회 정보' })).getByRole('button', { name: '송신 다시 조회' }));
   await waitFor(() => expect(release).toBeTypeOf('function'));
   expect(screen.getByText('RECIPIENT')).toBeTruthy();
   expect(screen.getByText(/송수신 일부 범위만/)).toBeTruthy();
@@ -105,7 +107,7 @@ it.each(['address', 'chain'])('clears exposed partial rows on %s change and disc
   vi.stubEnv('NEXT_PUBLIC_CHAINS', JSON.stringify([{ key: 'fixture', name: 'Fixture', lcdUrl: 'https://lcd.example.test' }, { key: 'other', name: 'Other', lcdUrl: 'https://other.example.test' }]));
   const view = render(<AddressTransactions address="old" />);
   await screen.findByText('OLD');
-  fireEvent.click(within(screen.getByRole('region', { name: '송신 거래' })).getByRole('button', { name: '다시 조회' }));
+  fireEvent.click(within(screen.getByRole('region', { name: '송수신 조회 정보' })).getByRole('button', { name: '송신 다시 조회' }));
   await waitFor(() => expect(release).toBeTypeOf('function'));
   if (transition === 'address') view.rerender(<AddressTransactions address="new" />);
   else act(() => setActiveChainKeyCookie('other'));

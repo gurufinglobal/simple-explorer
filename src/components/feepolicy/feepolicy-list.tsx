@@ -4,7 +4,7 @@ import { withChain } from "@/lib/chain-selection";
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@/hooks/use-query";
-import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
+import { QueryInfo } from "@/components/query/query-info";
 
 import Link from "next/link";
 import {
@@ -57,7 +57,7 @@ export function FeePolicyList() {
       </Typography>
 
       <Typography variant="body2">할인 유형·amount는 원문입니다. 적용 범위·단위·우선순위는 미확인입니다. ALL은 빈 address 원문의 표시명이며 전체 계정 적용을 확정하지 않습니다.</Typography>
-      <QueryStatus {...query} /><QueryStatus {...moderator} />
+      <QueryInfo queries={[{ ...query, label: "할인 정책" }, { ...moderator, label: "관리자" }]} />
 
       {!loading && supported ? (
         <Card variant="outlined">

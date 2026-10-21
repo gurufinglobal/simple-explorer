@@ -74,15 +74,19 @@ function getActiveChainConfigForRuntime(): ChainConfig {
 }
 
 async function readObserved<T>(chain: ChainConfig, path: string, signal?: AbortSignal, height?: string) {
-  requireModule(chain, path);
-  let blockHeight: string | null = null;
-  const data = await requestJson<T>(toUrl(chain.lcdUrl, path), height ? { headers: { "x-cosmos-block-height": height } } : {}, {
-    signal, onResponse: response => {
-      const raw = response.headers.get("x-cosmos-block-height") ?? response.headers.get("grpc-metadata-x-cosmos-block-height");
-      blockHeight = raw && /^\d+$/.test(raw) ? raw : null;
-    },
-  });
-  return { data: validateLcdJson(path, data), blockHeight };
+  try {
+    requireModule(chain, path);
+    let blockHeight: string | null = null;
+    const data = await requestJson<T>(toUrl(chain.lcdUrl, path), height ? { headers: { "x-cosmos-block-height": height } } : {}, {
+      signal, onResponse: response => {
+        const raw = response.headers.get("x-cosmos-block-height") ?? response.headers.get("grpc-metadata-x-cosmos-block-height");
+        blockHeight = raw && /^\d+$/.test(raw) ? raw : null;
+      },
+    });
+    return { data: validateLcdJson(path, data), blockHeight };
+  } catch (error) {
+    throw new QueryError({ ...queryError(error), endpoint: toUrl(chain.lcdUrl, path) });
+  }
 }
 
 export const apiClients = {

@@ -56,15 +56,16 @@ describe.each([
     http.mockResolvedValueOnce(new Response('', { status }));
     render(route(Page));
     expect((await screen.findAllByRole('alert'))[0].textContent).toContain(`HTTP ${status}`);
-    fireEvent.click(screen.getAllByRole('button', { name: '다시 조회' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: `${field === 'exchanges' ? '교환 목록' : field === 'requests' ? '요청 목록' : '할인 정책'} 다시 조회` })[0]);
     await screen.findByRole('link', { name: field === 'discounts' ? 'ALL' : row.id });
+    fireEvent.click(screen.getByRole('button', { name: '조회 정보' }));
     expect(screen.getAllByText(/응답 높이: 123/).length).toBeGreaterThan(0);
   });
   it('empty is distinct from malformed/partial; failed refresh keeps raw rows', async () => {
     http.mockImplementation(async input => Response.json({ ...body(new URL(String(input)).pathname), [field]: [] }));
     render(route(Page)); await screen.findAllByText('조회 완료: 빈 결과');
     http.mockResolvedValueOnce(Response.json({ [field]: [value, null] }));
-    fireEvent.click(screen.getAllByRole('button', { name: '다시 조회' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: `${field === 'exchanges' ? '교환 목록' : field === 'requests' ? '요청 목록' : '할인 정책'} 다시 조회` })[0]);
     // Existing successful empty snapshot is retained as stale on a malformed refresh.
     await screen.findByText('갱신 실패: 마지막 조회 데이터');
     cleanup();
@@ -73,7 +74,7 @@ describe.each([
     const link = await screen.findByRole('link', { name: field === 'discounts' ? 'ALL' : row.id });
     expect(link.getAttribute('href')).toContain('?chain=on');
     http.mockResolvedValueOnce(new Response('', { status: 500 }));
-    fireEvent.click(screen.getAllByRole('button', { name: '다시 조회' })[0]);
+    fireEvent.click(screen.getAllByRole('button', { name: `${field === 'exchanges' ? '교환 목록' : field === 'requests' ? '요청 목록' : '할인 정책'} 다시 조회` })[0]);
     await screen.findByText('갱신 실패: 마지막 조회 데이터');
     expect(screen.getByRole('link', { name: field === 'discounts' ? 'ALL' : row.id })).toBeTruthy();
   });

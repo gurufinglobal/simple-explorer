@@ -31,7 +31,7 @@ export function TokensMetadataList() {
         `/cosmos/bank/v1beta1/denoms_metadata` 결과를 기준으로 표시합니다.
       </Typography>
 
-      <QueryStatus {...query} />
+      <QueryStatus {...query} label="토큰 메타데이터" />
 
       {loading ? (
         <Card variant="outlined">
