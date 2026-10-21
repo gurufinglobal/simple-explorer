@@ -10,6 +10,8 @@ import { GlobalSearchBar } from "@/components/search/global-search-bar";
 import AddressPage from "@/app/(explorer)/address/[address]/page";
 import BlockPage from "@/app/(explorer)/blocks/[height]/page";
 import TxPage from "@/app/(explorer)/tx/[hash]/page";
+import Home from "@/app/page";
+import ChainLink from "@/components/layout/chain-link";
 import { getActiveChainConfig, getChainSelectionGeneration, resolveChainContext, synchronizeRouteChain, withChain } from "@/lib/chain-selection";
 import { canonicalAccountAddress } from "@/lib/canonical-address";
 import { getEffectiveCosmosAddress } from "@/lib/resolve-cosmos-address";
@@ -66,6 +68,18 @@ function route(params: Record<string, string>, element: React.ReactNode) {
 }
 
 describe("W08 chain-aware search and actual service reads", () => {
+  it.each(["unknown", "", "a"].flatMap(chain => [true, false].map(cookie => ({ chain, cookie }))))(
+    "R1 home links preserve URL '$chain' with cookie B=$cookie", ({ chain, cookie }) => {
+      vi.stubEnv("NEXT_PUBLIC_DEFAULT_CHAIN_KEY", "b");
+      if (!cookie) document.cookie = "gf_chain=; path=/; max-age=0";
+      window.history.replaceState(null, "", "/?chain=" + chain);
+      render(route({}, <><Home /><ChainLink href="/tx/history?chain=b">Saved transaction</ChainLink></>));
+      expect(screen.getByRole("link", { name: "Open Dashboard" }).getAttribute("href")).toBe("/dashboard?chain=" + chain);
+      expect(screen.getByRole("link", { name: "Start Block Exploration" }).getAttribute("href")).toBe("/blocks?chain=" + chain);
+      expect(screen.getByRole("link", { name: "Saved transaction" }).getAttribute("href")).toBe("/tx/history?chain=b");
+      expect(http).not.toHaveBeenCalled();
+    },
+  );
   it.each(chains)("AC05-1 $key canonical address reaches its chain endpoint", async chain => {
     const input = address(chain.bech32Prefix!).toUpperCase();
     const result = await lookupByQuery(input, { chain: chain.key, cookieChain: chain.key === "a" ? "b" : "a" });

@@ -21,7 +21,42 @@ await context.route(/https:\/\/[ab]\.example\//,async route=>{
  const response=u.pathname.includes("/txs/")?tx:{...block,block:{...block.block,header:{...block.block.header,chain_id:u.hostname==="a.example"?"guru-fixture":"cosmos-fixture",height:u.pathname.split("/").at(-1)}}};
  await route.fulfill({json:response});
 });
+const homeCases=[];
 try {
+ for (const chain of ["unknown", "", "a"]) {
+  for (const cookie of [true, false]) {
+   for (const [label, destination] of [["Open Dashboard", "/dashboard"], ["Start Block Exploration", "/blocks"]]) {
+    // Each case starts in a fresh browser context, including the no-cookie cases.
+    const homeContext=await browser.newContext();
+    try {
+     const homePage=await homeContext.newPage();
+     const homeRequests=[];
+     homePage.on("pageerror",error=>errors.push(error.message));
+     await homeContext.route(/https:\/\/[ab]\.example\//,async route=>{
+      homeRequests.push(route.request().url());
+      await route.fulfill({json:block});
+     });
+     if(cookie) await homeContext.addCookies([{name:"gf_chain",value:"b",url:base}]);
+     await homePage.goto(base+"/?chain="+chain);
+     const link=homePage.getByRole("link",{name:label,exact:true});
+     await homePage.waitForFunction(({label,href})=>Array.from(document.querySelectorAll("a")).some(a=>a.textContent===label&&a.getAttribute("href")===href),{label,href:destination+"?chain="+chain});
+     assert.equal(homeRequests.length,0);
+     await link.click();
+     await homePage.waitForURL(base+destination+"?chain="+chain);
+     if(chain!=="a") {
+      await homePage.getByRole("alert").filter({hasText:"설정이 없습니다"}).first().waitFor();
+      await homePage.waitForLoadState("networkidle");
+      assert.equal(homeRequests.length,0);
+      assert.equal((await homeContext.cookies()).find(c=>c.name==="gf_chain")?.value,cookie?"b":undefined);
+     } else {
+      await homePage.waitForLoadState("networkidle");
+      assert(homeRequests.length>0&&homeRequests.every(u=>u.startsWith("https://a.example/")));
+     }
+     homeCases.push({chain,cookie:cookie?"b":null,destination,requestCount:homeRequests.length,status:"passed"});
+    } finally {await homeContext.close();}
+   }
+  }
+ }
  await context.addCookies([{name:"gf_chain",value:"b",url:base}]);
  await page.goto(base+"/blocks/19611674?chain=a");
  await page.getByText("guru-fixture",{exact:true}).waitFor();
@@ -53,5 +88,5 @@ try {
  assert((await page.getByRole("link",{name:"19611783",exact:true}).getAttribute("href")).endsWith("?chain=a"));
  await page.screenshot({path:path.join(artifacts,"tx.png"),fullPage:true});
  assert.deepEqual(errors,[]);
- console.log(JSON.stringify({status:"passed",cases:["URL A + cookie B","copy chain link","internal detail link","back/forward","selector URL update","ambiguous candidate UI","candidate route","unknown chain zero HTTP","fresh browser URL A","E09 Cosmos summary"],requestCount:requests.length,pageErrors:errors},null,2));
+ console.log(JSON.stringify({status:"passed",homeCases,cases:["URL A + cookie B","copy chain link","internal detail link","back/forward","selector URL update","ambiguous candidate UI","candidate route","unknown chain zero HTTP","fresh browser URL A","E09 Cosmos summary"],requestCount:requests.length,pageErrors:errors},null,2));
 } finally {await browser.close();}

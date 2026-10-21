@@ -58,7 +58,10 @@ export function resolveChainContext(urlKey: string | null, cookieKey: string | n
 
 export function withChain(href: string, key?: string): string {
   const url = new URL(href, "https://explorer.invalid");
-  if (!url.searchParams.has("chain")) url.searchParams.set("chain", key ?? getActiveChainConfig().key);
+  // Navigation preserves even invalid explicit context so the destination can
+  // reject it. Validating here would let links lose unknown/empty URL keys.
+  const routeKey = typeof window === "undefined" ? null : new URLSearchParams(window.location.search).get("chain");
+  if (!url.searchParams.has("chain")) url.searchParams.set("chain", key ?? routeKey ?? getActiveChainConfig().key);
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
