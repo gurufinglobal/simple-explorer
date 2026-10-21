@@ -3,9 +3,9 @@ import { withChain } from "@/lib/chain-selection";
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@/hooks/use-query";
-import { QueryStatus } from "@/components/query/query-status";
+import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -20,9 +20,7 @@ import {
   Typography,
 } from "@mui/material";
 import {
-  FEEPOLICY_ALL_ROUTE_PARAM,
   getFeePolicyModeratorAddress,
-  isFeePolicyGlobalAddress,
   listFeePolicyDiscounts,
   toFeePolicyAddressLabel,
   type FeePolicyAccountDiscount,
@@ -35,7 +33,6 @@ function countDiscountItems(item: FeePolicyAccountDiscount): number {
 }
 
 export function FeePolicyList() {
-  const router = useRouter();
   const query = useQuery("feepolicy-discounts", client => listFeePolicyDiscounts(client));
   const moderator = useQuery("feepolicy-moderator", client => getFeePolicyModeratorAddress(client));
   const items = useMemo(() => query.result.data ?? [], [query.result.data]);
@@ -51,14 +48,15 @@ export function FeePolicyList() {
   }, [items, page]);
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
       <Typography variant="h5" fontWeight={700}>
         FeePolicy Discounts
       </Typography>
       <Typography variant="body2" color="text.secondary">
-        `/guru/feepolicy/v1/moderator_address`, `/guru/feepolicy/v1/discounts` 결과를 기반으로 표시합니다.
+        할인 유형·amount는 원문입니다. percent와 percentage를 같은 단위로 환산하지 않습니다. 적용 범위·단위·우선순위는 미확인입니다.
       </Typography>
 
+      <Typography variant="body2">할인 유형·amount는 원문입니다. 적용 범위·단위·우선순위는 미확인입니다. ALL은 빈 address 원문의 표시명이며 전체 계정 적용을 확정하지 않습니다.</Typography>
       <QueryStatus {...query} /><QueryStatus {...moderator} />
 
       {!loading && supported ? (
@@ -84,7 +82,7 @@ export function FeePolicyList() {
       {loading ? (
         <Card variant="outlined">
           <CardContent>
-            <Table size="small">
+            <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>Address</TableCell>
@@ -101,7 +99,7 @@ export function FeePolicyList() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
           </CardContent>
         </Card>
       ) : !supported ? null : items.length === 0 ? (
@@ -109,7 +107,7 @@ export function FeePolicyList() {
       ) : (
         <Card variant="outlined">
           <CardContent>
-            <Table size="small">
+            <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>Address</TableCell>
@@ -121,22 +119,16 @@ export function FeePolicyList() {
                 {pagedItems.map((item) => (
                   <TableRow
                     key={item.address || "__all__"}
-                    hover
-                    sx={{ cursor: "pointer" }}
-                    onClick={() => {
-                      const routeAddress = isFeePolicyGlobalAddress(item.address) ? FEEPOLICY_ALL_ROUTE_PARAM : item.address;
-                      router.push(withChain(`/feepolicy/${encodeURIComponent(routeAddress)}`));
-                    }}
                   >
                     <TableCell sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>
-                      {toFeePolicyAddressLabel(item.address)}
+                      <Link href={withChain(`/feepolicy/${encodeURIComponent(toFeePolicyAddressLabel(item.address))}`)}>{toFeePolicyAddressLabel(item.address)}</Link>
                     </TableCell>
                     <TableCell align="right">{item.modules.length}</TableCell>
                     <TableCell align="right">{countDiscountItems(item)}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>
-            </Table>
+            </Table></div>
             <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
               <Pagination page={page} count={pageCount} onChange={(_, nextPage) => setPage(nextPage)} size="small" />
             </Stack>

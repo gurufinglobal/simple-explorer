@@ -1,6 +1,6 @@
 import { vi } from 'vitest';
 export function mockQueryHttp(handler: (url: URL) => unknown | Response | Promise<unknown | Response>) {
-  vi.stubEnv('NEXT_PUBLIC_CHAINS', JSON.stringify([{ key: 'fixture', name: 'Fixture', bech32Prefix: 'guru', lcdUrl: 'https://lcd.example.test', denom: 'agxn', nativeDenom: 'agxn', bondDenom: 'agxn' }]));
+  vi.stubEnv('NEXT_PUBLIC_CHAINS', JSON.stringify([{ key: 'fixture', name: 'Fixture', features: { bex: true, oracle: true, feepolicy: true }, bech32Prefix: 'guru', lcdUrl: 'https://lcd.example.test', denom: 'agxn', nativeDenom: 'agxn', bondDenom: 'agxn' }]));
   vi.stubEnv('NEXT_PUBLIC_DEFAULT_CHAIN_KEY', 'fixture');
   const http = vi.fn<typeof fetch>(async input => {
     const response = await handler(new URL(String(input)));

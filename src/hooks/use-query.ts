@@ -64,7 +64,9 @@ export function useQuery<T>(target: string, load: (client: QueryClient, previous
       // Preserve the stale/error indication while retrying existing data.
       if (!pollMs || !previous.error) result = { ...previous, status: 'loading' };
       publish();
-      const next = await readQuery(context, () => loader.current(createQueryClient(selectedChain, controller.signal), previous.data), previous);
+      const client = createQueryClient(selectedChain, controller.signal);
+      const next = await readQuery(context, () => loader.current(client, previous.data), previous);
+      if (['success', 'empty', 'partial', 'not-found'].includes(next.status)) next.observations = client.observations;
       active = null;
       if (disposed || currentKey.current !== key) return;
       if (!controller.signal.aborted) {

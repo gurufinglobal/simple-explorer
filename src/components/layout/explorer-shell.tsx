@@ -1,4 +1,5 @@
 "use client";
+import { moduleEnabled } from "@/lib/module-capability";
 
 import Link from "@/components/layout/chain-link";
 import { usePathname, useSearchParams } from "next/navigation";
@@ -97,13 +98,13 @@ function ExplorerShellContent({ children }: { children: ReactNode }) {
   const ready = activeChain && (routeChain === null || routeChain === activeChain.key);
 
   const visibleMenus = menus.filter((menu) => {
-    if (menu.requiresBex && activeChain?.features?.bex !== true) {
+    if (menu.requiresBex && !moduleEnabled(activeChain, "bex")) {
       return false;
     }
-    if (menu.requiresFeePolicy && activeChain?.features?.feepolicy !== true) {
+    if (menu.requiresFeePolicy && !moduleEnabled(activeChain, "feepolicy")) {
       return false;
     }
-    if (menu.requiresOracle && activeChain?.features?.oracle !== true) {
+    if (menu.requiresOracle && !moduleEnabled(activeChain, "oracle")) {
       return false;
     }
     return true;

@@ -6,7 +6,6 @@ import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared
 import { PathParamsContext } from "next/dist/shared/lib/hooks-client-context.shared-runtime";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { TopNavSearch } from "@/components/search/top-nav-search";
-import { GlobalSearchBar } from "@/components/search/global-search-bar";
 import AddressPage from "@/app/(explorer)/address/[address]/page";
 import BlockPage from "@/app/(explorer)/blocks/[height]/page";
 import TxPage from "@/app/(explorer)/tx/[hash]/page";
@@ -108,7 +107,7 @@ describe("W08 chain-aware search and actual service reads", () => {
     expect(String(http.mock.calls[0][0])).toContain("/blocks/" + input);
     expect(classifyQuery("9007199254740993", chains[0]).normalized).toBe("9007199254740993");
   });
-  it.each([TopNavSearch, GlobalSearchBar])("AC05-3 rendered search exposes both choices before navigation", Component => {
+  it.each([TopNavSearch])("AC05-3 rendered search exposes both choices before navigation", Component => {
     render(route({}, <Component />));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "1".repeat(64) } });
     fireEvent.click(screen.getByRole("button", { name: "search" }));

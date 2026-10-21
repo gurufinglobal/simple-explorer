@@ -1,7 +1,7 @@
 "use client";
 
 import { useQuery } from "@/hooks/use-query";
-import { QueryStatus } from "@/components/query/query-status";
+import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
 
 import {
   Card,

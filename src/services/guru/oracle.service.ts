@@ -1,7 +1,9 @@
+import { schemaError } from "@/lib/query-result";
+import { moduleRows, rawText, requiredText, record } from "./module-contract";
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
 export type OracleParams = {
-  enable: boolean;
+  enable: boolean | null;
   quorumRatio: string;
   reportRetentionBlocks: string;
 };
@@ -123,34 +125,15 @@ const STATUS_LABEL: Record<string, string> = {
   "2": "STATUS_INACTIVE",
 };
 
-function toStringValue(value: string | number | undefined, fallback = "0"): string {
-  if (value === undefined || value === null) return fallback;
-  return String(value);
-}
-
-function normalizeCategory(value: string | number | undefined): string {
-  if (value === undefined || value === null) return "CATEGORY_UNSPECIFIED";
-  const raw = String(value).trim();
-  if (!raw) return "CATEGORY_UNSPECIFIED";
-  if (CATEGORY_LABEL[raw]) return CATEGORY_LABEL[raw];
-  if (/^CATEGORY_/.test(raw)) return raw;
-  return raw.toUpperCase().startsWith("CATEGORY_") ? raw.toUpperCase() : `CATEGORY_${raw.toUpperCase()}`;
-}
-
-function normalizeStatus(value: string | number | undefined): string {
-  if (value === undefined || value === null) return "STATUS_UNSPECIFIED";
-  const raw = String(value).trim();
-  if (!raw) return "STATUS_UNSPECIFIED";
-  if (STATUS_LABEL[raw]) return STATUS_LABEL[raw];
-  if (/^STATUS_/.test(raw)) return raw;
-  return raw.toUpperCase().startsWith("STATUS_") ? raw.toUpperCase() : `STATUS_${raw.toUpperCase()}`;
-}
+const toStringValue = rawText;
+function normalizeCategory(value: unknown): string { const raw = rawText(value); return CATEGORY_LABEL[raw] ?? raw; }
+function normalizeStatus(value: unknown): string { const raw = rawText(value); return STATUS_LABEL[raw] ?? raw; }
 
 function normalizeOracleRequest(raw: OracleRequestRaw): OracleRequestRow {
   return {
-    id: toStringValue(raw.id),
+    id: requiredText(raw.id),
     category: normalizeCategory(raw.category),
-    symbol: raw.symbol ?? "-",
+    symbol: rawText(raw.symbol),
     count: toStringValue(raw.count),
     period: toStringValue(raw.period),
     status: normalizeStatus(raw.status),
@@ -159,19 +142,21 @@ function normalizeOracleRequest(raw: OracleRequestRaw): OracleRequestRow {
 }
 
 function normalizeOracleReport(raw: OracleReportRaw): OracleReportRow {
+  if (!record(raw)) schemaError();
   return {
-    requestId: toStringValue(raw.request_id ?? raw.requestId),
-    provider: raw.provider ?? "-",
-    rawData: raw.raw_data ?? raw.rawData ?? "-",
+    requestId: requiredText(raw.request_id ?? raw.requestId),
+    provider: rawText(raw.provider),
+    rawData: rawText(raw.raw_data ?? raw.rawData),
     nonce: toStringValue(raw.nonce),
-    signature: raw.signature ?? "",
+    signature: rawText(raw.signature),
   };
 }
 
 function normalizeOracleResult(raw: OracleResultRaw): OracleResultRow {
+  if (!record(raw)) schemaError();
   return {
-    requestId: toStringValue(raw.request_id ?? raw.requestId),
-    aggregatedData: raw.aggregated_data ?? raw.aggregatedData ?? "-",
+    requestId: requiredText(raw.request_id ?? raw.requestId),
+    aggregatedData: rawText(raw.aggregated_data ?? raw.aggregatedData),
     aggregatedHeight: toStringValue(raw.aggregated_height ?? raw.aggregatedHeight),
     aggregatedTime: toStringValue(raw.aggregated_time ?? raw.aggregatedTime),
     nonce: toStringValue(raw.nonce),
@@ -179,9 +164,10 @@ function normalizeOracleResult(raw: OracleResultRaw): OracleResultRow {
 }
 
 function normalizeOracleParams(raw: OracleParamsRaw | undefined): OracleParams {
+  if (raw?.enable !== undefined && raw.enable !== null && typeof raw.enable !== "boolean") schemaError("Oracle enable 필드가 올바르지 않습니다.");
   return {
-    enable: Boolean(raw?.enable),
-    quorumRatio: raw?.quorum_ratio ?? raw?.quorumRatio ?? "0",
+    enable: typeof raw?.enable === "boolean" ? raw.enable : null,
+    quorumRatio: rawText(raw?.quorum_ratio ?? raw?.quorumRatio),
     reportRetentionBlocks: toStringValue(raw?.report_retention_blocks ?? raw?.reportRetentionBlocks),
   };
 }
@@ -191,16 +177,10 @@ async function safeLcdGet<T>(path: string, apiClients: QueryClient = defaultClie
   return await apiClients.lcdGet<T>(path);
 }
 
-export async function isOracleAvailable(apiClients: QueryClient = defaultClients): Promise<boolean> {
-
-  const response = await safeLcdGet<OracleParamsResponse>("/guru/oracle/v2/params", apiClients);
-  return response !== null;
-}
-
 export async function getOracleParams(apiClients: QueryClient = defaultClients): Promise<OracleParams | null> {
 
   const response = await safeLcdGet<OracleParamsResponse>("/guru/oracle/v2/params", apiClients);
-  if (!response) return null;
+  if (!record(response?.params)) schemaError();
   return normalizeOracleParams(response.params);
 }
 
@@ -214,16 +194,14 @@ export async function getOracleModeratorAddress(apiClients: QueryClient = defaul
 export async function getOracleCategories(apiClients: QueryClient = defaultClients): Promise<string[]> {
 
   const response = await safeLcdGet<OracleCategoriesResponse>("/guru/oracle/v2/categories", apiClients);
-  if (!response?.categories) return [];
+  if (!Array.isArray(response?.categories)) schemaError();
   return response.categories.map((category) => normalizeCategory(category));
 }
 
 export async function getOracleWhitelist(apiClients: QueryClient = defaultClients): Promise<{ addresses: string[]; count: string }> {
 
   const response = await safeLcdGet<OracleWhitelistResponse>("/guru/oracle/v2/whitelist", apiClients);
-  if (!response) {
-    return { addresses: [], count: "0" };
-  }
+  if (!Array.isArray(response?.addresses) || !response.addresses.every(item => typeof item === "string")) schemaError();
   return {
     addresses: response.addresses ?? [],
     count: toStringValue(response.count),
@@ -245,15 +223,14 @@ export async function listOracleRequests(filters?: {
   const queryString = query.toString();
   const path = queryString ? `/guru/oracle/v2/requests?${queryString}` : "/guru/oracle/v2/requests";
   const response = await safeLcdGet<OracleRequestsResponse>(path, apiClients);
-  if (!response?.requests) return [];
-  return response.requests.map(normalizeOracleRequest);
+  return moduleRows(response?.requests, normalizeOracleRequest);
 }
 
 export async function getOracleRequestById(requestId: string, apiClients: QueryClient = defaultClients): Promise<OracleRequestRow | null> {
   if (!/^[0-9]+$/.test(requestId)) return null;
 
   const response = await safeLcdGet<OracleRequestResponse>(`/guru/oracle/v2/requests/${encodeURIComponent(requestId)}`, apiClients);
-  if (!response?.request) return null;
+  if (!record(response?.request)) schemaError();
   return normalizeOracleRequest(response.request);
 }
 
@@ -274,16 +251,17 @@ export async function listOracleReports(params: {
     : `/guru/oracle/v2/requests/${encodeURIComponent(requestId)}/reports`;
 
   const response = await safeLcdGet<OracleReportsResponse>(path, apiClients);
-  if (!response?.reports) return [];
-  return response.reports.map(normalizeOracleReport);
+  return moduleRows(response?.reports, normalizeOracleReport);
 }
 
-export async function getOracleLatestResult(requestId: string, apiClients: QueryClient = defaultClients): Promise<OracleResultRow | null> {
+/** nonce=0 is the queried value; latest semantics are not verified. */
+export async function getOracleResultAtNonceZero(requestId: string, apiClients: QueryClient = defaultClients): Promise<OracleResultRow | null> {
   if (!/^[0-9]+$/.test(requestId)) return null;
 
   const response = await safeLcdGet<OracleResultResponse>(`/guru/oracle/v2/requests/${encodeURIComponent(requestId)}/result?nonce=0`, apiClients
   );
-  if (!response?.result || Object.keys(response.result).length === 0) return null;
+  if (response?.result === null || (record(response?.result) && Object.keys(response.result).length === 0)) return null;
+  if (!record(response?.result)) schemaError();
   return normalizeOracleResult(response.result);
 }
 
@@ -292,6 +270,5 @@ export async function listOracleResults(requestId: string, apiClients: QueryClie
 
   const response = await safeLcdGet<OracleResultsResponse>(`/guru/oracle/v2/requests/${encodeURIComponent(requestId)}/results`, apiClients
   );
-  if (!response?.results) return [];
-  return response.results.map(normalizeOracleResult);
+  return moduleRows(response?.results, normalizeOracleResult);
 }
