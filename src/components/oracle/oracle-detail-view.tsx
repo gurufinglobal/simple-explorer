@@ -1,4 +1,5 @@
 "use client";
+import { ModuleTable, moduleTextCellSx } from "@/components/query/module-table";
 
 import Link from "@/components/layout/chain-link";
 import { useMemo, useState } from "react";
@@ -16,7 +17,6 @@ import {
   Skeleton,
   Stack,
   Tab,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -290,7 +290,7 @@ export function OracleDetailView() {
                   </Button>
                 </Stack>
                 {reportsLoading ? (
-                  <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
+                  <ModuleTable>
                     <TableBody>
                       {Array.from({ length: 6 }).map((_, index) => (
                         <TableRow key={`oracle-report-skeleton-${index}`}>
@@ -301,11 +301,11 @@ export function OracleDetailView() {
                         </TableRow>
                       ))}
                     </TableBody>
-                  </Table></div>
+                  </ModuleTable>
                 ) : reports.length === 0 ? (
                   <Typography variant="body2">{reportQuery.result.status === "empty" ? "표시할 report가 없습니다." : "Report 조회 결과 미확인"}</Typography>
                 ) : (
-                  <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
+                  <ModuleTable>
                     <TableHead>
                       <TableRow>
                         <TableCell>Provider</TableCell>
@@ -317,16 +317,16 @@ export function OracleDetailView() {
                     <TableBody>
                       {reports.map((report, index) => (
                         <TableRow key={`${report.provider}-${report.nonce}-${index}`}>
-                          <TableCell sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>{report.provider}</TableCell>
+                          <TableCell sx={{ ...moduleTextCellSx, fontFamily: "monospace" }}>{report.provider}</TableCell>
                           <TableCell align="right">{report.nonce}</TableCell>
                           <TableCell align="right">{report.rawData}</TableCell>
-                          <TableCell sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>
+                          <TableCell sx={{ ...moduleTextCellSx, fontFamily: "monospace" }}>
                             {report.signature || "-"}
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
-                  </Table></div>
+                  </ModuleTable>
                 )}
               </Stack>
             ) : null}
@@ -341,7 +341,7 @@ export function OracleDetailView() {
                 {resultsSorted.length === 0 ? (
                   <Typography variant="body2">{resultsQuery.result.status === "empty" ? "표시할 결과 이력이 없습니다." : "결과 이력 미확인"}</Typography>
                 ) : (
-                  <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
+                  <ModuleTable>
                     <TableHead>
                       <TableRow>
                         <TableCell align="right">Nonce</TableCell>
@@ -360,7 +360,7 @@ export function OracleDetailView() {
                         </TableRow>
                       ))}
                     </TableBody>
-                  </Table></div>
+                  </ModuleTable>
                 )}
               </Stack>
             ) : null}

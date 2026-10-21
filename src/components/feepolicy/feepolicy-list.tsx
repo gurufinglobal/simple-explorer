@@ -1,4 +1,5 @@
 "use client";
+import { ModuleTable, moduleTextCellSx } from "@/components/query/module-table";
 import { withChain } from "@/lib/chain-selection";
 
 import { useMemo, useState } from "react";
@@ -12,7 +13,6 @@ import {
   Pagination,
   Skeleton,
   Stack,
-  Table,
   TableBody,
   TableCell,
   TableHead,
@@ -82,7 +82,7 @@ export function FeePolicyList() {
       {loading ? (
         <Card variant="outlined">
           <CardContent>
-            <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
+            <ModuleTable>
               <TableHead>
                 <TableRow>
                   <TableCell>Address</TableCell>
@@ -99,7 +99,7 @@ export function FeePolicyList() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table></div>
+            </ModuleTable>
           </CardContent>
         </Card>
       ) : !supported ? null : items.length === 0 ? (
@@ -107,7 +107,7 @@ export function FeePolicyList() {
       ) : (
         <Card variant="outlined">
           <CardContent>
-            <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}><Table size="small">
+            <ModuleTable>
               <TableHead>
                 <TableRow>
                   <TableCell>Address</TableCell>
@@ -120,7 +120,7 @@ export function FeePolicyList() {
                   <TableRow
                     key={item.address || "__all__"}
                   >
-                    <TableCell sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>
+                    <TableCell sx={{ ...moduleTextCellSx, fontFamily: "monospace" }}>
                       <Link href={withChain(`/feepolicy/${encodeURIComponent(toFeePolicyAddressLabel(item.address))}`)}>{toFeePolicyAddressLabel(item.address)}</Link>
                     </TableCell>
                     <TableCell align="right">{item.modules.length}</TableCell>
@@ -128,7 +128,7 @@ export function FeePolicyList() {
                   </TableRow>
                 ))}
               </TableBody>
-            </Table></div>
+            </ModuleTable>
             <Stack direction="row" justifyContent="center" sx={{ mt: 2 }}>
               <Pagination page={page} count={pageCount} onChange={(_, nextPage) => setPage(nextPage)} size="small" />
             </Stack>

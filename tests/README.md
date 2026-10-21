@@ -28,3 +28,5 @@
 - `integration/module-views.integration.test.tsx`: 실제 Next page 컴포넌트·서비스·DOM에서 목록/상세 직접 URL 차단, 오류→재시도, stale·체인 전환·늦은 응답 폐기와 원문 표시를 실행한다.
 - `browser/modules.browser.mjs`: 격리 production의 실제 Chrome 360/768/1280, 메뉴/6개 직접 URL, 404/500/timeout/empty/malformed/partial, 긴 문자열·표 스크롤·Tab/Enter를 검사한다. 환경 변수 `PLAYWRIGHT_MODULE`, `BROWSER_ORIGIN`, `BROWSER_OUTPUT`, `SOURCE_SHA`로 실행 맥락을 남긴다. 설정은 `on`/`off` 및 `https://on.example`/`https://off.example`의 공개 합성 체인이며 모든 HTTP를 가로챈다. 실제 체인·배포 origin CORS·물리 모바일·스크린리더·signer 검증과 구별한다.
 - Faucet/WS/재위임/서버 세션의 미사용 모의 성공 코드와 대응 가상 성공 검사는 제거했다. 실제 polling·wallet lifecycle·staking/거버넌스·F1 보관 결과 검사는 유지한다.
+
+모듈 browser runner는 긴 숫자·소수·헤더의 실제 텍스트 줄 수(1줄), 긴 설명 셀의 최소 240px 폭, 360px의 내부 overflow, Tab 진입·ArrowRight 이동·마지막 열 노출을 검사한다. BEX 3종 수수료 표, Oracle Reports/History, FeePolicy 목록/상세를 포함하며 3개 목록의 링크 Enter 후 chain 유지도 확인한다. 문서 가로 넘침만으로 표 가독성 통과를 판정하지 않는다.
