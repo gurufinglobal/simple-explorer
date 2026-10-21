@@ -180,6 +180,20 @@ it('AC07-5: empty Transactions tracks block height independently of rows and ski
   height++; await tick(3000); expect(http).toHaveBeenCalledTimes(124);
   expect(screen.getByText(/높이 151/)).toBeTruthy();
 });
+it('invalidation keeps the visible blocks but reloads the same height without the old cursor', async () => {
+  let finish!: (value: Response) => void;
+  const http = mockQueryHttp(() => block('1'));
+  render(<BlocksLiveList />); await tick();
+  expect(http).toHaveBeenCalledTimes(2);
+  http.mockImplementationOnce(() => new Promise(resolve => { finish = resolve; }));
+  act(() => window.dispatchEvent(new CustomEvent('explorer:queries-invalidated', { detail: { chain: 'fixture', targets: ['blocks'] } })));
+  expect(screen.getByText('#1')).toBeTruthy();
+  expect(screen.getByText('불러오는 중 · 갱신 중')).toBeTruthy();
+  await act(async () => finish(Response.json(block('1')))); await tick();
+  // latest + the block itself must both be requested despite unchanged height.
+  expect(http).toHaveBeenCalledTimes(4);
+  expect(screen.getByText('#1')).toBeTruthy();
+});
 it('expired Retry-After falls back to backoff instead of immediate request loops', async () => {
   const http = mockQueryHttp(() => new Response('', { status: 429, headers: { 'Retry-After': 'Tue, 20 Oct 2026 00:00:00 GMT' } }));
   render(<Probe />); await tick(2999); expect(http).toHaveBeenCalledTimes(1);

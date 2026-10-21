@@ -377,6 +377,32 @@ describe('W06 service context guards', () => {
 });
 
 describe('W06 refreshed rendered data', () => {
+  it('keeps the included receipt and form mounted during a delayed validator refresh', async () => {
+    let included = false;
+    const refresh = deferred<void>();
+    http.mockImplementation(async url => {
+      if (included && new URL(String(url)).pathname.endsWith(`/validators/${validator}`)) await refresh.promise;
+      return response(String(url));
+    });
+    render(<ValidatorDetailPage />);
+    await screen.findByText('0.001234 GXN');
+    const amount = screen.getByRole('textbox', { name: '수량 (표시 단위)' });
+    fireEvent.change(amount, { target: { value: '2' } });
+    boundary.broadcast.mockImplementation(async () => { included = true; validatorTokens = '5678'; return { code: 0, transactionHash: hash }; });
+    fireEvent.click(screen.getByRole('button', { name: 'Claim Reward' }));
+    await screen.findByRole('dialog'); await approve();
+    await waitFor(() => expect(screen.getByText(/체인 포함 성공/)).toBeTruthy());
+    // Let the post-inclusion refresh enter a real pending state, outside the
+    // synchronous HTTP batching that concealed the page unmount regression.
+    await screen.findByText('조회 갱신 중');
+    expect(amount.isConnected).toBe(true);
+    expect((amount as HTMLInputElement).value).toBe('2');
+    expect(await screen.findByRole('link', { name: new RegExp(hash) })).toBeTruthy();
+    await act(async () => refresh.resolve());
+    await screen.findByText('0.005678 GXN');
+    expect(screen.getByText(/체인 포함 성공/)).toBeTruthy();
+    expect(boundary.broadcast).toHaveBeenCalledOnce();
+  });
   it('updates validator metrics and keeps result visible after position reloading', async () => {
     render(<ValidatorDetailPage />); await screen.findByText('0.001234 GXN');
     boundary.broadcast.mockImplementation(async () => { validatorTokens = '5678'; delegation = '8000000'; return { code: 0, transactionHash: hash }; });
