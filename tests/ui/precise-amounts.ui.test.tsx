@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { PathParamsContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import AddressDetailPage from '@/app/(explorer)/address/[address]/page';
 import { TokensMetadataList } from '@/components/tokens/tokens-metadata-list';
-import { mockQueryHttp } from '../helpers/query-http';
+import { mockQueryHttp, fixtureAddress } from '../helpers/query-http';
 import { amountResponse } from '../helpers/amounts';
 import { restoreHttpBoundary } from '../helpers/network-summary';
 import observed from '../fixtures/tgxn-2026-10-20/metadata.json';
@@ -24,7 +24,7 @@ describe('AC02 amount details through the real service and DOM', () => {
       url.pathname.includes('/txs') ? { tx_responses: [] } :
       url.pathname.includes('/rewards') ? { total: [{ denom: 'agxn', amount: '123.450000' }] } :
       url.pathname.includes('/unbonding') ? Response.json({ unbonding_responses: [{ validator_address: 'validator', entries: [{ balance: '10', completion_time: '2020-01-01T00:00:00Z' }, { balance: '20', completion_time: '2030-01-01T00:00:00Z' }] }] }, { headers: { 'x-cosmos-block-height': '42' } }) : { delegation_responses: [] }));
-    render(<PathParamsContext.Provider value={{ address: 'any-public-address' }}><AddressDetailPage /></PathParamsContext.Provider>);
+    render(<PathParamsContext.Provider value={{ address: fixtureAddress }}><AddressDetailPage /></PathParamsContext.Provider>);
     expect(await screen.findByText('1 GXN')).toBeTruthy();
     expect(await screen.findByText('9007199254740993 unknown (정밀도 미확인)')).toBeTruthy();
     await screen.findByText(/합계 조회 기준 높이: 42/);

@@ -17,11 +17,12 @@ import { loadReceipts, queryReceipt, saveReceipt } from '@/services/transactions
 import { transactionLink, type TransactionReceipt } from '@/services/transactions/transaction';
 import { useWalletSessionStore as store } from '@/stores/wallet-session.store';
 import { useWalletPortfolioStore as portfolio } from '@/stores/wallet-portfolio.store';
+import { ExplorerShell } from '@/components/layout/explorer-shell';
 import TxPage from '@/app/(explorer)/tx/[hash]/page';
 
 const boundary = vi.hoisted(() => ({ connect: vi.fn(), simulate: vi.fn(), sign: vi.fn(), broadcast: vi.fn(), wallet: vi.fn(), search: 'a', hash: '' }));
 vi.mock('@cosmjs/stargate', async original => ({ ...await original<typeof import('@cosmjs/stargate')>(), SigningStargateClient: { connectWithSigner: boundary.connect } }));
-vi.mock('next/navigation', () => ({ useParams: () => ({ hash: boundary.hash }), useSearchParams: () => new URLSearchParams({ chain: boundary.search }) }));
+vi.mock('next/navigation', () => ({ useParams: () => ({ hash: boundary.hash }), useSearchParams: () => new URLSearchParams(window.location.search), usePathname: () => window.location.pathname, useRouter: () => ({ push: vi.fn() }) }));
 const sender = bech32.encode('guru', bech32.toWords(new Uint8Array(20).fill(1)));
 const recipient = bech32.encode('guru', bech32.toWords(new Uint8Array(20).fill(2)));
 const pubkey = new Uint8Array(33).fill(3);
@@ -62,6 +63,7 @@ function response(input: string): Response {
   throw new Error(`Unexpected HTTP ${url.pathname}`);
 }
 beforeEach(() => {
+  window.history.replaceState(null, '', '/');
   vi.clearAllMocks(); document.cookie = 'gf_chain=; max-age=0; path=/'; localStorage.clear(); configure(); connect();
   boundary.hash = hash; boundary.search = 'a';
   balances = [{ denom: 'agxn', amount: '999999999999999999999999999999999999999999' }];
@@ -214,7 +216,7 @@ describe('W05 saved receipt updates and lookup races (F1)', () => {
     expect(loadReceipts()[0]).toMatchObject(next);
   });
 });
-afterEach(() => { cleanup(); store.getState().disconnect(); delete window.keplr; delete window.getOfflineSigner; vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+afterEach(() => { window.history.replaceState(null, '', '/'); cleanup(); store.getState().disconnect(); delete window.keplr; delete window.getOfflineSigner; vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 async function fill() {
   render(<SendForm />);
   fireEvent.change(screen.getByLabelText('수신 주소'), { target: { value: recipient } });
@@ -374,12 +376,12 @@ describe('W05 preflight and execution contracts', () => {
     expect(screen.getByText(/해시가 없어 결과가 불명확/)).toBeTruthy(); expect(screen.queryByRole('link')).toBeNull();
   });
   it('chain+hash link pins the actual detail query even when the cookie selects another chain', async () => {
-    setActiveChainKeyCookie('b'); render(<TxPage />); await screen.findByText('트랜잭션 상세');
+    setActiveChainKeyCookie('b'); window.history.replaceState(null, '', '/tx/' + hash + '?chain=a'); render(<ExplorerShell><TxPage /></ExplorerShell>); await screen.findByText('트랜잭션 상세');
     expect(http.mock.calls.some(([url]) => String(url) === `https://a.test:1317/cosmos/tx/v1beta1/txs/${hash}`)).toBe(true);
-    expect(getActiveChainConfig().key).toBe('b'); expect(transactionLink({ chainKey: 'a', hash })).toBe(`/tx/${hash}?chain=a`);
+    expect(getActiveChainConfig().key).toBe('a'); expect(transactionLink({ chainKey: 'a', hash })).toBe(`/tx/${hash}?chain=a`);
   });
   it('an unknown chain link blocks instead of querying the selected cookie chain', () => {
-    boundary.search = 'unknown'; render(<TxPage />); expect(screen.getByRole('alert').textContent).toContain('체인 설정이 없습니다'); expect(http).not.toHaveBeenCalled();
+    boundary.search = 'unknown'; window.history.replaceState(null, '', '/tx/' + hash + '?chain=unknown'); render(<ExplorerShell><TxPage /></ExplorerShell>); expect(screen.getAllByRole('alert').some(alert => alert.textContent?.includes('설정이 없습니다'))).toBe(true); expect(http).not.toHaveBeenCalled();
   });
   it('saved pending results can be inspected after reload without reconnecting a wallet', async () => {
     saveReceipt({ chainKey: 'a', chainId: 'a-1', sender, hash, status: 'pending', message: '확인 중', estimatedFee: [], actualFee: null });

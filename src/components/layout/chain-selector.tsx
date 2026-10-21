@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Alert, FormControl, InputLabel, MenuItem, Select, Stack } from "@mui/material";
-import { setActiveChainKeyCookie, getActiveChainConfig } from "@/lib/chain-selection";
+import { selectActiveChain, getActiveChainConfig } from "@/lib/chain-selection";
 import { getConfiguredChains, type ChainConfig } from "@/lib/env";
 export function ChainSelector() {
   const [value, setValue] = useState("");
@@ -23,7 +23,7 @@ export function ChainSelector() {
     <FormControl size="small" fullWidth disabled={!chains.length}>
       <InputLabel id="chain-select-label">Select Chain</InputLabel>
       <Select labelId="chain-select-label" label="Select Chain" value={chains.some(c => c.key === value) ? value : ""}
-        onChange={event => { setActiveChainKeyCookie(event.target.value); setValue(event.target.value); setError(null); }}>
+        onChange={event => { selectActiveChain(event.target.value); setValue(event.target.value); setError(null); }}>
         {chains.map(chain => <MenuItem key={chain.key} value={chain.key}>{chain.name}</MenuItem>)}
       </Select>
     </FormControl>

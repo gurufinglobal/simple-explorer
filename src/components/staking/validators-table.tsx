@@ -1,4 +1,5 @@
 "use client";
+import { withChain } from "@/lib/chain-selection";
 
 import { CoinAmount } from "@/components/amount/coin-amount";
 import { useRouter } from "next/navigation";
@@ -88,7 +89,7 @@ export function ValidatorsTable({ validators }: ValidatorsTableProps) {
                 hover
                 sx={{ cursor: "pointer" }}
                 onClick={() => {
-                  router.push(`/staking/${encodeURIComponent(validator.operatorAddress)}`);
+                  router.push(withChain(`/staking/${encodeURIComponent(validator.operatorAddress)}`));
                 }}
               >
                 <TableCell>

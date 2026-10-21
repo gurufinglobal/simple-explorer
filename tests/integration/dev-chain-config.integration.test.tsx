@@ -15,9 +15,10 @@ const customChains = JSON.stringify([
 beforeEach(() => {
   for (const key of Object.keys(process.env).filter(key => key.startsWith("NEXT_PUBLIC_"))) vi.stubEnv(key, undefined);
   vi.stubEnv("NODE_ENV", "development");
+  window.history.replaceState(null, "", "/");
   document.cookie = "gf_chain=; max-age=0; path=/";
 });
-afterEach(() => { cleanup(); document.cookie = "gf_chain=; max-age=0; path=/"; vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); document.cookie = "gf_chain=; max-age=0; path=/"; vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 it("renders TGXN and sends client LCD/RPC requests to the same defaults as the server", async () => {
   render(<ChainSelector />);

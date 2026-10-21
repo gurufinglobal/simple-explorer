@@ -3,7 +3,7 @@
 import { useAmountEntry } from "@/components/amount/amount-entry";
 import { CoinAmount } from "@/components/amount/coin-amount";
 import { getDenomsMetadata } from "@/services/guru/token-metadata.service";
-import Link from "next/link";
+import Link from "@/components/layout/chain-link";
 import { useQuery } from "@/hooks/use-query";
 import { QueryStatus } from "@/components/query/query-status";
 import { useMemo, useState } from "react";

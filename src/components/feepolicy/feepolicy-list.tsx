@@ -1,4 +1,5 @@
 "use client";
+import { withChain } from "@/lib/chain-selection";
 
 import { useMemo, useState } from "react";
 import { useQuery } from "@/hooks/use-query";
@@ -124,7 +125,7 @@ export function FeePolicyList() {
                     sx={{ cursor: "pointer" }}
                     onClick={() => {
                       const routeAddress = isFeePolicyGlobalAddress(item.address) ? FEEPOLICY_ALL_ROUTE_PARAM : item.address;
-                      router.push(`/feepolicy/${encodeURIComponent(routeAddress)}`);
+                      router.push(withChain(`/feepolicy/${encodeURIComponent(routeAddress)}`));
                     }}
                   >
                     <TableCell sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>

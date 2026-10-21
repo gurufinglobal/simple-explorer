@@ -1,4 +1,5 @@
 "use client";
+import { withChain } from "@/lib/chain-selection";
 
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@/hooks/use-query";
@@ -245,7 +246,7 @@ export function OracleList() {
                     hover
                     sx={{ cursor: "pointer" }}
                     onClick={() => {
-                      router.push(`/oracle/${encodeURIComponent(request.id)}`);
+                      router.push(withChain(`/oracle/${encodeURIComponent(request.id)}`));
                     }}
                   >
                     <TableCell>{request.id}</TableCell>

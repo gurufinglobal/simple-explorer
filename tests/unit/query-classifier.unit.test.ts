@@ -8,9 +8,9 @@ describe("query classifier", () => {
     expect(result.resolvedType).toBe("txHash");
   });
 
-  it("classifies address", () => {
+  it("rejects unverified EVM address mapping", () => {
     const result = classifyQuery("0x0000000000000000000000000000000000000002");
-    expect(result.resolvedType).toBe("address");
+    expect(result.error).toContain("검증되지");
   });
 
   it("classifies validator and token prefixes", () => {
@@ -18,9 +18,9 @@ describe("query classifier", () => {
     expect(classifyQuery("token:uguru").resolvedType).toBe("token");
   });
 
-  it("falls back to token when pattern is unknown", () => {
+  it("rejects unknown input instead of interpreting it as a token", () => {
     const result = classifyQuery("???");
-    expect(result.resolvedType).toBe("token");
-    expect(result.candidates).toEqual(["token"]);
+    expect(result.resolvedType).toBeNull();
+    expect(result.candidates).toEqual([]);
   });
 });

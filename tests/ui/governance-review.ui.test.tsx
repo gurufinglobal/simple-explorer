@@ -33,8 +33,8 @@ it('renders the legacy list link and its matching detail with original content',
   governanceHttp();
   const list = render(<GovernancePage />);
   const link = await screen.findByRole('link', { name: /Legacy title/ });
-  expect(link.getAttribute('href')).toBe('/governance/7');
-  const proposalId = link.getAttribute('href')!.split('/').at(-1)!;
+  expect(link.getAttribute('href')).toBe('/governance/7?chain=fixture');
+  const proposalId = new URL(link.getAttribute('href')!, 'https://test').pathname.split('/').at(-1)!;
   list.unmount();
   showDetail(proposalId);
   expect(await screen.findByText('제안 #7')).toBeTruthy();
@@ -84,5 +84,5 @@ it.each(['success', 'failure'] as const)('keeps Dashboard proposals unqueried du
   expect(screen.getByText(message)).toBeTruthy();
   expect(screen.queryByText('No active proposals — open Governance for the full list.')).toBeNull();
   expect(http.mock.calls.some(([url]) => String(url).includes('/proposals'))).toBe(false);
-  expect(screen.getByRole('link', { name: 'Governance' }).getAttribute('href')).toBe('/governance');
+  expect(screen.getByRole('link', { name: 'Governance' }).getAttribute('href')).toBe('/governance?chain=fixture');
 });

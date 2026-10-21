@@ -1,12 +1,12 @@
 "use client";
 
-import Link from "next/link";
+import { CopyPageLink, CopyValue } from "@/components/explorer/copy-value";
+import Link from "@/components/layout/chain-link";
 import { useQuery } from "@/hooks/use-query";
 import { QueryStatus } from "@/components/query/query-status";
 
-import { useParams, useSearchParams } from "next/navigation";
-import { Suspense } from "react";
-import { getChainByKey, type ChainConfig } from "@/lib/env";
+import { useParams } from "next/navigation";
+import { normalizeCosmosTxHash } from "@/services/search/query-classifier";
 import { Alert } from "@mui/material";
 import {
   Card,
@@ -22,19 +22,14 @@ import {
 import { getTxDetail } from "@/services/guru/tx-details.service";
 
 export default function TxDetailPage() {
-  return <Suspense fallback={<Typography>거래 체인 확인 중</Typography>}><TxRoute /></Suspense>;
-}
-function TxRoute() {
-  const search = useSearchParams();
-  const key = search.get("chain");
-  const chain = key ? getChainByKey(key) : null;
-  if (key && !chain) return <Alert severity="error">거래 링크의 체인 설정이 없습니다: {key}</Alert>;
-  return <TxDetailContent pinnedChain={chain ?? undefined} />;
-}
-function TxDetailContent({ pinnedChain }: { pinnedChain?: ChainConfig }) {
   const params = useParams<{ hash: string }>();
-  const hash = params.hash ?? "";
-  const query = useQuery(`transaction:${hash}`, client => getTxDetail(hash, client), undefined, true, pinnedChain);
+  let hash: string;
+  try { hash = normalizeCosmosTxHash(params.hash ?? ""); }
+  catch (error) { return <Alert severity="error">{(error as Error).message}</Alert>; }
+  return <TxDetailContent hash={hash} />;
+}
+function TxDetailContent({ hash }: { hash: string }) {
+  const query = useQuery(`transaction:${hash}`, client => getTxDetail(hash, client));
   const tx = query.result.data;
   if (!tx) return <QueryStatus {...query} />;
 
@@ -52,7 +47,8 @@ function TxDetailContent({ pinnedChain }: { pinnedChain?: ChainConfig }) {
 
   return (
     <Stack spacing={2}>
-      {pinnedChain && <Alert severity="info">거래 링크 체인: {pinnedChain.key} / {pinnedChain.chainId} · 지갑 선택과 독립적으로 조회합니다.</Alert>}
+      <CopyPageLink />
+      {tx.messages.some(message => message.shortType === "MsgEthereumTx") && <Alert severity="info">Cosmos 거래 요약입니다. EVM transaction hash 대응, receipt/log 및 EVM 관련 주소는 제공하지 않습니다.</Alert>}
       <QueryStatus {...query} />
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ md: "center" }}>
         <Typography variant="h5" fontWeight={700}>
@@ -68,8 +64,9 @@ function TxDetailContent({ pinnedChain }: { pinnedChain?: ChainConfig }) {
               요약
             </Typography>
             <Typography sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>
-              <strong>Hash:</strong> {tx.hash}
+              <strong>Cosmos tx hash (hex):</strong> {tx.hash}
             </Typography>
+            <CopyValue label="Cosmos tx hash hex 복사" value={tx.hash} />
             <Typography>
               <strong>Height:</strong>{" "}
               {tx.height !== "0" ? (

@@ -316,7 +316,7 @@ describe('W07 events, refresh boundaries and concurrency', () => {
     render(<GovernancePage />); await screen.findByRole('link', { name: /Current proposal/ });
     const tx = await prepareGovernanceTx(input('proposal')); const receipt = await queryReceipt(await tx.execute(() => {}));
     await act(async () => { await refreshTransactionReads(receipt); });
-    expect((await screen.findAllByRole('link', { name: /Updated proposal/ })).some(l => l.getAttribute('href') === `/governance/${newId}`)).toBe(true);
+    expect((await screen.findAllByRole('link', { name: /Updated proposal/ })).some(l => l.getAttribute('href') === `/governance/${newId}?chain=a`)).toBe(true);
   });
   it('deposit advancing proposal status preserves inclusion result after refresh', async () => {
     await open('deposit'); boundary.broadcast.mockImplementation(async () => { included = true; status = 'PROPOSAL_STATUS_VOTING_PERIOD'; return { code: 0, transactionHash: hash }; }); await approve();

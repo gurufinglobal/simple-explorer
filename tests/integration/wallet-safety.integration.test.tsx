@@ -72,6 +72,7 @@ function response(input: string) {
   return { balances: [{ denom: "agxn", amount: "1000000000000000000" }], total: [], delegation_responses: [], unbonding_responses: [] };
 }
 beforeEach(() => {
+  window.history.replaceState(null, "", "/");
   vi.clearAllMocks(); configure(); vi.stubEnv("NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID", "test-project");
   document.cookie = "gf_chain=; max-age=0; path=/";
   resetWalletConnectClientForTests(); store.getState().disconnect();
@@ -90,7 +91,7 @@ beforeEach(() => {
     }, broadcastTx: boundary.broadcast, disconnect: boundary.close,
   }));
 });
-afterEach(() => { cleanup(); detach?.(); detach = undefined; store.getState().disconnect(); delete window.keplr; delete window.getOfflineSigner; delete window.ethereum; vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); detach?.(); detach = undefined; store.getState().disconnect(); delete window.keplr; delete window.getOfflineSigner; delete window.ethereum; vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 const send = () => submitSendTx({ ...base, toAddress: addressB, amount: "1", denom: "agxn" });
 describe("W03 chain configuration and signing boundaries", () => {

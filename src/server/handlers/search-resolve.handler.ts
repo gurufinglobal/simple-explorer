@@ -1,26 +1,14 @@
-import { sanitizeInput } from "@/lib/sanitize";
-import { classifyQuery } from "@/services/search/query-classifier";
+import { getActiveChainConfig } from "@/lib/chain-selection";
+import type { ChainConfig } from "@/lib/env";
+import { classifyQuery, type SearchResolution } from "@/services/search/query-classifier";
 import type { HandlerResult } from "./types";
 
-export type SearchResolvePayload =
-  | {
-      resolvedType: "txHash" | "address" | "blockHeight" | "validator" | "token";
-      hasConflict: boolean;
-      candidates: ("txHash" | "address" | "blockHeight" | "validator" | "token")[];
-    }
-  | { message: string };
-
-export function resolveSearch(queryInput?: string): HandlerResult<SearchResolvePayload> {
-  const query = sanitizeInput(queryInput ?? "");
-  if (!query) {
-    return {
-      status: 400,
-      body: { message: "query는 필수입니다." },
-    };
-  }
-
-  return {
-    status: 200,
-    body: classifyQuery(query),
-  };
+export type SearchResolvePayload = SearchResolution | { message: string };
+export function resolveSearch(queryInput?: string, chain?: ChainConfig): HandlerResult<SearchResolvePayload> {
+  try {
+    const result = classifyQuery(queryInput ?? "", chain ?? getActiveChainConfig());
+    return result.error
+      ? { status: result.resolvedType === "validator" || result.resolvedType === "token" ? 422 : 400, body: { message: result.error } }
+      : { status: 200, body: result };
+  } catch (error) { return { status: 400, body: { message: (error as Error).message } }; }
 }

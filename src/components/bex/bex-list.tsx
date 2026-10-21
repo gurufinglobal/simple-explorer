@@ -1,4 +1,5 @@
 "use client";
+import { withChain } from "@/lib/chain-selection";
 
 import { useQuery } from "@/hooks/use-query";
 import { QueryStatus } from "@/components/query/query-status";
@@ -127,7 +128,7 @@ export function BexList() {
                     hover
                     sx={{ cursor: "pointer" }}
                     onClick={() => {
-                      router.push(`/bex/${encodeURIComponent(item.id)}`);
+                      router.push(withChain(`/bex/${encodeURIComponent(item.id)}`));
                     }}
                   >
                     <TableCell>{item.id}</TableCell>

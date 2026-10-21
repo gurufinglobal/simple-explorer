@@ -1,4 +1,4 @@
-import Link from "next/link";
+import Link from "@/components/layout/chain-link";
 import { Alert, Button, Container, Stack, Typography } from "@mui/material";
 
 export default function Home() {

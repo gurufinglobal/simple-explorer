@@ -1,27 +1,14 @@
-import { ethToCosmosBech32, isEthereumAddress } from "@/lib/evm-to-bech32";
-import { getActiveChainConfigFromClientCookie } from "@/lib/chain-selection";
-import { readPublicEnv } from "@/lib/env";
+import { canonicalAccountAddress } from "@/lib/canonical-address";
+import { getActiveChainConfig } from "@/lib/chain-selection";
+import type { ChainConfig } from "@/lib/env";
 
-/**
- * Returns the Cosmos (bech32) address used for LCD queries.
- * If the wallet only exposes an EVM 0x address, derives the matching Ethermint-style bech32 account.
- */
+/** Uses the same validated account identity as address details and search. */
 export function getEffectiveCosmosAddress(input: {
   bech32Address: string | null;
   evmAddress: string | null;
-}): string | null {
-  if (input.bech32Address) {
-    return input.bech32Address;
-  }
-  if (input.evmAddress && isEthereumAddress(input.evmAddress)) {
-    try {
-      const chain = typeof window !== "undefined" ? getActiveChainConfigFromClientCookie() : null;
-      const hrp = chain?.bech32Prefix ?? readPublicEnv().NEXT_PUBLIC_BECH32_PREFIX;
-      if (!hrp) return null;
-      return ethToCosmosBech32(input.evmAddress, hrp);
-    } catch {
-      return null;
-    }
-  }
-  return null;
+}, chain?: ChainConfig): string | null {
+  try {
+    const address = input.bech32Address ?? input.evmAddress;
+    return address ? canonicalAccountAddress(address, chain ?? getActiveChainConfig()) : null;
+  } catch { return null; }
 }
