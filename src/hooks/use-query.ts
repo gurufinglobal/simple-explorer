@@ -42,7 +42,7 @@ export function useQuery<T>(target: string, load: (client: QueryClient, previous
     let active: AbortController | null = null;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let version = 0;
-    let failures = 0, queued = false, recovered = false, unchanged = false;
+    let failures = 0, queued = false, recovered = false, unchanged = false, invalidated = false;
     const publish = () => {
       if (!disposed && currentKey.current === key) setView({ result, busy: !!active && !paused, paused, recovered, unchanged });
     };
@@ -65,7 +65,7 @@ export function useQuery<T>(target: string, load: (client: QueryClient, previous
       if (!pollMs || !previous.error) result = { ...previous, status: 'loading' };
       publish();
       const client = createQueryClient(selectedChain, controller.signal);
-      const next = await readQuery(context, () => loader.current(client, previous.data), previous);
+      const next = await readQuery(context, () => loader.current(client, invalidated ? null : previous.data), previous);
       if (['success', 'empty', 'partial', 'not-found'].includes(next.status)) next.observations = client.observations;
       active = null;
       if (disposed || currentKey.current !== key) return;
@@ -74,6 +74,7 @@ export function useQuery<T>(target: string, load: (client: QueryClient, previous
           failures++;
           if (pollMs) next.error = { ...next.error, retryAt: next.error.retryAt && next.error.retryAt > Date.now() ? next.error.retryAt : Date.now() + [3000, 6000, 12000, 30000][Math.min(failures - 1, 3)] };
         } else if (!next.error) {
+          invalidated = false;
           recovered = failures > 0;
           unchanged = !!next.blockHeight && next.blockHeight === previous.blockHeight;
           failures = 0;
@@ -102,8 +103,12 @@ export function useQuery<T>(target: string, load: (client: QueryClient, previous
       cancel();
       version++;
       // Wait for the cancelled cycle to settle; coalesce repeated invalidations.
-      // Keep any Retry-After deadline, but discard pre-inclusion data.
-      result = { ...initialResult<T>(context), error: result.error };
+      // Keep the same-context view mounted (including its transaction receipt)
+      // while refreshing. Invalidate the loader's cursor separately so an
+      // unchanged height cannot reuse pre-inclusion data. Errors retain the
+      // old observation and Retry-After deadline until a successful reload.
+      invalidated = true;
+      result = { ...result, status: result.error ? result.status : 'loading' };
       retained.current = result;
       queued = true;
       publish();
