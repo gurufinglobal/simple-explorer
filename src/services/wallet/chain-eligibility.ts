@@ -2,6 +2,7 @@ import { bech32 } from "bech32";
 import type { ChainConfig } from "@/lib/env";
 import { requestJson } from "@/services/clients";
 import type { WalletSessionState } from "@/stores/wallet-session.store";
+import { signingProfileBlockReason } from "./signing-profile";
 
 export async function verifyLcdChain(chain: ChainConfig): Promise<string> {
   const response = await requestJson<{ default_node_info?: { network?: string } }>(`${chain.lcdUrl.replace(/\/$/, "")}/cosmos/base/tendermint/v1beta1/node_info`);
@@ -17,6 +18,8 @@ export function writeBlockReason(chain: ChainConfig, state: WalletSessionState):
   if (!chain.rpcUrl) return "RPC endpoint가 없습니다. LCD 조회만 가능합니다.";
   if (!chain.bech32Prefix || !chain.nativeDenom || !chain.bondDenom || !chain.feeDenom || chain.decimals === undefined) return "prefix·denom·decimals 검증 정보가 부족하여 조회만 가능합니다.";
   if (!chain.signing?.some(s => s.wallet === state.walletType && (state.walletType !== "walletconnect" || s.method === "amino"))) return "이 체인·지갑의 서명 방식이 확인되지 않았습니다. 조회만 가능합니다.";
+  const profileReason = signingProfileBlockReason(chain);
+  if (profileReason) return profileReason;
   const access = chain.rpcAccess;
   if (!access || typeof window === "undefined" || access.origin !== window.location.origin) return "현재 origin의 RPC GET·JSON POST·OPTIONS 접근 근거가 없습니다. 조회만 가능합니다.";
   if (!state.bech32Address) return "현재 체인의 Cosmos 계정이 없습니다. 다시 연결하세요.";

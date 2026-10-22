@@ -7,6 +7,7 @@ import { verifyChainEndpoints, writeBlockReason } from "@/services/wallet/chain-
 import { useWalletSessionStore as store } from "@/stores/wallet-session.store";
 import { errorMessage, type PreparedTransaction, type TransactionReceipt } from "@/services/transactions/transaction";
 import { saveReceipt } from "@/services/transactions/receipt";
+import { assertCosmosWalletKey, signingAccountParser } from "@/services/wallet/signing-profile";
 
 import type { ChainConfig } from "@/lib/env";
 import type { QueryClient } from "@/services/clients";
@@ -53,6 +54,7 @@ export async function prepareTransaction(params: SigningInput, setup: (context: 
   };
   assertCurrent();
   const sender = state.bech32Address!;
+  assertCosmosWalletKey(chain, sender, state.pubkey!, "secp256k1");
   const query = createQueryClient(chain);
   const { message, policy, display, context, governance, check, allowedSigning, assertValid } = await setup({ chain, query, sender, assertCurrent });
   assertActionCurrent = assertValid ?? (() => {});
@@ -69,7 +71,7 @@ export async function prepareTransaction(params: SigningInput, setup: (context: 
       const simulator = await SigningStargateClient.connectWithSigner(chain.rpcUrl!, {
         getAccounts: async () => { assertCurrent(); return [{ address: sender, algo: "secp256k1", pubkey: state.pubkey! }]; },
         signDirect: async () => { throw new Error("수수료 추정은 서명할 수 없습니다."); },
-      });
+      }, { accountParser: signingAccountParser(chain, { address: sender, pubkey: state.pubkey! }) });
       try {
         assertCurrent();
         const used = await simulator.simulate(sender, [message], "");

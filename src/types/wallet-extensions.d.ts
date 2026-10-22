@@ -1,14 +1,11 @@
-type KeplrAccount = {
-  address: string;
-  pubkey?: Uint8Array;
-};
-
-type OfflineSigner = {
-  getAccounts: () => Promise<KeplrAccount[]>;
-};
+import type { KeplrChainInfo, KeplrKey, KeplrSigner } from "@/services/wallet/keplr";
 
 type KeplrExtension = {
   enable: (chainId: string) => Promise<void>;
+  getOfflineSignerAuto?: (chainId: string) => Promise<KeplrSigner>;
+  getOfflineSigner?: (chainId: string) => KeplrSigner;
+  getKey?: (chainId: string) => Promise<KeplrKey>;
+  experimentalSuggestChain?: (chainInfo: KeplrChainInfo) => Promise<void>;
 };
 
 type EthereumProvider = {
@@ -20,7 +17,8 @@ type EthereumProvider = {
 declare global {
   interface Window {
     keplr?: KeplrExtension;
-    getOfflineSigner?: (chainId: string) => OfflineSigner;
+    getOfflineSigner?: (chainId: string) => KeplrSigner;
+    getOfflineSignerAuto?: (chainId: string) => Promise<KeplrSigner>;
     ethereum?: EthereumProvider;
   }
 }
