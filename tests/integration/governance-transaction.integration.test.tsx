@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { cosmosAddress, cosmosPubkey, cosmosSigningProfile } from "../helpers/cosmos-signing";
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -27,15 +28,15 @@ import { prepareStakingTx, stakingMessages } from '@/services/guru/staking-tx.cl
 const boundary = vi.hoisted(() => ({ connect: vi.fn(), simulate: vi.fn(), sign: vi.fn(), broadcast: vi.fn(), wallet: vi.fn(), id: '9007199254740993', chain: '' }));
 vi.mock('@cosmjs/stargate', async original => ({ ...await original<typeof import('@cosmjs/stargate')>(), SigningStargateClient: { connectWithSigner: boundary.connect } }));
 vi.mock('next/navigation', () => ({ useParams: () => ({ proposalId: boundary.id }), useSearchParams: () => new URLSearchParams(boundary.chain ? { chain: boundary.chain } : {}) }));
-const sender = bech32.encode('guru', bech32.toWords(new Uint8Array(20).fill(1)));
+const sender = cosmosAddress;
 const authority = bech32.encode('guru', bech32.toWords(new Uint8Array(20).fill(2)));
 const validator = bech32.encode('guruvaloper', bech32.toWords(new Uint8Array(20).fill(1)));
-const pubkey = new Uint8Array(33).fill(3);
+const pubkey = cosmosPubkey;
 const signed = { bodyBytes: new Uint8Array(), authInfoBytes: new Uint8Array(), signatures: [] };
 const hash = Array.from(sha256(TxRaw.encode(signed).finish()), b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
 const fee = { mode: 'simulate' as const, gasPrice: '0.001agxn', gasMultiplierBps: 13000, evidence: 'synthetic fixture only' };
 const signing = [{ wallet: 'keplr' as const, method: 'direct' as const, evidence: 'synthetic fixture only' }];
-const a: ChainConfig = { key: 'a', name: 'A', chainId: 'a-1', lcdUrl: 'https://a.test:1317', rpcUrl: 'https://a.test:26657',
+const a: ChainConfig = { signingProfile: cosmosSigningProfile, key: 'a', name: 'A', chainId: 'a-1', lcdUrl: 'https://a.test:1317', rpcUrl: 'https://a.test:26657',
   nativeDenom: 'agxn', bondDenom: 'agxn', feeDenom: 'agxn', bech32Prefix: 'guru', decimals: 6, signing,
   rpcAccess: { origin: 'http://localhost:3000', get: true, post: true, options: true, observedAt: '2026-10-20', evidence: 'synthetic only' },
   features: { governance: true, staking: true, distribution: true },

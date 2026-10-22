@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { cosmosAddress, cosmosPubkey, cosmosSigningProfile } from "../helpers/cosmos-signing";
 import { amountResponse } from "../helpers/amounts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -34,11 +35,11 @@ vi.mock("@cosmjs/stargate", async original => ({
   ...await original<typeof import("@cosmjs/stargate")>(),
   SigningStargateClient: { connectWithSigner: boundary.connectSigner },
 }));
-const address = bech32.encode("guru", bech32.toWords(new Uint8Array(20).fill(1)));
+const address = cosmosAddress;
 const addressB = bech32.encode("guru", bech32.toWords(new Uint8Array(20).fill(2)));
-const pubkey = new Uint8Array(33).fill(3);
+const pubkey = cosmosPubkey;
 const a: ChainConfig = {
-  key: "a", name: "Chain A", chainId: "a-1", lcdUrl: "https://a.test:1317", rpcUrl: "https://a.test:26657",
+  signingProfile: cosmosSigningProfile, key: "a", name: "Chain A", chainId: "a-1", lcdUrl: "https://a.test:1317", rpcUrl: "https://a.test:26657",
   bech32Prefix: "guru", denom: "agxn", nativeDenom: "agxn", bondDenom: "agxn", feeDenom: "agxn", decimals: 18,
   features: { governance: true },
   governanceCapabilities: { proposal: { typeUrl: governanceMessages.proposal.typeUrl, evidence: 'synthetic only', legacyContent: { authority: addressB, evidence: 'synthetic only' }, signing: [{ wallet: 'keplr', method: 'direct', evidence: 'synthetic only' }], fee: { mode: 'fixed', gasPrice: '0.001agxn', gas: 900000, evidence: 'synthetic', limitation: 'synthetic only' } } },
@@ -128,8 +129,8 @@ describe("W03 chain configuration and signing boundaries", () => {
     connected(); await expect(send()).resolves.toMatchObject({ status: "success", hash: "E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855" }); expect(sign).toHaveBeenCalledTimes(1); expect(boundary.broadcast).toHaveBeenCalledTimes(1);
   });
   it("rejects an actual signer different from the displayed account", async () => {
-    connected(); window.getOfflineSigner = () => ({ getAccounts: async () => [{ address: addressB, pubkey }] });
-    await expect(send()).rejects.toThrow("실제 signer"); expect(sign).not.toHaveBeenCalled(); expect(boundary.broadcast).not.toHaveBeenCalled();
+    connected(); window.getOfflineSigner = () => ({ getAccounts: async () => [{ address: addressB, pubkey, algo: "secp256k1" }], signDirect: sign });
+    await expect(send()).rejects.toThrow("주소"); expect(sign).not.toHaveBeenCalled(); expect(boundary.broadcast).not.toHaveBeenCalled();
   });
   it("disconnect while wallet signature is pending prevents broadcast", async () => {
     connected(); const pending = deferred<unknown>(); sign.mockReturnValue(pending.promise);

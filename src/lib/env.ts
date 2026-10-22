@@ -37,6 +37,28 @@ export const ChainConfigSchema = z.object({
   nativeDenom: z.string().min(1).optional(),
   bondDenom: z.string().min(1).optional(),
   feeDenom: z.string().min(1).optional(),
+  // Codec evidence is separate from permission to use a wallet or an RPC origin.
+  signingProfile: z.object({
+    family: z.enum(["cosmos", "ethermint", "cosmos-evm"]),
+    chainVersion: z.string().min(1),
+    accountTypeUrl: z.string().startsWith("/"),
+    pubkeyTypeUrl: z.string().startsWith("/"),
+    addressAlgorithm: z.enum(["cosmos", "ethereum"]),
+    signModes: z.array(z.enum(["direct", "amino"])).min(1),
+    evidence: z.string().min(1),
+  }).optional(),
+  keplrRegistration: z.object({
+    coinType: z.number().int().min(0).max(2147483647),
+    currency: z.string().min(1),
+    // All prefixes must be observed; do not derive validator prefixes from account prefix.
+    bech32Config: z.object({
+      bech32PrefixAccAddr: z.string().min(1), bech32PrefixAccPub: z.string().min(1),
+      bech32PrefixValAddr: z.string().min(1), bech32PrefixValPub: z.string().min(1),
+      bech32PrefixConsAddr: z.string().min(1), bech32PrefixConsPub: z.string().min(1),
+    }),
+    gasPriceStep: z.object({ low: z.number().positive(), average: z.number().positive(), high: z.number().positive() }),
+    evidence: z.string().min(1),
+  }).optional(),
   // A policy is evidence for MsgSend fees only; it never grants wallet/RPC support.
   sendFeePolicy: FeePolicySchema.optional(),
   stakingCapabilities: z.object({

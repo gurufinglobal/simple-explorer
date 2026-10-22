@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { cosmosAddress, cosmosPubkey, cosmosSigningProfile } from "../helpers/cosmos-signing";
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { bech32 } from 'bech32';
@@ -13,12 +14,12 @@ import { prepareGovernanceTx, governanceMessages } from '@/services/guru/governa
 const submitSendTx = async (input: SendTxInput) => executeSend(await prepareSendTx(input));
 const boundary = vi.hoisted(() => ({ connect: vi.fn(), sign: vi.fn(), broadcast: vi.fn() }));
 vi.mock('@cosmjs/stargate', async original => ({ ...await original<typeof import('@cosmjs/stargate')>(), SigningStargateClient: { connectWithSigner: boundary.connect } }));
-const address = bech32.encode('guru', bech32.toWords(new Uint8Array(20).fill(1)));
+const address = cosmosAddress;
 const validatorAddress = bech32.encode('guruvaloper', bech32.toWords(new Uint8Array(20).fill(1)));
-const pubkey = new Uint8Array(33).fill(3);
+const pubkey = cosmosPubkey;
 const base = { walletType: 'keplr' as const, sessionTopic: null, bech32Address: address };
 function configure(decimals = 6) {
-  vi.stubEnv('NEXT_PUBLIC_CHAINS', JSON.stringify([{ key: 'a', name: 'A', chainId: 'a-1', lcdUrl: 'https://a.test:1317', rpcUrl: 'https://a.test:26657', bech32Prefix: 'guru', nativeDenom: 'agxn', bondDenom: 'agxn', feeDenom: 'agxn', decimals,
+  vi.stubEnv('NEXT_PUBLIC_CHAINS', JSON.stringify([{ signingProfile: cosmosSigningProfile, key: 'a', name: 'A', chainId: 'a-1', lcdUrl: 'https://a.test:1317', rpcUrl: 'https://a.test:26657', bech32Prefix: 'guru', nativeDenom: 'agxn', bondDenom: 'agxn', feeDenom: 'agxn', decimals,
     features: { staking: true, distribution: true, governance: true },
     governanceCapabilities: Object.fromEntries(Object.entries(governanceMessages).map(([action, definition]) => [action, { typeUrl: definition.typeUrl, evidence: 'synthetic only', legacyContent: { authority: address, evidence: 'synthetic only' }, signing: [{ wallet: 'keplr', method: 'direct', evidence: 'synthetic' }], fee: { mode: 'fixed', gasPrice: '0.001agxn', gas: 220000, evidence: 'synthetic', limitation: 'synthetic only' } }])) ,
     stakingCapabilities: Object.fromEntries(Object.entries(stakingMessages).map(([action, definition]) => [action, { typeUrl: definition.typeUrl, evidence: 'synthetic only', signing: [{ wallet: 'keplr', method: 'direct', evidence: 'synthetic' }], fee: { mode: 'fixed', gasPrice: '0.001agxn', gas: 220000, evidence: 'synthetic', limitation: 'synthetic only' } }])),

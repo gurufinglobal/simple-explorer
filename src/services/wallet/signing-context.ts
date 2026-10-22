@@ -12,6 +12,8 @@ import { createWalletConnectOfflineSigner } from "./walletconnect-cosmos-signer"
 import { assertWalletConnectApproval } from "./walletconnect-session";
 import { getActiveWalletConnectSession } from "./walletconnect-client";
 import { createQueryClient } from "@/services/clients";
+import { cosmosKeplrSigner, getKeplrSigner } from "./keplr";
+import { assertCosmosWalletKey, signingAccountParser } from "./signing-profile";
 
 export type SigningInput = { walletType: WalletConnectorKind; sessionTopic: string | null; bech32Address: string | null };
 export type SigningGuard = {
@@ -41,10 +43,7 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
   assertCurrent();
   let signer: OfflineSigner;
   if (params.walletType === "keplr") {
-    if (!window.keplr || !window.getOfflineSigner) throw new Error("Keplr 지갑을 찾을 수 없습니다.");
-    await window.keplr.enable(chain.chainId!);
-    assertCurrent();
-    signer = window.getOfflineSigner(chain.chainId!) as unknown as OfflineSigner;
+    signer = cosmosKeplrSigner(await getKeplrSigner(chain, assertCurrent), chain, assertCurrent);
   } else {
     const session = await getActiveWalletConnectSession(state.sessionTopic!);
     assertCurrent();
@@ -60,10 +59,12 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
     if (!account || !account.pubkey?.length || !state.pubkey || account.pubkey.length !== state.pubkey.length || account.pubkey.some((v, i) => v !== state.pubkey![i])) {
       throw new Error("실제 signer 계정·공개키가 연결 계정과 다릅니다. 다시 연결하세요.");
     }
+    assertCosmosWalletKey(chain, account.address, account.pubkey, account.algo);
     return accounts;
   };
   await getAccounts();
   const signingMethod = isOfflineDirectSigner(signer) ? "direct" : "amino";
+  if (!chain.signingProfile!.signModes.includes(signingMethod)) throw new Error("체인 프로필이 실제 signer 방식을 허용하지 않습니다.");
   if (!chain.signing?.some(s => s.wallet === state.walletType && s.method === signingMethod)) throw new Error("실제 signer 방식이 검증된 서명 방식과 다릅니다.");
   if (guard?.allowedSigning && !guard.allowedSigning.some(s => s.wallet === state.walletType && s.method === signingMethod)) throw new Error("이 메시지의 실제 지갑 서명 방식은 검증되지 않았습니다.");
   const guarded: OfflineSigner = isOfflineDirectSigner(signer) ? {
@@ -116,7 +117,9 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
     client: {
       signAndBroadcast: async (who: string, messages: readonly EncodeObject[], fee: StdFee) => {
         assertCurrent();
-        const client = await SigningStargateClient.connectWithSigner(chain.rpcUrl!, guarded, { gasPrice });
+        const client = await SigningStargateClient.connectWithSigner(chain.rpcUrl!, guarded, {
+          gasPrice, accountParser: signingAccountParser(chain, { address, pubkey: state.pubkey! }),
+        });
         try {
           assertCurrent();
           if (who !== address) throw new Error("거래 계정 불일치");
