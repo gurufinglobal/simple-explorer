@@ -1,5 +1,6 @@
 "use client";
-import { SigningStargateClient, type GasPrice } from "@cosmjs/stargate";
+import { type GasPrice } from "@cosmjs/stargate";
+import { connectSigningClient } from "./connect-signing-client";
 import type { StdFee } from "@cosmjs/amino";
 import { isOfflineDirectSigner, type EncodeObject, type OfflineSigner } from "@cosmjs/proto-signing";
 import { AuthInfo, TxRaw } from "cosmjs-types/cosmos/tx/v1beta1/tx";
@@ -117,7 +118,7 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
     client: {
       signAndBroadcast: async (who: string, messages: readonly EncodeObject[], fee: StdFee) => {
         assertCurrent();
-        const client = await SigningStargateClient.connectWithSigner(chain.rpcUrl!, guarded, {
+        const client = await connectSigningClient(chain, guarded, {
           gasPrice, accountParser: signingAccountParser(chain, { address, pubkey: state.pubkey! }),
         });
         try {

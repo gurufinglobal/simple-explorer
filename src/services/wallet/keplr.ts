@@ -2,7 +2,7 @@ import type { AccountData, DirectSignResponse, OfflineSigner } from "@cosmjs/pro
 import type { AminoSignResponse, StdSignDoc } from "@cosmjs/amino";
 import type { SignDoc } from "cosmjs-types/cosmos/tx/v1beta1/tx";
 import type { ChainConfig } from "@/lib/env";
-import { assertCosmosWalletKey, assertSigningProfile } from "./signing-profile";
+import { assertCosmosWalletKey, assertSigningProfile, isGuruReleaseProfile } from "./signing-profile";
 
 export type KeplrAccount = { address: string; pubkey?: Uint8Array; algo?: string };
 export type KeplrSigner = {
@@ -26,13 +26,21 @@ export function buildKeplrChainInfo(chain: ChainConfig) {
     throw new Error("Keplr 등록을 위한 coin type·prefix·단일 자산 정보가 확인되지 않았습니다.");
   }
   const step = registration.gasPriceStep;
+  if (isGuruReleaseProfile(chain) && (registration.coinType !== 60 ||
+    registration.bech32Config.bech32PrefixAccPub !== "gurupub" ||
+    registration.bech32Config.bech32PrefixValAddr !== "guruvaloper" ||
+    registration.bech32Config.bech32PrefixValPub !== "guruvaloperpub" ||
+    registration.bech32Config.bech32PrefixConsAddr !== "guruvalcons" ||
+    registration.bech32Config.bech32PrefixConsPub !== "guruvalconspub")) {
+    throw new Error("Keplr coin type·prefix가 Guru 릴리스 소스와 다릅니다.");
+  }
   if (step.low > step.average || step.average > step.high) throw new Error("Keplr 수수료 가격 순서가 올바르지 않습니다.");
   const currency = { coinDenom: registration.currency, coinMinimalDenom: chain.nativeDenom, coinDecimals: chain.decimals };
   return {
     chainId: chain.chainId, chainName: chain.name, rpc: chain.rpcUrl, rest: chain.lcdUrl,
     bip44: { coinType: registration.coinType }, bech32Config: { ...registration.bech32Config },
     currencies: [currency], stakeCurrency: currency, feeCurrencies: [{ ...currency, gasPriceStep: { ...step } }],
-    features: [] as string[],
+    features: isGuruReleaseProfile(chain) ? ["eth-address-gen", "eth-key-sign", "eth-secp256k1-cosmos"] : [] as string[],
   };
 }
 
