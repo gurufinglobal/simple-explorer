@@ -230,6 +230,70 @@ async function confirmDialog() {
 }
 async function executeUi() { await fill(); const dialog = await confirmDialog(); fireEvent.click(within(dialog).getByRole('button', { name: '확인하고 지갑 서명' })); }
 
+describe('GURA-57 recipient validation through actual form and preparation', () => {
+  const reportedAddress = 'guru12yx8z0fzv27x3jx57yk0h8rlvwarp6y4zd00us';
+  it.each(['development-preset', 'missing-prefix'])('keeps a valid address neutral and blocks writes for %s', async mode => {
+    if (mode === 'development-preset') {
+      for (const key of Object.keys(process.env).filter(key => key.startsWith('NEXT_PUBLIC_'))) vi.stubEnv(key, undefined);
+      vi.stubEnv('NODE_ENV', 'development');
+      store.getState().connect('keplr', sender, null, { chainKey: 'tgxn', chainId: 'guru_631-1', pubkey });
+      expect(getActiveChainConfig().key).toBe('tgxn');
+    } else configure({ bech32Prefix: undefined });
+    expect(getActiveChainConfig().bech32Prefix).toBeUndefined();
+    render(<SendForm />);
+    fireEvent.change(screen.getByLabelText('수신 주소'), { target: { value: reportedAddress } });
+    expect(screen.getByLabelText('수신 주소').getAttribute('aria-invalid')).toBe('false');
+    expect(screen.getByText(/선택 체인의 주소 prefix가 확인되지 않아/)).toBeTruthy();
+    expect(screen.getByText(/검증 정보가 부족하여 조회만 가능합니다/)).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Send Tx' }) as HTMLButtonElement).disabled).toBe(true);
+    await expect(prepareSendTx({ ...input, toAddress: reportedAddress })).rejects.toThrow('검증 정보가 부족');
+    expect(window.getOfflineSigner).not.toHaveBeenCalled();
+    expect(boundary.sign).not.toHaveBeenCalled();
+    expect(boundary.wallet).not.toHaveBeenCalled();
+    expect(boundary.broadcast).not.toHaveBeenCalled();
+  });
+  it('prepares the reported address with verified synthetic settings without signing', async () => {
+    await fill();
+    fireEvent.change(screen.getByLabelText('수신 주소'), { target: { value: reportedAddress } });
+    expect(screen.getByLabelText('수신 주소').getAttribute('aria-invalid')).toBe('false');
+    const dialog = await confirmDialog();
+    expect(within(dialog).getByText(`전체 수신 주소: ${reportedAddress}`)).toBeTruthy();
+    const prepared = await prepareSendTx({ ...input, toAddress: reportedAddress });
+    expect(prepared.snapshot.recipient).toBe(reportedAddress);
+    prepared.cancel();
+    expect(boundary.wallet).not.toHaveBeenCalled();
+    expect(boundary.broadcast).not.toHaveBeenCalled();
+  });
+  const invalidAddresses = [
+    ['prefix', bech32.encode('cosmos', bech32.toWords(new Uint8Array(20)))],
+    ['checksum', reportedAddress.slice(0, -1) + 'q'],
+    ['short-payload', bech32.encode('guru', bech32.toWords(new Uint8Array(19)))],
+    ['32-byte-payload', bech32.encode('guru', bech32.toWords(new Uint8Array(32)))],
+  ];
+  it.each(invalidAddresses)('rejects %s in both the form and service', async (_kind, address) => {
+    await fill();
+    fireEvent.change(screen.getByLabelText('수신 주소'), { target: { value: address } });
+    expect(screen.getByLabelText('수신 주소').getAttribute('aria-invalid')).toBe('true');
+    expect((screen.getByRole('button', { name: 'Send Tx' }) as HTMLButtonElement).disabled).toBe(true);
+    await expect(prepareSendTx({ ...input, toAddress: address })).rejects.toThrow('수신 주소');
+    expect(boundary.simulate).not.toHaveBeenCalled();
+    expect(boundary.wallet).not.toHaveBeenCalled();
+    expect(boundary.broadcast).not.toHaveBeenCalled();
+  });
+  it.each(invalidAddresses.slice(1))('still marks malformed %s as an input error without a chain prefix', (_kind, address) => {
+    configure({ bech32Prefix: undefined }); render(<SendForm />);
+    fireEvent.change(screen.getByLabelText('수신 주소'), { target: { value: address } });
+    expect(screen.getByLabelText('수신 주소').getAttribute('aria-invalid')).toBe('true');
+  });
+  it('rejects an already prepared snapshot when the configured prefix is removed', async () => {
+    const prepared = await prepareSendTx(input);
+    configure({ bech32Prefix: undefined });
+    await expect(submitSendTx(prepared)).rejects.toThrow('변경');
+    expect(boundary.wallet).not.toHaveBeenCalled();
+    expect(boundary.broadcast).not.toHaveBeenCalled();
+  });
+});
+
 describe('W05 actual UI → prepared snapshot → MsgSend → chain result', () => {
   it('shows every confirmation field without a signing prompt, focuses cancel, Escape restores the trigger and broadcasts zero', async () => {
     const user = userEvent.setup(); await fill();

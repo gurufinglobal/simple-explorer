@@ -1,5 +1,5 @@
 "use client";
-import { bech32 } from "bech32";
+import { validateSendAddress } from "@/lib/send-address";
 import { GasPrice } from "@cosmjs/stargate";
 import type { StdFee } from "@cosmjs/amino";
 import { MsgSend } from "cosmjs-types/cosmos/bank/v1beta1/tx";
@@ -17,10 +17,8 @@ export async function prepareSendTx(params: SendTxInput, assertInputCurrent: () 
   return prepareTransaction(params, async ({ chain, query, sender, assertCurrent }) => {
     if (chain.features?.bank === false) throw new Error("이 체인은 송금 메시지를 지원하지 않습니다.");
     const recipient = params.toAddress.trim();
-    try {
-      const decoded = bech32.decode(recipient);
-      if (decoded.prefix !== chain.bech32Prefix || bech32.fromWords(decoded.words).length !== 20) throw new Error();
-    } catch { throw new Error("수신 주소의 체크섬·길이·체인 prefix를 확인하세요."); }
+    const addressValidation = validateSendAddress(recipient, chain.bech32Prefix);
+    if (addressValidation.status !== "valid") throw new Error(addressValidation.message);
     if (!params.denom.trim()) throw new Error("송금 자산 denom을 입력하세요.");
     const policy = chain.sendFeePolicy;
     if (!policy) throw new Error("검증된 송금 수수료 정책이 없습니다. 수수료 미확인으로 전송을 차단합니다.");
