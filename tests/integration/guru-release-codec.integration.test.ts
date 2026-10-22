@@ -212,6 +212,33 @@ describe('Guru release v2.1.0 service flow, with network and wallet boundaries i
     await expect(submitSendTx(await prepareSendTx(input))).rejects.toThrow('변경');
     expect(broadcast).not.toHaveBeenCalled();
   });
+  it('accepts an unchanged protobuf Long account number from actual Keplr API semantics', async () => {
+    wallet.signDirect = async (_who, doc) => ({
+      signed: { ...doc, accountNumber: { low: Number(doc.accountNumber), high: 0, unsigned: false } },
+      signature: await signBytes(SignDoc.encode(doc).finish()),
+    });
+    expect(await submitSendTx(await prepareSendTx(input))).toMatchObject({ status: 'success' });
+    expect(broadcast).toHaveBeenCalledOnce();
+  });
+  it('rejects a changed protobuf Long account number before broadcast', async () => {
+    wallet.signDirect = async (_who, doc) => ({
+      signed: { ...doc, accountNumber: { low: Number(doc.accountNumber) + 1, high: 0, unsigned: false } },
+      signature: await signBytes(SignDoc.encode(doc).finish()),
+    });
+    await expect(submitSendTx(await prepareSendTx(input))).rejects.toThrow('계정 번호');
+    expect(broadcast).not.toHaveBeenCalled();
+  });
+  it.each([
+    { low: 1.5, high: 0, unsigned: false },
+    { low: 1, high: -1, unsigned: false },
+    { low: 4294967296, high: 0, unsigned: true },
+  ])('rejects malformed or negative protobuf Long account numbers %j', async accountNumber => {
+    wallet.signDirect = async (_who, doc) => ({
+      signed: { ...doc, accountNumber }, signature: await signBytes(SignDoc.encode(doc).finish()),
+    });
+    await expect(submitSendTx(await prepareSendTx(input))).rejects.toThrow('계정 번호');
+    expect(broadcast).not.toHaveBeenCalled();
+  });
   it('rejects Amino fee changes', async () => {
     wallet = { getAccounts: wallet.getAccounts, signAmino: async (_who, doc) => {
       const signed = { ...doc, fee: { ...doc.fee, gas: '1' } };

@@ -5,9 +5,14 @@ import type { ChainConfig } from "@/lib/env";
 import { assertCosmosWalletKey, assertSigningProfile, isGuruReleaseProfile } from "./signing-profile";
 
 export type KeplrAccount = { address: string; pubkey?: Uint8Array; algo?: string };
+type KeplrDirectResponse = Omit<DirectSignResponse, "signed"> & {
+  signed: Omit<SignDoc, "accountNumber"> & {
+    accountNumber: bigint | { low: number; high: number; unsigned: boolean };
+  };
+};
 export type KeplrSigner = {
   getAccounts: () => Promise<readonly KeplrAccount[]>;
-  signDirect?: (address: string, doc: SignDoc) => Promise<DirectSignResponse>;
+  signDirect?: (address: string, doc: SignDoc) => Promise<KeplrDirectResponse>;
   signAmino?: (address: string, doc: StdSignDoc) => Promise<AminoSignResponse>;
 };
 export type KeplrKey = {
@@ -15,6 +20,18 @@ export type KeplrKey = {
   isNanoLedger?: boolean; isKeystone?: boolean;
 };
 export type KeplrChainInfo = ReturnType<typeof buildKeplrChainInfo>;
+
+/** Keplr 0.13.53 returns protobuf Long; current CosmJS uses bigint. */
+function keplrAccountNumber(value: KeplrDirectResponse["signed"]["accountNumber"]): bigint {
+  if (typeof value === "bigint") {
+    if (value >= BigInt(0) && value <= BigInt("18446744073709551615")) return value;
+  } else if (value && typeof value === "object" && typeof value.unsigned === "boolean" &&
+    [value.low, value.high].every(word => Number.isInteger(word) && word >= -2147483648 && word <= 2147483647) &&
+    (value.unsigned || value.high >= 0)) {
+    return (BigInt(value.high >>> 0) << BigInt(32)) | BigInt(value.low >>> 0);
+  }
+  throw new Error("Keplr가 잘못된 서명 계정 번호를 반환했습니다.");
+}
 
 /** Registration is opt-in and requires explicit derivation and currency evidence. */
 export function buildKeplrChainInfo(chain: ChainConfig) {
@@ -110,7 +127,10 @@ export function cosmosKeplrSigner(signer: KeplrSigner, chain: ChainConfig, asser
       return { address: account.address, algo: account.algo, pubkey: account.pubkey.slice() };
     });
   };
-  if (signer.signDirect) return { getAccounts, signDirect: (who, doc) => signer.signDirect!(who, doc) };
+  if (signer.signDirect) return { getAccounts, signDirect: async (who, doc) => {
+    const response = await signer.signDirect!(who, doc);
+    return { ...response, signed: { ...response.signed, accountNumber: keplrAccountNumber(response.signed.accountNumber) } };
+  } };
   if (signer.signAmino) return { getAccounts, signAmino: (who, doc) => signer.signAmino!(who, doc) };
   throw new Error("Keplr signer에 지원하는 서명 메서드가 없습니다.");
 }
