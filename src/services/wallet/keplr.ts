@@ -76,13 +76,22 @@ export async function readKeplrAccounts(signer: KeplrSigner, chain: ChainConfig,
   if (window.keplr?.getKey) {
     const key = await window.keplr.getKey(chain.chainId!);
     assertCurrent();
-    if (key.bech32Address !== account.address || (account.algo && account.algo !== key.algo) ||
+    // Keplr 0.13.53 exposes Ethereum signing semantics in getKey, while its
+    // CosmJS signer reports the underlying curve. Validate both declarations;
+    // never relabel an unknown signer algorithm to satisfy CosmJS.
+    const guru = isGuruReleaseProfile(chain);
+    const algorithmsMatch = guru
+      ? account.algo === "secp256k1" && key.algo === "ethsecp256k1"
+      : !account.algo || account.algo === key.algo;
+    if (!algorithmsMatch) throw new Error("Keplr signer·wallet key 알고리즘이 체인 서명 프로필과 다릅니다.");
+    if (key.bech32Address !== account.address ||
       (account.pubkey?.length && (account.pubkey.length !== key.pubKey.length || account.pubkey.some((v, i) => v !== key.pubKey[i])))) {
       throw new Error("Keplr signer와 wallet key의 계정·공개키가 다릅니다.");
     }
     if (forSigning && (key.isNanoLedger || key.isKeystone)) throw new Error("이 하드웨어 계정의 서명은 아직 검증되지 않았습니다.");
     account.pubkey = key.pubKey.slice();
-    account.algo = key.algo;
+    if (!guru) account.algo = key.algo;
+    if (guru) assertCosmosWalletKey(chain, account.address, account.pubkey, account.algo!);
   }
   if (forSigning) {
     if (!account.pubkey || !account.algo) throw new Error("지갑 공개키·알고리즘을 확인하지 못했습니다.");

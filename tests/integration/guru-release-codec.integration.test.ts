@@ -70,7 +70,7 @@ beforeEach(() => {
   wallet = { getAccounts: vi.fn(async () => [{ address: sender, pubkey, algo: 'secp256k1' }]),
     signDirect: vi.fn(async (_who, doc) => { signedDoc = doc; return { signed: doc, signature: await signBytes(SignDoc.encode(doc).finish()) }; }) };
   window.keplr = { enable: vi.fn(async () => {}), getOfflineSignerAuto: vi.fn(async () => wallet),
-    getKey: vi.fn(async () => ({ bech32Address: sender, pubKey: pubkey, algo: 'secp256k1' })) };
+    getKey: vi.fn(async () => ({ bech32Address: sender, pubKey: pubkey, algo: 'ethsecp256k1' })) };
   window.getOfflineSigner = vi.fn(() => { throw new Error('Auto signer must take priority'); });
   vi.stubGlobal('fetch', vi.fn(async (url: string) => {
     if (url.includes('node_info')) return Response.json({ default_node_info: { network: chain.chainId }, application_version: { git_commit: nodeCommit } });
@@ -221,12 +221,30 @@ describe('Guru release v2.1.0 service flow, with network and wallet boundaries i
     expect(broadcast).not.toHaveBeenCalled();
   });
   it('recovers the first-use key from getKey', async () => {
-    wallet.getAccounts = async () => [{ address: sender }];
+    wallet.getAccounts = async () => [{ address: sender, algo: 'secp256k1' }];
     expect((await connectWallet('keplr', chain)).pubkey).toEqual(pubkey);
     expect(await submitSendTx(await prepareSendTx(input))).toMatchObject({ status: 'success' });
   });
+  it.each([
+    ['ethsecp256k1', 'ethsecp256k1'],
+    ['secp256k1', 'secp256k1'],
+    ['ed25519', 'ethsecp256k1'],
+    [undefined, 'ethsecp256k1'],
+  ])('rejects unverified signer/wallet algorithm pair %s/%s', async (signerAlgo, walletAlgo) => {
+    wallet.getAccounts = async () => [{ address: sender, pubkey, algo: signerAlgo }];
+    window.keplr!.getKey = async () => ({ bech32Address: sender, pubKey: pubkey, algo: walletAlgo! });
+    await expect(connectWallet('keplr', chain)).rejects.toThrow('알고리즘');
+    expect(wallet.signDirect).not.toHaveBeenCalled();
+    expect(broadcast).not.toHaveBeenCalled();
+  });
+  it('rejects a different wallet key even when the observed algorithm pair matches', async () => {
+    const other = Secp256k1.compressPubkey((await Secp256k1.makeKeypair(fromHex('02'.repeat(32)))).pubkey);
+    window.keplr!.getKey = async () => ({ bech32Address: sender, pubKey: other, algo: 'ethsecp256k1' });
+    await expect(connectWallet('keplr', chain)).rejects.toThrow('wallet key');
+    expect(broadcast).not.toHaveBeenCalled();
+  });
   it.each(['isNanoLedger', 'isKeystone'] as const)('blocks hardware %s', async flag => {
-    window.keplr!.getKey = async () => ({ bech32Address: sender, pubKey: pubkey, algo: 'secp256k1', [flag]: true });
+    window.keplr!.getKey = async () => ({ bech32Address: sender, pubKey: pubkey, algo: 'ethsecp256k1', [flag]: true });
     await expect(submitSendTx(await prepareSendTx(input))).rejects.toThrow('하드웨어');
     expect(broadcast).not.toHaveBeenCalled();
   });
