@@ -1,6 +1,6 @@
 "use client";
 import { useState } from "react";
-import { bech32 } from "bech32";
+import { validateSendAddress } from "@/lib/send-address";
 import { Alert, Button, Stack, TextField, Typography } from "@mui/material";
 import { getActiveChainConfig } from "@/lib/chain-selection";
 import { useWalletSessionStore } from "@/stores/wallet-session.store";
@@ -19,13 +19,7 @@ export function SendForm() {
   const [denom, setDenom] = useState(chain.nativeDenom ?? "");
   const entry = useAmountEntry(amount, denom);
   const flow = useTransactionFlow(JSON.stringify([chain.key, wallet.generation, recipient, amount, denom, entry.base, entry.ready]));
-  let addressError = "";
-  if (recipient) {
-    try {
-      const decoded = bech32.decode(recipient);
-      if (decoded.prefix !== chain.bech32Prefix || bech32.fromWords(decoded.words).length !== 20) throw new Error();
-    } catch { addressError = "수신 주소의 체크섬·길이·체인 prefix를 확인하세요."; }
-  }
+  const addressValidation = recipient ? validateSendAddress(recipient, chain.bech32Prefix) : null;
   const blocked = writeBlockReason(chain, wallet) ?? (!chain.sendFeePolicy ? "검증된 송금 수수료 정책이 없습니다. 수수료 미확인으로 전송을 차단합니다." : null);
   const begin = () => flow.begin(assertCurrent => {
     if (!wallet.walletType) throw new Error("지갑을 연결하세요.");
@@ -35,7 +29,7 @@ export function SendForm() {
   return <Stack spacing={1} sx={{ mt: 2 }}>
     <Typography variant="subtitle2">SEND</Typography>
     {blocked && <Alert severity="info">{blocked}</Alert>}
-    <TextField label="수신 주소" size="small" value={recipient} error={!!addressError} helperText={addressError}
+    <TextField label="수신 주소" size="small" value={recipient} error={addressValidation?.status === "invalid"} helperText={addressValidation?.message}
       onChange={e => setRecipient(e.target.value.trim())} />
     <Stack direction={{ xs: "column", sm: "row" }} spacing={1}>
       <TextField label="수량 (표시 단위)" size="small" value={amount} onChange={e => setAmount(e.target.value.trim())} fullWidth />
@@ -43,7 +37,7 @@ export function SendForm() {
     </Stack>
     {entry.confirmation}
     <Button variant="contained" color="info" onClick={() => void begin()}
-      disabled={!!blocked || !entry.ready || !recipient || !!addressError || flow.busy || flow.phase === "confirming"}>
+      disabled={!!blocked || !entry.ready || addressValidation?.status !== "valid" || flow.busy || flow.phase === "confirming"}>
       {flow.phase === "validating" ? "잔액·수수료 확인 중" : "Send Tx"}
     </Button>
     {flow.error && <Alert severity="warning" role="status">{flow.error}</Alert>}
