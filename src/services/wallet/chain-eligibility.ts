@@ -2,12 +2,15 @@ import { bech32 } from "bech32";
 import type { ChainConfig } from "@/lib/env";
 import { requestJson } from "@/services/clients";
 import type { WalletSessionState } from "@/stores/wallet-session.store";
-import { signingProfileBlockReason } from "./signing-profile";
+import { GURU_RELEASE_COMMIT, isGuruReleaseProfile, signingProfileBlockReason } from "./signing-profile";
 
 export async function verifyLcdChain(chain: ChainConfig): Promise<string> {
-  const response = await requestJson<{ default_node_info?: { network?: string } }>(`${chain.lcdUrl.replace(/\/$/, "")}/cosmos/base/tendermint/v1beta1/node_info`);
+  const response = await requestJson<{ default_node_info?: { network?: string }; application_version?: { git_commit?: string } }>(`${chain.lcdUrl.replace(/\/$/, "")}/cosmos/base/tendermint/v1beta1/node_info`);
   const chainId = response.default_node_info?.network;
   if (!chainId || (chain.chainId && chain.chainId !== chainId)) throw new Error("LCD chain ID가 선택 체인 설정과 일치하지 않습니다.");
+  if (isGuruReleaseProfile(chain) && response.application_version?.git_commit !== GURU_RELEASE_COMMIT) {
+    throw new Error("노드가 보고한 소스 커밋이 검증된 Guru 릴리스와 다릅니다. 서명이 차단되었습니다.");
+  }
   return chainId;
 }
 
@@ -20,6 +23,7 @@ export function writeBlockReason(chain: ChainConfig, state: WalletSessionState):
   if (!chain.signing?.some(s => s.wallet === state.walletType && (state.walletType !== "walletconnect" || s.method === "amino"))) return "이 체인·지갑의 서명 방식이 확인되지 않았습니다. 조회만 가능합니다.";
   const profileReason = signingProfileBlockReason(chain);
   if (profileReason) return profileReason;
+  if (isGuruReleaseProfile(chain) && state.walletType !== "keplr") return "Guru 릴리스 어댑터는 Keplr 소프트웨어 계정만 검증 대상입니다.";
   const access = chain.rpcAccess;
   if (!access || typeof window === "undefined" || access.origin !== window.location.origin) return "현재 origin의 RPC GET·JSON POST·OPTIONS 접근 근거가 없습니다. 조회만 가능합니다.";
   if (!state.bech32Address) return "현재 체인의 Cosmos 계정이 없습니다. 다시 연결하세요.";

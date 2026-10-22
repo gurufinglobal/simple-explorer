@@ -1,5 +1,6 @@
 "use client";
-import { BroadcastTxError, calculateFee, GasPrice, SigningStargateClient } from "@cosmjs/stargate";
+import { BroadcastTxError, calculateFee, GasPrice } from "@cosmjs/stargate";
+import { connectSigningClient } from "@/services/wallet/connect-signing-client";
 import { getActiveChainConfig, getChainSelectionGeneration } from "@/lib/chain-selection";
 import { createQueryClient } from "@/services/clients";
 import { createBoundSigningClient, type SigningInput } from "@/services/wallet/signing-context";
@@ -68,7 +69,7 @@ export async function prepareTransaction(params: SigningInput, setup: (context: 
   if (policy.mode === "simulate") {
     try {
       // Simulation uses the verified public key, never a wallet signing prompt.
-      const simulator = await SigningStargateClient.connectWithSigner(chain.rpcUrl!, {
+      const simulator = await connectSigningClient(chain, {
         getAccounts: async () => { assertCurrent(); return [{ address: sender, algo: "secp256k1", pubkey: state.pubkey! }]; },
         signDirect: async () => { throw new Error("수수료 추정은 서명할 수 없습니다."); },
       }, { accountParser: signingAccountParser(chain, { address: sender, pubkey: state.pubkey! }) });
