@@ -3,6 +3,7 @@ import { parse, TYPE, type MessageFormatElement } from '@formatjs/icu-messagefor
 import { createTranslator } from 'next-intl';
 import en from '../../messages/en.json';
 import ko from '../../messages/ko.json';
+import serviceTemplates from '@/i18n/service-messages.json';
 import { queryError } from '@/lib/query-result';
 import { resolveLocale } from '@/i18n/locale';
 import { describeServiceMessage, ServiceError, serviceMessage } from '@/i18n/service-message';
@@ -60,6 +61,26 @@ it('errors retain stable code/parameters and original detail, including legacy s
   expect(describeServiceMessage(error.message)?.messageCode).toBe(error.messageCode);
   expect(describeServiceMessage('remote RPC detail: insufficient funds')).toBeNull();
   expect(describeServiceMessage(`prefix ${error.message} suffix`)).toBeNull();
+});
+
+it('every service template parameter remains an ICU argument in both catalogs', () => {
+  for (const [code, template] of Object.entries(serviceTemplates)) {
+    const expected = [...template.matchAll(/\{(\w+)\}/g)].map(match => `${match[1]}:${TYPE.argument}`).sort();
+    for (const catalog of [en, ko]) {
+      const message = catalog.common.service[code as keyof typeof serviceTemplates];
+      expect(signature(parse(message)), code).toEqual(expected);
+    }
+  }
+});
+
+it('preserves selected-chain raw errors and identifies legacy saved messages', () => {
+  const code = 'configuration_for_selected_chain_is_missing_select_a_chain_again';
+  const error = new ServiceError(code, { value0: 'tgxn' });
+  const raw = "선택 체인 'tgxn' 설정이 없습니다. 체인을 다시 선택하세요.";
+  expect(error.message).toBe(raw);
+  for (const value of [error, raw, JSON.parse(JSON.stringify({ message: raw }))]) {
+    expect(describeServiceMessage(value)).toEqual({ message: raw, messageCode: code, messageParams: { value0: 'tgxn' } });
+  }
 });
 
 it('formats relative dates with the supplied clock and locale, and absolute dates in UTC', () => {

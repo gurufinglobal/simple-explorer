@@ -17,7 +17,7 @@
       "invalid_account_address_byte_length": "계정 주소 bytes 길이가 올바르지 않습니다.",
       "could_not_read_the_saved_chain_key_select_a_chain": "저장된 체인 key를 읽을 수 없습니다. 체인을 다시 선택하세요.",
       "unregistered_chain": "등록되지 않은 체인입니다.",
-      "configuration_for_selected_chain_is_missing_select_a_chain_again": "선택 체인 '{value0}' 설정이 없습니다. 체인을 다시 선택하세요.",
+      "configuration_for_selected_chain_is_missing_select_a_chain_again": "선택 체인 ''{value0}'' 설정이 없습니다. 체인을 다시 선택하세요.",
       "invalid_raw_amount": "금액 원본이 올바르지 않습니다.",
       "invalid_raw_amount_or_denom": "금액·denom 원본이 올바르지 않습니다.",
       "amount_must_be_a_positive_integer_in_base_units": "수량은 0보다 큰 최소 단위 정수여야 합니다.",
