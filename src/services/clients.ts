@@ -6,7 +6,6 @@ import type { QueryObservation } from "@/lib/query-result";
 import { validateLcdJson } from "@/services/lcd-schema";
 import { QueryError, queryError } from "@/lib/query-result";
 import {
-  readPublicEnv,
   type ChainConfig,
 } from "@/lib/env";
 import { getActiveChainConfig as getActiveChainConfigFromClientCookie } from "@/lib/chain-selection";
@@ -95,13 +94,10 @@ async function readObserved<T>(chain: ChainConfig, path: string, signal?: AbortS
 export const apiClients = {
   lcdGetObserved: <T>(path: string, height?: string) => readObserved<T>(getActiveChainConfigForRuntime(), path, undefined, height),
   get chain() { return getActiveChainConfigForRuntime(); },
-  /**
-   * Synchronous URL helpers keep default env behavior.
-   * Runtime-selected chain endpoints are applied in async request methods below.
-   */
-  lcdUrl: (path: string) => toUrl(readPublicEnv().NEXT_PUBLIC_LCD_URL, path),
-  rpcUrl: (path: string) => toUrl(readPublicEnv().NEXT_PUBLIC_RPC_URL, path),
-  evmRpcUrl: (path: string) => toUrl(readPublicEnv().NEXT_PUBLIC_EVM_RPC_URL, path),
+  // URL helpers and requests must use the same selected chain.
+  lcdUrl: (path: string) => toUrl(getActiveChainConfigForRuntime().lcdUrl, path),
+  rpcUrl: (path: string) => toUrl(resolveRpcBaseUrl(getActiveChainConfigForRuntime()), path),
+  evmRpcUrl: (path: string) => toUrl(resolveEvmRpcBaseUrl(getActiveChainConfigForRuntime()), path),
   lcdGet: async <T>(pathOrUrl: string) => {
     const chain = getActiveChainConfigForRuntime();
     requireModule(chain, pathOrUrl);
@@ -143,8 +139,10 @@ export function createQueryClient(chain: ChainConfig, signal?: AbortSignal) {
   };
   return {
     observations,
-    ...apiClients,
     chain,
+    lcdUrl: (path: string) => toUrl(chain.lcdUrl, path),
+    rpcUrl: (path: string) => toUrl(resolveRpcBaseUrl(chain), path),
+    evmRpcUrl: (path: string) => toUrl(resolveEvmRpcBaseUrl(chain), path),
     lcdGetObserved: observed,
     lcdGet: async <T>(path: string) => (await observed<T>(path)).data,
     rpcGet: <T>(path: string) => requestJson<T>(toUrl(resolveRpcBaseUrl(chain), path), {}, { signal }),

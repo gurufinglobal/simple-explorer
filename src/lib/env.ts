@@ -123,33 +123,9 @@ const EnvSchema = z.object({
   NEXT_PUBLIC_BECH32_PREFIX: z.string().min(1).optional(),
 });
 
-export type AppEnv = {
-  NEXT_PUBLIC_LCD_URL: string;
-  NEXT_PUBLIC_RPC_URL: string;
-  NEXT_PUBLIC_EVM_RPC_URL: string;
-  NEXT_PUBLIC_WS_URL: string;
-  NEXT_PUBLIC_CHAINS: string | undefined;
-  NEXT_PUBLIC_DEFAULT_CHAIN_KEY: string | undefined;
-  NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: string | undefined;
-  NEXT_PUBLIC_WALLETCONNECT_RELAY_URL: string | undefined;
-  NEXT_PUBLIC_EVM_CHAIN_ID: string | undefined;
-  NEXT_PUBLIC_BECH32_PREFIX: string | undefined;
-};
-
+export type AppEnv = z.infer<typeof EnvSchema>;
 export type ChainConfig = z.infer<typeof ChainConfigSchema>;
-
-const DEFAULT_HOST = "trpc.gurufin.io";
-const DEFAULT_LCD_URL = `https://${DEFAULT_HOST}:1317`;
-const DEFAULT_RPC_URL = `https://${DEFAULT_HOST}:26657`;
-const DEFAULT_EVM_RPC_URL = `https://${DEFAULT_HOST}:8545`;
-const DEFAULT_WS_URL = `wss://${DEFAULT_HOST}:26657/websocket`;
 const DEFAULT_CHAIN_KEY = "default";
-const DEV_LCD_URL = "https://tgxn.gurufin.io:1317";
-const DEV_RPC_URL = "https://tgxn.gurufin.io:26657";
-// Metadata is enriched by parseChainConfigs using the existing W01 observations.
-const DEV_CHAINS = JSON.stringify([
-  { key: "tgxn", name: "TGXN", lcdUrl: DEV_LCD_URL, rpcUrl: DEV_RPC_URL },
-]);
 
 function defaultChainConfig(env: {
   lcdUrl: string;
@@ -207,28 +183,8 @@ export function readPublicEnv(): AppEnv {
     NEXT_PUBLIC_BECH32_PREFIX: process.env.NEXT_PUBLIC_BECH32_PREFIX,
   });
 
-  // Keep explicit single-chain settings on the existing configuration path.
-  // Direct process.env references above are required for Next's client inlining.
-  const hasSingleChainOverride = [
-    parsed.NEXT_PUBLIC_LCD_URL, parsed.NEXT_PUBLIC_RPC_URL,
-    parsed.NEXT_PUBLIC_EVM_RPC_URL, parsed.NEXT_PUBLIC_WS_URL,
-    parsed.NEXT_PUBLIC_EVM_CHAIN_ID, parsed.NEXT_PUBLIC_BECH32_PREFIX,
-  ].some(value => value !== undefined);
-  const useDevPreset = process.env.NODE_ENV === "development"
-    && parsed.NEXT_PUBLIC_CHAINS === undefined && !hasSingleChainOverride;
-
-  return {
-    NEXT_PUBLIC_LCD_URL: parsed.NEXT_PUBLIC_LCD_URL ?? (useDevPreset ? DEV_LCD_URL : DEFAULT_LCD_URL),
-    NEXT_PUBLIC_RPC_URL: parsed.NEXT_PUBLIC_RPC_URL ?? (useDevPreset ? DEV_RPC_URL : DEFAULT_RPC_URL),
-    NEXT_PUBLIC_EVM_RPC_URL: parsed.NEXT_PUBLIC_EVM_RPC_URL ?? DEFAULT_EVM_RPC_URL,
-    NEXT_PUBLIC_WS_URL: parsed.NEXT_PUBLIC_WS_URL ?? DEFAULT_WS_URL,
-    NEXT_PUBLIC_CHAINS: parsed.NEXT_PUBLIC_CHAINS ?? (useDevPreset ? DEV_CHAINS : undefined),
-    NEXT_PUBLIC_DEFAULT_CHAIN_KEY: parsed.NEXT_PUBLIC_DEFAULT_CHAIN_KEY,
-    NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: parsed.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID,
-    NEXT_PUBLIC_WALLETCONNECT_RELAY_URL: parsed.NEXT_PUBLIC_WALLETCONNECT_RELAY_URL,
-    NEXT_PUBLIC_EVM_CHAIN_ID: parsed.NEXT_PUBLIC_EVM_CHAIN_ID,
-    NEXT_PUBLIC_BECH32_PREFIX: parsed.NEXT_PUBLIC_BECH32_PREFIX,
-  };
+  // Static public references above are required for Next's browser inlining.
+  return parsed;
 }
 
 export function getConfiguredChains(): ChainConfig[] {
@@ -237,6 +193,7 @@ export function getConfiguredChains(): ChainConfig[] {
   if (fromEnv.length > 0) {
     return fromEnv;
   }
+  if (!env.NEXT_PUBLIC_LCD_URL) throw new ServiceError("chain_configuration_required");
   return [
     defaultChainConfig({
       lcdUrl: env.NEXT_PUBLIC_LCD_URL,

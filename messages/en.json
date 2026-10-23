@@ -26,6 +26,7 @@
       "exceeds_the_allowed_decimal_places": "Exceeds the allowed {value0} decimal places.",
       "precision_unknown": "{value0} {value1} (precision unknown)",
       "invalid_chain_configuration_json_correct_the_configuration_and_refresh": "Invalid chain configuration JSON. Correct the configuration and refresh.",
+      "chain_configuration_required": "Chain configuration is missing. Set NEXT_PUBLIC_CHAINS or NEXT_PUBLIC_LCD_URL and restart the server.",
       "invalid_chain_endpoint_or_configuration_field": "Invalid chain endpoint or configuration field.",
       "duplicate_chain_key": "Duplicate chain key.",
       "chain_endpoints_must_be_http_s_urls": "Chain endpoints must be HTTP(S) URLs.",

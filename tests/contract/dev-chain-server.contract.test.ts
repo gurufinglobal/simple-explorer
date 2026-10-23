@@ -14,7 +14,8 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("server development configuration", () => {
-  it("uses TGXN through the real selection and HTTP clients without browser globals", async () => {
+  it("uses explicit TGXN through the real selection and HTTP clients without browser globals", async () => {
+    vi.stubEnv("NEXT_PUBLIC_CHAINS", '[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317"}]');
     expect(typeof document).toBe("undefined");
     expect(getDefaultChainKey()).toBe("tgxn");
     expect(getActiveChainConfig()).toMatchObject({ key: "tgxn", name: "TGXN", chainId: "guru_631-1", nativeDenom: "agxn", bondDenom: "agxn" });
@@ -31,14 +32,9 @@ describe("server development configuration", () => {
     expect(http).toHaveBeenCalledTimes(2);
   });
 
-  it.each(["production", "test"])("preserves legacy defaults in %s", mode => {
+  it.each(["development", "production", "test"])("requires explicit configuration in %s", mode => {
     vi.stubEnv("NODE_ENV", mode);
-    expect(getDefaultChainKey()).toBe("default");
-    expect(getConfiguredChains()).toEqual([{
-      key: "default", name: "Default", lcdUrl: "https://trpc.gurufin.io:1317", rpcUrl: "https://trpc.gurufin.io:26657",
-      evmRpcUrl: "https://trpc.gurufin.io:8545", wsUrl: "wss://trpc.gurufin.io:26657/websocket",
-      evmChainId: undefined, bech32Prefix: undefined,
-    }]);
+    expect(() => getConfiguredChains()).toThrow("NEXT_PUBLIC_CHAINS");
   });
 
   it.each([
@@ -49,6 +45,7 @@ describe("server development configuration", () => {
     ["NEXT_PUBLIC_EVM_CHAIN_ID", "123", "evmChainId"],
     ["NEXT_PUBLIC_BECH32_PREFIX", "custom", "bech32Prefix"],
   ])("respects the existing single-chain override %s", (variable, value, field) => {
+    vi.stubEnv("NEXT_PUBLIC_LCD_URL", "https://custom.example:1317");
     vi.stubEnv(variable, value);
     expect(getDefaultChainKey()).toBe("default");
     expect(getActiveChainConfig()).toMatchObject({ [field]: value });
@@ -56,10 +53,9 @@ describe("server development configuration", () => {
     expect(readPublicEnv().NEXT_PUBLIC_CHAINS).toBeUndefined();
   });
 
-  it("keeps the preset with wallet project settings or explicit tgxn default key", () => {
-    vi.stubEnv("NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID", "synthetic-project");
-    vi.stubEnv("NEXT_PUBLIC_DEFAULT_CHAIN_KEY", "tgxn");
-    expect(getDefaultChainKey()).toBe("tgxn");
+  it.each(["NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID", "NEXT_PUBLIC_RPC_URL"])("rejects %s without LCD/JSON", variable => {
+    vi.stubEnv(variable, variable.endsWith("URL") ? "https://rpc.example" : "synthetic-project");
+    expect(() => getConfiguredChains()).toThrow("NEXT_PUBLIC_CHAINS");
   });
 
   it("loads .env.local and process overrides through Next's actual loader", () => {

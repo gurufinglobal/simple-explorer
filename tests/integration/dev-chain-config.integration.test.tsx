@@ -15,12 +15,13 @@ const customChains = JSON.stringify([
 beforeEach(() => {
   for (const key of Object.keys(process.env).filter(key => key.startsWith("NEXT_PUBLIC_"))) vi.stubEnv(key, undefined);
   vi.stubEnv("NODE_ENV", "development");
+  vi.stubEnv("NEXT_PUBLIC_CHAINS", '[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317","rpcUrl":"https://tgxn.gurufin.io:26657"}]');
   window.history.replaceState(null, "", "/");
   document.cookie = "gf_chain=; max-age=0; path=/";
 });
 afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); document.cookie = "gf_chain=; max-age=0; path=/"; vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
-it("renders TGXN and sends client LCD/RPC requests to the same defaults as the server", async () => {
+it("renders TGXN and sends client LCD/RPC requests to the same explicit configuration as the server", async () => {
   render(<ChainSelector id="test-chain" />);
   expect(screen.getByRole("combobox").textContent).toBe("TGXN");
   const chain = getActiveChainConfig();
@@ -51,6 +52,8 @@ it("honors JSON and default key overrides, then preserves a valid saved cookie",
   await apiClients.lcdGet("/probe");
   await apiClients.rpcGet("/status");
   expect(http.mock.calls.map(([url]) => url)).toEqual(["https://saved.example:1317/probe", "https://saved.example:26657/status"]);
+  expect(apiClients.lcdUrl("/probe")).toBe("https://saved.example:1317/probe");
+  expect(apiClients.rpcUrl("/status")).toBe("https://saved.example:26657/status");
   expect(document.cookie).toContain("gf_chain=saved");
 });
 
@@ -69,7 +72,7 @@ it.each(["default", "missing", "%E0%A4%A"])("preserves invalid cookie %s until e
 
 it.each(["{broken", "", "[]", '[{"key":"bad","name":"Bad","lcdUrl":"invalid"}]',
   '[{"key":"x","name":"X","lcdUrl":"https://x.example"},{"key":"x","name":"X","lcdUrl":"https://x.example"}]',
-])("does not hide invalid chain configuration %s behind the dev preset", raw => {
+])("does not hide invalid chain configuration %s behind a preset", raw => {
   vi.stubEnv("NEXT_PUBLIC_CHAINS", raw);
   expect(() => getConfiguredChains()).toThrow();
   render(<ChainSelector id="test-chain" />);

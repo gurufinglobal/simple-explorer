@@ -1,59 +1,42 @@
 # Simple-Explorer Frontend
 
-## 로컬 개발과 CP2 화면 확인
+## 환경 설정과 로컬 실행
 
 ```bash
 npm install
+cp env.example .env.development.local
 npm run dev
 ```
 
-터미널에 표시된 앱 주소(기본 `http://localhost:3000`)를 엽니다. 별도 체인 환경 설정과 저장된 선택 쿠키가 없는 경우 **TGXN**이 선택됩니다. `https://tgxn.gurufin.io`는 개발 앱 주소가 아니라 외부 체인 API 호스트입니다.
+터미널의 앱 주소(기본 `http://localhost:3000`)를 엽니다. `env.example`의 기본 복사 블록은 TRPC 단일 체인(`default` / `Default`)입니다. **무설정 개발 TGXN·운영 TRPC 자동 선택은 종료했습니다.** 개발·운영에도 명시적 체인 JSON 또는 LCD 설정이 필요합니다. 전체 공개 변수 10개와 `ChainConfigSchema` 옵션·조건은 [env.example](env.example)을 참고하세요.
 
-| 개발 기본값 | 값 |
+| 용도 | 설정 |
 | --- | --- |
-| 선택 key / 표시 이름 | `tgxn` / `TGXN` |
-| LCD | `https://tgxn.gurufin.io:1317` |
-| Tendermint RPC | `https://tgxn.gurufin.io:26657` |
-| 관찰된 chain ID | `guru_631-1` |
-| native / bond denom | `agxn` / `agxn` |
+| 로컬 개발 | `env.example` → `.env.development.local` |
+| 로컬 production build/start | `env.example` → `.env.production.local`, 이후 `npm run build`와 `npm start` |
+| 개발·운영 공통 개인 설정 | `.env.local` (test에서는 무시) |
+| 테스트 기본값 | 추적된 `.env.test`의 공개 TRPC endpoint 4개 |
+| 개인 테스트 override | `.env.test.local` (Git 제외) |
+| 파일 없는 실행 | build/dev 전에 충분한 `process.env` 공개 설정 주입 |
 
-TGXN 프리셋은 `NODE_ENV=development`에서만 적용합니다. 별도 설정 없는 `npm run build` / `npm start`는 기존 `default` 체인과 `trpc.gurufin.io` 기본값을 유지합니다. 개발용 `.env.local`을 직접 작성하면 production 빌드에도 로드되므로 개발 전용 override는 `.env.development.local`에 넣으세요.
+`env.example`은 자동 로딩되지 않습니다. `.env.test`는 test 전용이며 개발·운영 fallback이 아닙니다. `NODE_ENV`는 Next/Vitest가 `development`/`production`/`test`로 정하도록 두세요. test 설정을 읽으려고 `NODE_ENV=test`로 Next dev/build를 실행하지 마세요.
 
-1. 왼쪽 **Select Chain**이 `TGXN`인지 확인합니다.
-2. 브라우저 개발자 도구 → **Network**를 연 뒤 `/dashboard`로 이동하거나 새로고침합니다. `tgxn.gurufin.io`로 필터링하고 Fetch/XHR 요청의 **Request URL**을 확인합니다. LCD 조회는 `:1317/cosmos/...`, RPC 조회(해당 화면에서 발생하는 경우)는 `:26657/...`를 사용해야 합니다. 모든 화면이 RPC를 호출하는 것은 아닙니다.
-3. 성공한 조회에서는 네트워크 ID `guru_631-1`, 블록·공급량 등 응답 기반 값이 보입니다. denom은 `agxn`이며 검증된 decimals가 없으면 원본 단위로 표시될 수 있습니다. HTTP/CORS/timeout 실패는 오류·재시도 상태로 표시되어야 하며 정상 잔액 0이나 성공으로 해석하지 않습니다.
-4. 기존 CP2 화면별 점검은 Paperclip의 [CP2 확인 가이드](/GURA/issues/GURA-35#document-checkpoint-cp2)를 참고합니다(링크는 Paperclip 앱 기준).
+Next.js의 변수별 우선순위는 `process.env` → `.env.<mode>.local` → `.env.local` → `.env.<mode>` → `.env`입니다. test는 `.env.local`을 제외합니다. 상위 파일이 비어 있거나 WalletConnect ID만 있어도 나머지 변수는 하위 표준 파일에서 읽습니다. 빈 문자열은 명시적 잘못된 값이며 하위 값으로 대체하지 않습니다. [Next.js 15 환경 변수 문서](https://nextjs.org/docs/15/app/guides/environment-variables)
 
-이 설정은 공개 조회용입니다. 기존 W01의 터미널 관찰을 재사용하며 브라우저 CORS·EVM RPC·WebSocket·지갑 서명 성공을 보장하지 않습니다. TGXN 프리셋에는 미확인 prefix, fee denom, decimals, signing, rpcAccess, EVM/WS endpoint를 추가하지 않습니다. 지갑 쓰기 기능은 기존 검증 조건에 따라 차단됩니다.
+`NEXT_PUBLIC_*`는 브라우저에 노출되므로 비밀값을 넣지 마세요. 변경 후 개발 서버를 재시작하고 production은 재빌드해야 합니다. 배포·운영 설정 변경은 이 저장소 변경에 포함되지 않습니다.
 
-## 환경 설정 우선순위
+체인 JSON이 있으면 그 목록이 우선하며, 기본 key는 `NEXT_PUBLIC_DEFAULT_CHAIN_KEY` 또는 첫 체인입니다. JSON이 없으면 LCD가 필수이고 RPC/EVM RPC/WS는 선택입니다. JSON과 함께 명시한 단일 변수도 검증합니다. 빈 구성·WC-only·RPC-only, 잘못된 URL/JSON, 빈 배열, 중복 key, unknown 기본 key는 구성 오류입니다. 누락 endpoint를 다른 체인의 주소로 보충하지 않습니다. 해당 endpoint가 필요한 기능은 오류/차단을 표시합니다.
 
-Next.js는 변수마다 `process.env` → `.env.$NODE_ENV.local` → `.env.local` → `.env.$NODE_ENV` → `.env` 순서로 처음 발견한 값을 사용합니다(`test`에서는 `.env.local` 제외). `NEXT_PUBLIC_*`는 클라이언트 번들에 포함되므로 비밀값을 넣지 마세요. 환경 수정 후 개발 서버를 재시작하고 페이지를 새로고침하세요. production 공개 설정 변경은 재빌드가 필요합니다. [Next.js 15 환경 변수 문서](https://nextjs.org/docs/15/app/guides/environment-variables)
+표준 병합은 변수별이므로 LCD만 다른 체인으로 바꾸면 하위 파일의 RPC 등이 남을 수 있습니다. 체인 전환 시 endpoint를 함께 변경하거나 완전한 JSON을 사용하세요. TGXN을 사용하려면 복사한 파일에서 TRPC 활성 4줄을 제거/주석 처리한 뒤 아래 대안을 활성화합니다.
 
-앱의 체인 설정은 다음 순서로 결정됩니다.
-
-1. `NEXT_PUBLIC_CHAINS`가 있으면 그 JSON 목록을 사용합니다. 기본 선택은 `NEXT_PUBLIC_DEFAULT_CHAIN_KEY`, 생략하면 목록 첫 체인입니다.
-2. JSON 목록이 없고 아래 단일 체인 변수 중 하나라도 있으면 기존 `default` / `Default` 설정 경로를 사용합니다. 지정한 값은 유지하고 생략한 endpoint는 기존 `trpc.gurufin.io` 기본값을 사용합니다. 서로 다른 체인을 섞지 않도록 LCD와 RPC를 함께 지정하세요.
-   `NEXT_PUBLIC_LCD_URL`, `NEXT_PUBLIC_RPC_URL`, `NEXT_PUBLIC_EVM_RPC_URL`, `NEXT_PUBLIC_WS_URL`, `NEXT_PUBLIC_EVM_CHAIN_ID`, `NEXT_PUBLIC_BECH32_PREFIX`.
-3. 둘 다 없으면 개발에서 TGXN 프리셋을 사용합니다. WalletConnect project/relay 설정만으로는 프리셋이 바뀌지 않습니다.
-
-예를 들어 개발용 JSON override를 `.env.development.local`에 저장하면:
-
-```env
+```dotenv
+NEXT_PUBLIC_CHAINS='[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317","rpcUrl":"https://tgxn.gurufin.io:26657"}]'
 NEXT_PUBLIC_DEFAULT_CHAIN_KEY=tgxn
-NEXT_PUBLIC_CHAINS=[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317","rpcUrl":"https://tgxn.gurufin.io:26657"}]
 ```
 
-단일 endpoint 방식의 예시(선택 key는 `default`; TGXN 관찰 metadata 자동 보강은 JSON의 `tgxn` key + 해당 LCD 조합에 적용):
+기존 W01 관찰 규칙은 유지합니다. `tgxn` key와 위 LCD가 일치할 때 `chainId=guru_631-1`, `denom/nativeDenom/bondDenom=agxn`, 누락 RPC를 보강합니다. 미확인 prefix·decimals·수수료·서명·EVM/WS 지원은 추가하지 않습니다. 공개 URL과 터미널 관찰은 실제 브라우저 CORS·지갑 서명 성공의 증거가 아닙니다.
 
-```bash
-NEXT_PUBLIC_LCD_URL=https://tgxn.gurufin.io:1317 \
-NEXT_PUBLIC_RPC_URL=https://tgxn.gurufin.io:26657 npm run dev
-```
-
-기존 `NEXT_PUBLIC_CHAINS`가 있다면 위 단일 endpoint 명령보다 JSON 목록이 우선합니다. 유효하지 않은 JSON/URL, 빈 목록, 중복 key, 목록에 없는 기본 key는 설정 오류입니다. 오류를 TGXN으로 조용히 대체하지 않습니다.
-
-JSON의 `key`, `name`, `lcdUrl`은 필수입니다. `rpcUrl`, `evmRpcUrl`, `wsUrl`, `evmChainId`, `bech32Prefix` 등은 선택 필드이며 확인한 값만 지정하세요. LCD만으로 가능한 공개 조회에는 RPC가 필요 없습니다. RPC/EVM URL이 빠지면 해당 endpoint가 필요한 조회·쓰기만 구성 오류/차단으로 표시됩니다(TGXN key와 LCD가 일치할 때의 기존 RPC 보강 예외). 지갑 쓰기는 URL 존재 외에도 chain ID·지갑/서명 방식·origin POST/OPTIONS·메시지별 수수료 검증이 필요합니다.
+설정 후 Select Chain 표시를 확인하고 `/dashboard`의 Network 요청 URL이 선택 체인의 LCD/RPC와 일치하는지 확인하세요. 모든 화면이 RPC를 요청하는 것은 아닙니다. HTTP/CORS/timeout 오류는 정상 잔액 0이나 성공으로 해석하지 않습니다. CP2 화면별 절차는 [CP2 확인 가이드](/GURA/issues/GURA-35#document-checkpoint-cp2)를 참고하세요.
 
 ## 저장된 체인 선택 복구
 
@@ -63,7 +46,7 @@ JSON의 `key`, `name`, `lcdUrl`은 필수입니다. `rpcUrl`, `evmRpcUrl`, `wsUr
 - 수동 초기화가 필요하면 개발자 도구 → Application/Storage → Cookies → 현재 앱 호스트에서 **`gf_chain`만 삭제**한 뒤 새로고침합니다. 시크릿 창으로 확인할 수도 있습니다. 쿠키는 포트별로 구분되지 않아 같은 localhost의 다른 포트와 공유될 수 있습니다.
 - 목록 자체가 잘못된 경우 환경 설정을 수정하고 서버를 재시작해야 합니다.
 
-쿠키가 없는 서버·클라이언트는 동일한 프리셋을 사용합니다. 서버는 브라우저 쿠키를 직접 읽지 않으며, 클라이언트는 마운트 후 저장된 선택을 반영합니다.
+쿠키가 없는 서버·클라이언트는 동일한 명시적 설정을 사용합니다. 서버는 브라우저 쿠키를 직접 읽지 않으며, 클라이언트는 마운트 후 저장된 선택을 반영합니다.
 
 ## 검증
 
@@ -71,7 +54,7 @@ JSON의 `key`, `name`, `lcdUrl`은 필수입니다. `rpcUrl`, `evmRpcUrl`, `wsUr
 
 Dashboard의 **SEND → Send Tx**는 잔액·주소·정밀 수량·수수료를 조회한 뒤 앱 확인 창을 엽니다. 전체 송신/수신 주소, 체인 key/ID, 표시/최소 단위 수량, 예상 수수료와 근거를 확인한 후 **확인하고 지갑 서명**을 누릅니다. 확인 창의 취소 또는 Escape는 지갑 서명·전송을 실행하지 않습니다. 입력·체인·계정 변경 또는 2분 경과 시 새 확인이 필요합니다.
 
-`NEXT_PUBLIC_CHAINS`의 체인별 `sendFeePolicy`는 **MsgSend에만** 적용됩니다. 종전 송금의 `NEXT_PUBLIC_GAS_PRICE`/`0.001agxn` fallback과 고정 gas 220000은 제거했습니다. 실제 근거가 없는 정책을 임의로 추가하지 마세요. 기존 체인·signing·RPC origin 검증도 모두 충족해야 하며, TGXN 개발 프리셋은 계속 조회 전용입니다.
+`NEXT_PUBLIC_CHAINS`의 체인별 `sendFeePolicy`는 **MsgSend에만** 적용됩니다. 종전 송금의 `NEXT_PUBLIC_GAS_PRICE`/`0.001agxn` fallback과 고정 gas 220000은 제거했습니다. 실제 근거가 없는 정책을 임의로 추가하지 마세요. 기존 체인·signing·RPC origin 검증도 모두 충족해야 하며, TGXN 예시 설정은 계속 조회 전용입니다.
 
 | 정책 | 필수 필드 | 동작 |
 | --- | --- | --- |
@@ -128,7 +111,7 @@ BEX fee/limit, FeePolicy discount_type/amount, Oracle nonce·결과 시각·repo
 
 EVM 전송은 헤더에서 탐색된 **MetaMask provider를 직접 선택**하거나 **WalletConnect · EVM**으로 연결한 뒤, 대시보드 **Send**에서 사용합니다. 조회는 지정 public RPC, 서명·방송 요청은 선택한 지갑으로 보냅니다. Cosmos 전송·staking·governance 권한과 EVM 주소 변환 제한은 별도로 유지합니다.
 
-`NEXT_PUBLIC_CHAINS` 항목에 다음 EVM 필드가 모두 필요합니다. 예시는 합성 값이며 배포 체인 지원 근거가 아닙니다. 기존 TGXN 프리셋에 EVM 지원을 자동으로 추가하지 않습니다.
+`NEXT_PUBLIC_CHAINS` 항목에 다음 EVM 필드가 모두 필요합니다. 예시는 합성 값이며 배포 체인 지원 근거가 아닙니다. TGXN 예시 설정에 EVM 지원을 자동으로 추가하지 않습니다.
 
 ```json
 {
