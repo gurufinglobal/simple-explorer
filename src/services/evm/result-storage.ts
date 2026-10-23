@@ -9,6 +9,7 @@ const resultSchema = z.object({
   id: z.string(), status: z.enum(["submitting", "pending", "unknown", "success", "reverted", "rejected"]),
   hash: z.custom<`0x${string}`>(value => typeof value === "string" && /^0x[0-9a-f]{64}$/i.test(value)).optional(), actualFee: integer.optional(),
   snapshot: z.object({
+    contract: z.object({ signature: z.string().max(65536), arguments: z.string().max(131072), mutability: z.string() }).optional(),
     chain: ChainConfigSchema, from: address, to: address,
     asset: z.object({ address: address.optional(), symbol: z.string().max(64), decimals: z.number().int().min(0).max(255), balance: integer }),
     amount: integer, displayAmount: z.string(), nonce: z.number().int().nonnegative(), gas: integer, maxFee: integer, createdAt: z.number(),
