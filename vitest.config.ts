@@ -1,7 +1,14 @@
 import { defineConfig } from "vitest/config";
 import path from "node:path";
+import nextEnv from "@next/env";
+
+// Load before workers import application modules. Vite's dotenv loader is disabled
+// so it cannot inject .env.local values that Next intentionally ignores in test.
+Object.assign(process.env, { NODE_ENV: "test" });
+nextEnv.loadEnvConfig(import.meta.dirname);
 
 export default defineConfig({
+  envDir: false,
   oxc: { jsx: { runtime: "automatic" } },
   test: {
     pool: "threads",

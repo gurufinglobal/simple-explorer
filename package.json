@@ -36,6 +36,7 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.5",
     "@formatjs/icu-messageformat-parser": "^3.5.22",
+    "@next/env": "15.5.28",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",

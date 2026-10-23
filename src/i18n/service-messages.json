@@ -20,6 +20,7 @@
   "exceeds_the_allowed_decimal_places": "허용 소수 {value0}자리를 초과했습니다.",
   "precision_unknown": "{value0} {value1} (정밀도 미확인)",
   "invalid_chain_configuration_json_correct_the_configuration_and_refresh": "체인 설정 JSON이 올바르지 않습니다. 설정을 수정하고 새로고침하세요.",
+  "chain_configuration_required": "체인 설정이 없습니다. NEXT_PUBLIC_CHAINS 또는 NEXT_PUBLIC_LCD_URL을 설정하고 서버를 재시작하세요.",
   "invalid_chain_endpoint_or_configuration_field": "체인 endpoint 또는 설정 필드가 올바르지 않습니다.",
   "duplicate_chain_key": "중복 체인 key입니다.",
   "chain_endpoints_must_be_http_s_urls": "체인 endpoint는 HTTP(S) URL이어야 합니다.",

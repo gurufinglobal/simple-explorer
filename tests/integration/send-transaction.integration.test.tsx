@@ -251,10 +251,11 @@ async function executeUi() { await fill(); const dialog = await confirmDialog();
 
 describe('GURA-57 recipient validation through actual form and preparation', () => {
   const reportedAddress = 'guru12yx8z0fzv27x3jx57yk0h8rlvwarp6y4zd00us';
-  it.each(['development-preset', 'missing-prefix'])('keeps a valid address neutral and blocks writes for %s', async mode => {
-    if (mode === 'development-preset') {
+  it.each(['explicit-tgxn', 'missing-prefix'])('keeps a valid address neutral and blocks writes for %s', async mode => {
+    if (mode === 'explicit-tgxn') {
       for (const key of Object.keys(process.env).filter(key => key.startsWith('NEXT_PUBLIC_'))) vi.stubEnv(key, undefined);
       vi.stubEnv('NODE_ENV', 'development');
+      vi.stubEnv('NEXT_PUBLIC_CHAINS', '[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317"}]');
       store.getState().connect('keplr', sender, null, { chainKey: 'tgxn', chainId: 'guru_631-1', pubkey });
       expect(getActiveChainConfig().key).toBe('tgxn');
     } else configure({ bech32Prefix: undefined });

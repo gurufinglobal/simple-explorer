@@ -36,3 +36,12 @@
 - `integration/send-transaction.integration.test.tsx`: 실제 SendForm을 native form에 넣고 영한 키보드 재조회가 metadata HTTP만 실행하며 submit·서명·broadcast를 유발하지 않는지 확인한다.
 - `browser/query-refresh.browser.mjs`: 실제 production Chrome의 360/768/1440px × en/ko에서 단일 조회·다중 조회·폼 내부 조회·`/wallet`의 버튼 폭, 44px 터치 높이, 줄바꿈, 상단 배치, 키보드 포커스 및 error/Retry-After/busy/success/stale/partial을 검증하고 PNG와 측정 JSON을 저장한다. HTTP와 주입 지갑만 합성 경계이며 실제 서명/거래·물리 모바일 검증이 아니다.
 - 실행: `node tests/browser/wallet-page-server.mjs --production`으로 합성 체인 production 서버를 시작한 후 `PLAYWRIGHT_MODULE=<playwright index.mjs 경로> node tests/browser/query-refresh.browser.mjs`. 선택 환경 변수는 `BROWSER_ORIGIN`(기본 3265 포트), `BROWSER_OUTPUT`, `SOURCE_SHA`다. 빌드와 전체 테스트는 동시에 실행하지 않는다.
+
+## 환경 파일과 Next 경계 (GURA-74)
+
+- `vitest.config.ts`는 worker의 앱 import 전에 `NODE_ENV=test`로 `@next/env`를 초기화합니다. Vite `envDir: false`로 중복 dotenv 로딩을 끄며 `test.env`로 설정을 덮어쓰지 않습니다. `.env.test` 기본값, `.env.test.local` 개인 override, process 최우선 정책을 사용합니다.
+- `contract/env-loading.contract.test.ts`: 임시 디렉터리·새 Node 프로세스에서 3개 모드의 변수별 우선순위, test의 `.env.local` 제외, 빈/WC-only 상위 파일, process-only 설정, 빈/손상 설정, JSON 우선순위, TGXN 보강, 누락 endpoint HTTP 0회를 확인합니다. 별도 Vitest 실행으로 실제 threads worker의 기본값/파일/process override·env 복원도 검증합니다.
+- 기존 `dev-chain-server`, `dev-chain-config`, `send-transaction`은 명시적 TGXN 설정에서 실제 선택·클라이언트·UI·서명 차단 회귀를 유지합니다.
+- `browser/env-config.browser.mjs`: 추적/비제외 소스만 임시 프로젝트에 복사하고 `node_modules`를 링크합니다. 개인 env·공유 `.next`는 복사하지 않습니다. `env.example`의 TRPC 블록과 TGXN 주석 대안을 각각 `.env.development.local`/`.env.production.local`로 준비하여 Next dev 및 `npm run build`/start를 실행합니다. 빈 포트와 새 Chrome context를 사용하고 종료 시 자체 서버를 정리합니다.
+- 임시 프로젝트에만 생성하는 `env-verification` route는 실제 env·chain selection·URL helper를 SSR/브라우저 양쪽에서 실행하여 값을 비교합니다. 실제 HTTP client 호출과 제품 홈·Dashboard도 검사합니다. LCD-only에서 RPC/EVM 누락 오류와 HTTP 차단, 빈 설정에서 구성 오류를 확인합니다. HTTP 경계만 모킹하며 실제 체인 가용성·CORS·서명 지원을 검증하지 않습니다.
+- 실행: `PLAYWRIGHT_MODULE=<playwright/index.mjs 경로> node tests/browser/env-config.browser.mjs`. 선택 runner 변수 `BROWSER_OUTPUT`(기본 `/tmp/gura74-browser`)은 앱 설정이 아닙니다. 결과 JSON에 origin/build ID/source SHA/dirty 여부/체인/요청/시각/Chrome 버전을 남기고 PNG·build/server 로그를 저장합니다. source SHA가 clean일 때 최종 커밋 검증으로 해석하세요. 빌드와 전체 테스트는 동시에 실행하지 않습니다. Next 폰트 다운로드 네트워크와 Chrome 실행 권한이 필요합니다.
