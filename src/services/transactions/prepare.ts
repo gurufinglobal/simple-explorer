@@ -1,4 +1,6 @@
 "use client";
+import { describeServiceMessage, ServiceError, serviceText } from '@/i18n/service-message';
+
 import { BroadcastTxError, calculateFee, GasPrice } from "@cosmjs/stargate";
 import { connectSigningClient } from "@/services/wallet/connect-signing-client";
 import { getActiveChainConfig, getChainSelectionGeneration } from "@/lib/chain-selection";
@@ -31,7 +33,7 @@ const inFlight = new Set<string>();
 export async function prepareTransaction(params: SigningInput, setup: (context: {
   chain: ChainConfig; query: QueryClient; sender: string; assertCurrent: () => void;
 }) => Promise<TransactionSetup>, assertInputCurrent: () => void = () => {}): Promise<PreparedTransaction> {
-  if (typeof window === "undefined") throw new Error("거래는 브라우저에서만 실행할 수 있습니다.");
+  if (typeof window === "undefined") throw new ServiceError("transactions_are_only_available_in_the_browser");
   params = { ...params };
   const chain = getActiveChainConfig();
   const chainGeneration = getChainSelectionGeneration();
@@ -42,15 +44,15 @@ export async function prepareTransaction(params: SigningInput, setup: (context: 
   const assertCurrent = () => {
     assertInputCurrent();
     assertActionCurrent();
-    if (preparedAt && Date.now() - preparedAt > 120_000) throw new Error("확인 후 2분이 지났습니다. 수수료와 잔액을 다시 확인하세요.");
+    if (preparedAt && Date.now() - preparedAt > 120_000) throw new ServiceError("two_minutes_have_elapsed_since_confirmation_check_fees_and_balances");
     if (cancelled || getChainSelectionGeneration() !== chainGeneration || JSON.stringify(getActiveChainConfig()) !== JSON.stringify(chain) || store.getState().generation !== state.generation) {
-      throw new Error("입력·체인·계정·연결이 변경되었습니다. 거래를 다시 확인하세요.");
+      throw new ServiceError("input_chain_account_or_connection_changed_review_the_transaction_again");
     }
     const now = store.getState();
     const reason = writeBlockReason(chain, now);
     if (reason) throw new Error(reason);
     if (now.bech32Address !== params.bech32Address || now.walletType !== params.walletType || now.sessionTopic !== params.sessionTopic) {
-      throw new Error("현재 지갑 연결과 송신 계정이 다릅니다.");
+      throw new ServiceError("sender_account_differs_from_the_connected_wallet");
     }
   };
   assertCurrent();
@@ -61,7 +63,7 @@ export async function prepareTransaction(params: SigningInput, setup: (context: 
   assertActionCurrent = assertValid ?? (() => {});
   assertCurrent();
   const price = GasPrice.fromString(policy.gasPrice);
-  if (price.denom !== chain.feeDenom || BigInt(price.amount.atomics) <= BigInt(0)) throw new Error("수수료 가격·자산이 검증된 체인 설정과 다릅니다.");
+  if (price.denom !== chain.feeDenom || BigInt(price.amount.atomics) <= BigInt(0)) throw new ServiceError("fee_price_or_asset_differs_from_the_verified_chain_configuration");
   await verifyChainEndpoints(chain);
   assertCurrent();
   let gas: number;
@@ -71,27 +73,27 @@ export async function prepareTransaction(params: SigningInput, setup: (context: 
       // Simulation uses the verified public key, never a wallet signing prompt.
       const simulator = await connectSigningClient(chain, {
         getAccounts: async () => { assertCurrent(); return [{ address: sender, algo: "secp256k1", pubkey: state.pubkey! }]; },
-        signDirect: async () => { throw new Error("수수료 추정은 서명할 수 없습니다."); },
+        signDirect: async () => { throw new ServiceError("fee_estimation_cannot_request_signatures"); },
       }, { accountParser: signingAccountParser(chain, { address: sender, pubkey: state.pubkey! }) });
       try {
         assertCurrent();
         const used = await simulator.simulate(sender, [message], "");
         assertCurrent();
-        if (!Number.isSafeInteger(used) || used <= 0) throw new Error("유효한 simulate gas를 받지 못했습니다.");
+        if (!Number.isSafeInteger(used) || used <= 0) throw new ServiceError("no_valid_simulated_gas_result");
         const adjusted = (BigInt(used) * BigInt(policy.gasMultiplierBps) + BigInt(9999)) / BigInt(10000);
-        if (adjusted > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("추정 gas가 안전 범위를 초과했습니다.");
+        if (adjusted > BigInt(Number.MAX_SAFE_INTEGER)) throw new ServiceError("estimated_gas_exceeds_the_safe_range");
         gas = Number(adjusted);
-        feeBasis = `simulate gas ${used} × ${policy.gasMultiplierBps}/10000 · ${policy.evidence}`;
+        feeBasis = serviceText("simulated_gas", { value0: used, value1: policy.gasMultiplierBps, value2: policy.evidence });
       } finally { simulator.disconnect(); }
     } catch (error) {
       assertCurrent();
-      if (!policy.fallback) throw new Error(`수수료 추정 실패 · ${errorMessage(error)}`);
+      if (!policy.fallback) throw new ServiceError("fee_estimation_failed", { value0: String(errorMessage(error)) });
       gas = policy.fallback.gas;
-      feeBasis = `simulate 불가 (${errorMessage(error)}). 검증된 고정 gas ${gas} · ${policy.fallback.evidence} · 실제 소모량과 다를 수 있습니다.`;
+      feeBasis = serviceText("simulation_unavailable_verified_fixed_gas_actual_usage_may_differ", { value0: String(errorMessage(error)), value1: String(gas), value2: String(policy.fallback.evidence) });
     }
   } else {
     gas = policy.gas;
-    feeBasis = `검증된 고정 gas ${gas} · ${policy.evidence} · ${policy.limitation}`;
+    feeBasis = serviceText("verified_fixed_gas", { value0: String(gas), value1: String(policy.evidence), value2: String(policy.limitation) });
   }
   assertCurrent();
   const fee = calculateFee(gas, price);
@@ -108,14 +110,14 @@ export async function prepareTransaction(params: SigningInput, setup: (context: 
     snapshot, assertCurrent, cancel: () => { cancelled = true; },
     execute: async onBroadcast => {
       assertCurrent();
-      if (Date.now() - snapshot.preparedAt > 120_000) throw new Error("확인 후 2분이 지났습니다. 수수료와 잔액을 다시 확인하세요.");
+      if (Date.now() - snapshot.preparedAt > 120_000) throw new ServiceError("two_minutes_have_elapsed_since_confirmation_check_fees_and_balances");
       const lock = `${chain.chainId}:${sender}`;
-      if (consumed || inFlight.has(lock)) throw new Error("이미 처리 중이거나 사용한 확인입니다. 결과를 확인하세요.");
+      if (consumed || inFlight.has(lock)) throw new ServiceError("this_confirmation_is_in_progress_or_already_used_check_the");
       consumed = true;
       inFlight.add(lock);
       let hash: string | null = null;
       const receipt = (status: TransactionReceipt["status"], message: string, code?: number): TransactionReceipt => ({
-        chainKey: chain.key, chainId: chain.chainId!, sender, hash, status, message, code, ...(context ? { staking: context } : {}),
+        chainKey: chain.key, chainId: chain.chainId!, sender, hash, status, message, ...(describeServiceMessage(message) ?? {}), code, ...(context ? { staking: context } : {}),
         ...(governance ? { governance } : {}),
         estimatedFee: fee.amount.map(c => ({ ...c })), actualFee: null,
       });
@@ -126,33 +128,33 @@ export async function prepareTransaction(params: SigningInput, setup: (context: 
           beforeSign: checkBalance, allowedSigning,
           onBroadcast: txHash => {
             hash = txHash;
-            const pending = receipt("pending", "전송·포함 확인 중 · 자동 재전송하지 않습니다.");
+            const pending = receipt("pending", serviceText("checking_broadcast_and_inclusion_no_automatic_resubmission"));
             const saved = saveReceipt(pending);
-            onBroadcast({ ...pending, ...(!saved ? { feeWarning: "브라우저 저장 실패: 새로고침 전에 거래 링크를 보관하세요." } : {}) });
+            onBroadcast({ ...pending, ...(!saved ? { feeWarning: serviceText("browser_storage_failed_save_the_transaction_link_before_refreshing") } : {}) });
           },
         });
         assertCurrent();
         const result = await client.signAndBroadcast(signerAddress, [message], fee);
         // Preserve an already broadcast result under its original chain after a switch.
         if (!Number.isInteger(result.code) || result.code < 0 || !result.transactionHash || result.transactionHash.toUpperCase() !== hash) {
-          const pending = receipt("pending", "노드 응답의 code/hash를 확인할 수 없습니다. 확인 중 · 자동 재전송하지 않습니다.");
-          if (!saveReceipt(pending)) pending.feeWarning = "브라우저 저장 실패: 새로고침 전에 거래 링크를 보관하세요.";
+          const pending = receipt("pending", serviceText("could_not_verify_the_node_response_code_or_hash_checking"));
+          if (!saveReceipt(pending)) pending.feeWarning = serviceText("browser_storage_failed_save_the_transaction_link_before_refreshing");
           return pending;
         }
         const done = receipt(result.code === 0 ? "success" : "failed",
-          result.code === 0 ? "체인 포함 성공" : result.rawLog || `체인 실행 실패 (code ${result.code})`, result.code);
-        if (!saveReceipt(done)) done.feeWarning = "브라우저 저장 실패: 새로고침 전에 거래 링크를 보관하세요.";
+          result.code === 0 ? serviceText("included_successfully_on_chain") : result.rawLog || serviceText("chain_execution_failed_code", { value0: String(result.code) }), result.code);
+        if (!saveReceipt(done)) done.feeWarning = serviceText("browser_storage_failed_save_the_transaction_link_before_refreshing");
         return done;
       } catch (error) {
         if (!hash) {
           assertCurrent();
-          if (/reject|denied|declin|cancel|거절|취소/i.test(errorMessage(error))) return receipt("cancelled", "지갑 서명이 취소되었습니다. 전송하지 않았습니다.");
+          if (/reject|denied|declin|cancel|거절|취소/i.test(errorMessage(error))) return receipt("cancelled", serviceText("wallet_signature_cancelled_nothing_was_sent"));
           throw error;
         }
         const result = error instanceof BroadcastTxError
-          ? receipt("failed", error.log || `노드가 거래를 거절했습니다 (code ${error.code})`, error.code)
-          : receipt("pending", `확인 중 · ${errorMessage(error)} · 자동 재전송하지 않습니다.`);
-        if (!saveReceipt(result)) result.feeWarning = "브라우저 저장 실패: 새로고침 전에 거래 링크를 보관하세요.";
+          ? receipt("failed", error.log || serviceText("node_rejected_the_transaction_code", { value0: String(error.code) }), error.code)
+          : receipt("pending", serviceText("checking_no_automatic_resubmission", { value0: String(errorMessage(error)) }));
+        if (!saveReceipt(result)) result.feeWarning = serviceText("browser_storage_failed_save_the_transaction_link_before_refreshing");
         return result;
       } finally { inFlight.delete(lock); }
     },

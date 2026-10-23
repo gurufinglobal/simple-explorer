@@ -1,3 +1,5 @@
+
+import { serviceMessage } from '@/i18n/service-message';
 import { bech32 } from "bech32";
 
 type SendAddressValidation =
@@ -12,13 +14,13 @@ export function validateSendAddress(address: string, chainPrefix: string | undef
     if (bech32.fromWords(decoded.words).length !== 20) throw new Error();
     prefix = decoded.prefix;
   } catch {
-    return { status: "invalid", message: "수신 주소의 형식·체크섬·길이(20바이트)를 확인하세요." };
+    return { status: "invalid", ...serviceMessage("check_the_recipient_address_format_checksum_and_20_byte_length") };
   }
   if (!chainPrefix) {
-    return { status: "unverified", message: "선택 체인의 주소 prefix가 확인되지 않아 수신 주소의 체인 일치 여부를 검증할 수 없습니다. 송금은 차단됩니다." };
+    return { status: "unverified", ...serviceMessage("the_chain_prefix_is_unverified_so_the_recipient_s_chain") };
   }
   if (prefix !== chainPrefix) {
-    return { status: "invalid", message: "수신 주소의 prefix가 선택 체인과 다릅니다." };
+    return { status: "invalid", ...serviceMessage("recipient_prefix_differs_from_the_selected_chain") };
   }
   return { status: "valid", message: null };
 }

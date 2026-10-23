@@ -2,7 +2,7 @@
 import { cosmosAddress, cosmosPubkey, cosmosSigningProfile } from "../helpers/cosmos-signing";
 import { amountResponse } from "../helpers/amounts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "../helpers/render";
 import { bech32 } from "bech32";
 import type { OfflineSigner } from "@cosmjs/proto-signing";
 import type { SessionTypes } from "@walletconnect/types";
@@ -300,12 +300,12 @@ describe("W03 connection and session lifecycle", () => {
   });
   it("actual header exposes cancellation and blocks duplicate connect buttons", async () => {
     const pending = deferred<void>(); window.keplr!.enable = () => pending.promise;
-    render(<HeaderWalletMenu />); fireEvent.click(screen.getByLabelText("wallet menu")); fireEvent.click(screen.getByText("Keplr"));
+    render(<HeaderWalletMenu />); fireEvent.click(screen.getByLabelText("지갑 메뉴")); fireEvent.click(screen.getByText("Keplr"));
     await waitFor(() => expect(store.getState().status).toBe("connecting"));
-    fireEvent.click(screen.getByLabelText("wallet menu"));
+    fireEvent.click(screen.getByLabelText("지갑 메뉴"));
     expect(screen.getByText("Keplr").closest('[role="menuitem"]')?.getAttribute("aria-disabled")).toBe("true");
-    fireEvent.click(screen.getByText("Cancel connection")); await act(async () => { pending.resolve(); });
-    expect(store.getState().status).toBe("disconnected"); expect(screen.getByText("Disconnected")).toBeTruthy();
+    fireEvent.click(screen.getByText("연결 취소")); await act(async () => { pending.resolve(); });
+    expect(store.getState().status).toBe("disconnected"); expect(screen.getByText("미연결")).toBeTruthy();
   });
 });
 
@@ -319,7 +319,7 @@ describe("W03 pending WalletConnect session invalidation", () => {
   async function expectInvalidated() {
     expect(store.getState()).toMatchObject({ status: "error", bech32Address: null, sessionTopic: null, pubkey: null, writeStatus: "blocked" });
     expect(store.getState().writeReason).toContain("다시 연결");
-    expect(screen.getByText("Error")).toBeTruthy();
+    expect(screen.getByText("연결 오류")).toBeTruthy();
     expect(portfolio.getState()).toMatchObject({ balance: "—", staking: "—", reward: "—", unbonding: "—" });
     expect(portfolio.getState().result.data).toBeNull();
     expect((screen.getByRole("button", { name: "제안 전송" }) as HTMLButtonElement).disabled).toBe(true);

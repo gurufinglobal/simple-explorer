@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cosmosAddress, cosmosPubkey, cosmosSigningProfile } from "../helpers/cosmos-signing";
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '../helpers/render';
 import userEvent from '@testing-library/user-event';
 import { bech32 } from 'bech32';
 import { sha256 } from '@cosmjs/crypto';
@@ -95,7 +95,7 @@ describe('W05 saved receipt updates and lookup races (F1)', () => {
     render(<SavedTransactions chainKey="a" />);
     fireEvent.click(screen.getByText(/보관된 거래 결과/));
     fireEvent.click(await screen.findByRole('button', { name: new RegExp(hash) }));
-    expect(screen.getByRole('status').textContent).toBe(pending.message);
+    expect(screen.getByRole('status').textContent).toContain(pending.message);
   }
   it.each(outcomes)('updates an expanded receipt to $status including message and warnings', async next => {
     await openPending();
@@ -226,7 +226,7 @@ async function fill() {
   fireEvent.click(screen.getByRole('checkbox'));
 }
 async function confirmDialog() {
-  fireEvent.click(screen.getByRole('button', { name: 'Send Tx' }));
+  fireEvent.click(screen.getByRole('button', { name: "송금 실행" }));
   return screen.findByRole('dialog');
 }
 async function executeUi() { await fill(); const dialog = await confirmDialog(); fireEvent.click(within(dialog).getByRole('button', { name: '확인하고 지갑 서명' })); }
@@ -246,7 +246,7 @@ describe('GURA-57 recipient validation through actual form and preparation', () 
     expect(screen.getByLabelText('수신 주소').getAttribute('aria-invalid')).toBe('false');
     expect(screen.getByText(/선택 체인의 주소 prefix가 확인되지 않아/)).toBeTruthy();
     expect(screen.getByText(/검증 정보가 부족하여 조회만 가능합니다/)).toBeTruthy();
-    expect((screen.getByRole('button', { name: 'Send Tx' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: "송금 실행" }) as HTMLButtonElement).disabled).toBe(true);
     await expect(prepareSendTx({ ...input, toAddress: reportedAddress })).rejects.toThrow('검증 정보가 부족');
     expect(window.getOfflineSigner).not.toHaveBeenCalled();
     expect(boundary.sign).not.toHaveBeenCalled();
@@ -275,7 +275,7 @@ describe('GURA-57 recipient validation through actual form and preparation', () 
     await fill();
     fireEvent.change(screen.getByLabelText('수신 주소'), { target: { value: address } });
     expect(screen.getByLabelText('수신 주소').getAttribute('aria-invalid')).toBe('true');
-    expect((screen.getByRole('button', { name: 'Send Tx' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: "송금 실행" }) as HTMLButtonElement).disabled).toBe(true);
     await expect(prepareSendTx({ ...input, toAddress: address })).rejects.toThrow('수신 주소');
     expect(boundary.simulate).not.toHaveBeenCalled();
     expect(boundary.wallet).not.toHaveBeenCalled();
@@ -298,7 +298,7 @@ describe('GURA-57 recipient validation through actual form and preparation', () 
 describe('W05 actual UI → prepared snapshot → MsgSend → chain result', () => {
   it('shows every confirmation field without a signing prompt, focuses cancel, Escape restores the trigger and broadcasts zero', async () => {
     const user = userEvent.setup(); await fill();
-    const trigger = screen.getByRole('button', { name: 'Send Tx' }); await user.click(trigger);
+    const trigger = screen.getByRole('button', { name: "송금 실행" }); await user.click(trigger);
     const dialog = await screen.findByRole('dialog');
     for (const text of ['행위: 송금', '체인: a / a-1', `서명 계정: ${sender}`, `전체 수신 주소: ${recipient}`, '표시 수량: 1.234567 GXN', '전송 원본: 1234567 agxn', '예상 수수료 (최소 단위): 130 agxn']) expect(within(dialog).getByText(text)).toBeTruthy();
     expect(within(dialog).getByText(/simulate gas 100000/)).toBeTruthy();
@@ -324,10 +324,10 @@ describe('W05 actual UI → prepared snapshot → MsgSend → chain result', () 
     boundary.wallet.mockRejectedValue(new Error('Request rejected by user')); await executeUi();
     await screen.findByText('지갑 서명이 취소되었습니다. 전송하지 않았습니다.'); expect(boundary.broadcast).not.toHaveBeenCalled();
   });
-  it.each(['수신 주소', '수량 (표시 단위)', 'Denom'])('editing %s invalidates the app approval, including returning to the old input', async label => {
+  it.each(['수신 주소', '수량 (표시 단위)', "단위 (denom)"])('editing %s invalidates the app approval, including returning to the old input', async label => {
     await fill(); await confirmDialog();
     const inputField = screen.getByLabelText(label); const original = (inputField as HTMLInputElement).value;
-    fireEvent.change(inputField, { target: { value: label === '수신 주소' ? sender : label === 'Denom' ? 'uother' : '2' } });
+    fireEvent.change(inputField, { target: { value: label === '수신 주소' ? sender : label === "단위 (denom)" ? 'uother' : '2' } });
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     fireEvent.change(inputField, { target: { value: original } });
     expect(screen.queryByRole('dialog')).toBeNull(); expect(boundary.broadcast).not.toHaveBeenCalled();
@@ -345,7 +345,7 @@ describe('W05 actual UI → prepared snapshot → MsgSend → chain result', () 
     expect(boundary.broadcast).not.toHaveBeenCalled(); expect(screen.queryByText(/체인 포함 성공/)).toBeNull();
   });
   it.each(['input', 'chain', 'account'])('a late simulation after %s change cannot create a confirmation', async change => {
-    const pending = deferred<number>(); boundary.simulate.mockReturnValue(pending.promise); await fill(); fireEvent.click(screen.getByRole('button', { name: 'Send Tx' }));
+    const pending = deferred<number>(); boundary.simulate.mockReturnValue(pending.promise); await fill(); fireEvent.click(screen.getByRole('button', { name: "송금 실행" }));
     await waitFor(() => expect(boundary.simulate).toHaveBeenCalled());
     act(() => { if (change === 'chain') { setActiveChainKeyCookie('b'); setActiveChainKeyCookie('a'); } else if (change === 'account') connect(); else fireEvent.change(screen.getByLabelText('수신 주소'), { target: { value: sender } }); });
     await act(async () => { pending.resolve(100000); }); expect(screen.queryByRole('dialog')).toBeNull(); expect(boundary.wallet).not.toHaveBeenCalled();

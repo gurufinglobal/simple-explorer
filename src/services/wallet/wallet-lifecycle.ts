@@ -1,4 +1,6 @@
 "use client";
+import { serviceText, ServiceError } from '@/i18n/service-message';
+
 import { getActiveChainConfig } from "@/lib/chain-selection";
 import type { ChainConfig } from "@/lib/env";
 import type { WalletConnectNormalizedSession } from "@/types/walletconnect";
@@ -10,7 +12,7 @@ import { verifyLcdChain, verifyChainEndpoints, writeBlockReason } from "./chain-
 import { getAccountPubkeyBytes } from "@/services/guru/governance-query.service";
 import { createQueryClient } from "@/services/clients";
 
-function message(error: unknown) { return error instanceof Error ? error.message : "지갑 연결에 실패했습니다. 다시 연결하세요."; }
+function message(error: unknown) { return error instanceof Error ? error.message : serviceText("wallet_connection_failed_reconnect"); }
 function isCurrent(generation: number, key: string) {
   try { return store.getState().generation === generation && getActiveChainConfig().key === key; }
   catch { return false; }
@@ -21,12 +23,12 @@ type ApprovalIdentity = Pick<WalletConnectNormalizedSession, "sessionTopic" | "b
 async function assertLiveApproval(chain: ChainConfig, expected: ApprovalIdentity): Promise<void> {
   const session = await getActiveWalletConnectSession(expected.sessionTopic).catch(() => undefined);
   if (!session || session.topic !== expected.sessionTopic || !Number.isFinite(session.expiry) || session.expiry * 1000 <= Date.now()) {
-    throw new Error("WalletConnect 세션이 없거나 만료되었습니다. 지갑을 다시 연결하세요.");
+    throw new ServiceError("walletconnect_session_is_missing_or_expired_reconnect_your_wallet");
   }
   const live = normalizeWalletConnectSession(session, chain);
   if (live.bech32Address !== expected.bech32Address || live.evmAddress !== expected.evmAddress ||
     JSON.stringify(live.methods ?? []) !== JSON.stringify([...(expected.methods ?? [])].sort())) {
-    throw new Error("WalletConnect 체인·계정 또는 승인이 변경되었습니다. 지갑을 다시 연결하세요.");
+    throw new ServiceError("walletconnect_chain_account_or_approval_changed_reconnect_your_wallet");
   }
 }
 export async function refreshWriteEligibility(): Promise<void> {
@@ -38,7 +40,7 @@ export async function refreshWriteEligibility(): Promise<void> {
     const validateSession = async () => {
       if (state.walletType === "walletconnect") {
         try {
-          if (!state.sessionTopic) throw new Error("WalletConnect 세션이 없습니다. 지갑을 다시 연결하세요.");
+          if (!state.sessionTopic) throw new ServiceError("walletconnect_session_missing_reconnect_your_wallet");
           await assertLiveApproval(chain, { ...state, sessionTopic: state.sessionTopic });
         } catch (error) {
           if (isCurrent(generation, chain.key)) store.getState().setError(message(error));
@@ -50,7 +52,7 @@ export async function refreshWriteEligibility(): Promise<void> {
     if (!await validateSession() || !isCurrent(generation, chain.key)) return;
     const reason = writeBlockReason(chain, state);
     if (reason) { store.setState({ writeStatus: "blocked", writeReason: reason }); return; }
-    store.setState({ writeStatus: "checking", writeReason: "LCD/RPC 체인 및 접근 확인 중입니다." });
+    store.setState({ writeStatus: "checking", writeReason: serviceText("checking_lcd_rpc_chain_identity_and_access") });
     await verifyChainEndpoints(chain);
     if (await validateSession() && isCurrent(generation, chain.key)) store.setState({ writeStatus: "ready", writeReason: null });
   } catch (error) {
@@ -62,7 +64,7 @@ export async function connectExtension(wallet: "keplr" | "metamask"): Promise<vo
   if (generation === null) return;
   try {
     const chain = getActiveChainConfig();
-    const result = await connectWallet(wallet, chain, () => { if (!isCurrent(generation, chain.key)) throw new Error("연결이 취소되었습니다."); });
+    const result = await connectWallet(wallet, chain, () => { if (!isCurrent(generation, chain.key)) throw new ServiceError("connection_cancelled"); });
     if (!isCurrent(generation, chain.key)) return;
     store.getState().connect(result.walletType, result.bech32Address, result.evmAddress, result);
     await refreshWriteEligibility();
@@ -85,7 +87,7 @@ export async function connectQr(onUri: (uri: string | null) => void): Promise<vo
     const normalized = normalizeWalletConnectSession(session, chain);
     if (session.expiry * 1000 <= Date.now() || (!normalized.bech32Address && !normalized.evmAddress)) {
       await disconnectWalletConnectByTopic(session.topic).catch(() => {});
-      throw new Error("현재 체인의 승인된 계정이 없거나 세션이 만료되었습니다. 다시 연결하세요.");
+      throw new ServiceError("no_approved_account_for_this_chain_or_the_session_expired");
     }
     const pubkey = normalized.bech32Address
       ? await getAccountPubkeyBytes(normalized.bech32Address, createQueryClient(chain)).catch(() => null) : null;
@@ -110,7 +112,7 @@ export function attachWalletLifecycle(): () => void {
   const invalidate = (wallet?: string) => {
     const state = store.getState();
     if (state.status === "disconnected" || (wallet && state.walletType && state.walletType !== wallet)) return;
-    state.setError("체인·계정 또는 세션이 변경되었습니다. 지갑을 다시 연결하세요.");
+    state.setError(serviceText("chain_account_or_session_changed_reconnect_your_wallet"));
   };
   const onChain = () => { store.getState().disconnect(); };
   const onKeplr = () => invalidate("keplr");

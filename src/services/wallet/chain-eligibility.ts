@@ -1,3 +1,5 @@
+
+import { ServiceError, serviceText } from '@/i18n/service-message';
 import { bech32 } from "bech32";
 import type { ChainConfig } from "@/lib/env";
 import { requestJson } from "@/services/clients";
@@ -7,36 +9,36 @@ import { GURU_RELEASE_COMMIT, isGuruReleaseProfile, signingProfileBlockReason } 
 export async function verifyLcdChain(chain: ChainConfig): Promise<string> {
   const response = await requestJson<{ default_node_info?: { network?: string }; application_version?: { git_commit?: string } }>(`${chain.lcdUrl.replace(/\/$/, "")}/cosmos/base/tendermint/v1beta1/node_info`);
   const chainId = response.default_node_info?.network;
-  if (!chainId || (chain.chainId && chain.chainId !== chainId)) throw new Error("LCD chain ID가 선택 체인 설정과 일치하지 않습니다.");
+  if (!chainId || (chain.chainId && chain.chainId !== chainId)) throw new ServiceError("lcd_chain_id_differs_from_the_selected_chain_configuration");
   if (isGuruReleaseProfile(chain) && response.application_version?.git_commit !== GURU_RELEASE_COMMIT) {
-    throw new Error("노드가 보고한 소스 커밋이 검증된 Guru 릴리스와 다릅니다. 서명이 차단되었습니다.");
+    throw new ServiceError("node_source_commit_differs_from_the_verified_guru_release_signing");
   }
   return chainId;
 }
 
 export function writeBlockReason(chain: ChainConfig, state: WalletSessionState): string | null {
-  if (state.status !== "connected") return "조회 전용 · 지갑을 연결하세요.";
-  if (state.chainKey !== chain.key || !chain.chainId || state.chainId !== chain.chainId) return "체인·지갑 연결이 일치하지 않습니다. 다시 연결하세요.";
-  if (state.walletType === "metamask") return "MetaMask는 Cosmos 조회 전용입니다. Keplr 또는 WalletConnect로 다시 연결하세요.";
-  if (!chain.rpcUrl) return "RPC endpoint가 없습니다. LCD 조회만 가능합니다.";
-  if (!chain.bech32Prefix || !chain.nativeDenom || !chain.bondDenom || !chain.feeDenom || chain.decimals === undefined) return "prefix·denom·decimals 검증 정보가 부족하여 조회만 가능합니다.";
-  if (!chain.signing?.some(s => s.wallet === state.walletType && (state.walletType !== "walletconnect" || s.method === "amino"))) return "이 체인·지갑의 서명 방식이 확인되지 않았습니다. 조회만 가능합니다.";
+  if (state.status !== "connected") return serviceText("read_only_connect_your_wallet");
+  if (state.chainKey !== chain.key || !chain.chainId || state.chainId !== chain.chainId) return serviceText("chain_and_wallet_connection_do_not_match_reconnect");
+  if (state.walletType === "metamask") return serviceText("metamask_is_read_only_for_cosmos_reconnect_with_keplr_or");
+  if (!chain.rpcUrl) return serviceText("rpc_endpoint_missing_only_lcd_queries_are_available");
+  if (!chain.bech32Prefix || !chain.nativeDenom || !chain.bondDenom || !chain.feeDenom || chain.decimals === undefined) return serviceText("prefix_denom_or_decimals_verification_is_incomplete_read_only");
+  if (!chain.signing?.some(s => s.wallet === state.walletType && (state.walletType !== "walletconnect" || s.method === "amino"))) return serviceText("signing_for_this_chain_and_wallet_is_unverified_read_only");
   const profileReason = signingProfileBlockReason(chain);
   if (profileReason) return profileReason;
-  if (isGuruReleaseProfile(chain) && state.walletType !== "keplr") return "Guru 릴리스 어댑터는 Keplr 소프트웨어 계정만 검증 대상입니다.";
+  if (isGuruReleaseProfile(chain) && state.walletType !== "keplr") return serviceText("the_guru_release_adapter_is_only_verified_for_keplr_software");
   const access = chain.rpcAccess;
-  if (!access || typeof window === "undefined" || access.origin !== window.location.origin) return "현재 origin의 RPC GET·JSON POST·OPTIONS 접근 근거가 없습니다. 조회만 가능합니다.";
-  if (!state.bech32Address) return "현재 체인의 Cosmos 계정이 없습니다. 다시 연결하세요.";
-  try { if (bech32.decode(state.bech32Address).prefix !== chain.bech32Prefix) return "계정 prefix가 선택 체인과 다릅니다. 다시 연결하세요."; }
-  catch { return "Cosmos 계정 주소가 올바르지 않습니다. 다시 연결하세요."; }
-  if (state.walletType === "walletconnect" && (!state.sessionTopic || !state.methods.includes("cosmos_signAmino"))) return "현재 체인의 cosmos_signAmino 승인이 없습니다. 다시 연결하세요.";
-  if (!state.pubkey?.length) return "계정 공개키를 확보하지 못했습니다. 지갑/계정을 확인하고 다시 연결하세요.";
+  if (!access || typeof window === "undefined" || access.origin !== window.location.origin) return serviceText("no_verified_rpc_get_json_post_and_options_access_from");
+  if (!state.bech32Address) return serviceText("no_cosmos_account_for_the_current_chain_reconnect");
+  try { if (bech32.decode(state.bech32Address).prefix !== chain.bech32Prefix) return serviceText("account_prefix_differs_from_the_selected_chain_reconnect"); }
+  catch { return serviceText("invalid_cosmos_account_address_reconnect"); }
+  if (state.walletType === "walletconnect" && (!state.sessionTopic || !state.methods.includes("cosmos_signAmino"))) return serviceText("no_cosmos_signamino_approval_for_the_current_chain_reconnect");
+  if (!state.pubkey?.length) return serviceText("could_not_obtain_the_account_public_key_check_the_wallet");
   return null;
 }
 
 /** Browser JSON POST triggers the real CORS preflight; OPTIONS evidence is separately required per origin. */
 export async function verifyChainEndpoints(chain: ChainConfig): Promise<void> {
-  if (!chain.chainId || !chain.rpcUrl) throw new Error("chain ID 또는 RPC 설정이 없습니다.");
+  if (!chain.chainId || !chain.rpcUrl) throw new ServiceError("chain_id_or_rpc_configuration_missing");
   const rpc = chain.rpcUrl.replace(/\/$/, "");
   const [lcd, get, post] = await Promise.all([
     verifyLcdChain(chain),
@@ -47,6 +49,6 @@ export async function verifyChainEndpoints(chain: ChainConfig): Promise<void> {
     }),
   ]);
   if (lcd !== chain.chainId || get.result?.node_info?.network !== chain.chainId || post.result?.node_info?.network !== chain.chainId) {
-    throw new Error("LCD/RPC GET·POST chain ID가 일치하지 않습니다. 서명이 차단되었습니다.");
+    throw new ServiceError("lcd_and_rpc_get_post_chain_ids_do_not_match");
   }
 }

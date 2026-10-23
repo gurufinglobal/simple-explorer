@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cosmosAddress, cosmosPubkey, cosmosSigningProfile } from "../helpers/cosmos-signing";
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '../helpers/render';
 import userEvent from '@testing-library/user-event';
 import { bech32 } from 'bech32';
 import { sha256 } from '@cosmjs/crypto';
@@ -113,7 +113,7 @@ beforeEach(() => {
 
 afterEach(() => { cleanup(); store.getState().disconnect(); portfolio.getState().clear(); delete window.keplr; delete window.getOfflineSigner; vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 const actions = ['delegate', 'undelegate', 'reward', 'commission'] as const;
-const labels = { delegate: 'Delegate', undelegate: 'Undelegate', reward: 'Claim Reward', commission: 'Claim Operator Reward' };
+const labels = { delegate: "위임", undelegate: "위임 해제", reward: "보상 받기", commission: "운영자 보상 받기" };
 function stakingInput(action: StakingAction, target = validator): StakingTxInput {
   const base = { walletType: 'keplr' as const, sessionTopic: null, bech32Address: sender, validatorAddress: target };
   return action === 'delegate' || action === 'undelegate' ? { ...base, action, amount: '1234567', denom: 'agxn', displayAmount: '1.234567' } : { ...base, action };
@@ -177,7 +177,7 @@ describe.each(actions)('W06 %s real UI / service / signing flow', action => {
   });
   it('code failure keeps code/hash/cause and has no success message', async () => {
     boundary.broadcast.mockResolvedValue({ code: 9, transactionHash: hash, rawLog: 'staking rejected' }); txStatus = 9; detailFailure = true;
-    await open(action); await approve(); await screen.findByText('staking rejected · code 9');
+    await open(action); await approve(); expect((await screen.findByText('원문 상세: staking rejected')).parentElement?.textContent).toContain('code 9');
     expect(screen.queryByText(/체인 포함 성공/)).toBeNull(); expect(loadReceipts()[0]).toMatchObject({ code: 9, hash, status: 'failed', staking: { action, validator } });
   });
   it('timeout is pending, survives reload, re-queries original action and never auto-resends', async () => {
@@ -284,7 +284,7 @@ describe('W06 validation / invalidation / entry points', () => {
   });
   it.each(['input', 'validator', 'account', 'chain', 'disconnect'])('invalidates %s change during confirmation', async change => {
     const view = render(<StakingForm validatorAddress={validator} isOperator />);
-    fireEvent.click(screen.getByRole('button', { name: 'Claim Reward' })); await screen.findByRole('dialog');
+    fireEvent.click(screen.getByRole('button', { name: "보상 받기" })); await screen.findByRole('dialog');
     act(() => {
       if (change === 'input') fireEvent.change(screen.getByLabelText('수량 (표시 단위)'), { target: { value: '2' } });
       if (change === 'validator') view.rerender(<StakingForm validatorAddress={otherValidator} isOperator />);
@@ -296,7 +296,7 @@ describe('W06 validation / invalidation / entry points', () => {
   });
   it('discard late preparation after an input A-B-A transition', async () => {
     const pending = deferred<number>(); boundary.simulate.mockReturnValue(pending.promise);
-    render(<StakingForm validatorAddress={validator} isOperator />); fireEvent.click(screen.getByRole('button', { name: 'Claim Reward' }));
+    render(<StakingForm validatorAddress={validator} isOperator />); fireEvent.click(screen.getByRole('button', { name: "보상 받기" }));
     await waitFor(() => expect(boundary.simulate).toHaveBeenCalledOnce());
     fireEvent.change(screen.getByLabelText('수량 (표시 단위)'), { target: { value: '2' } });
     fireEvent.change(screen.getByLabelText('수량 (표시 단위)'), { target: { value: '' } });
@@ -332,18 +332,18 @@ describe('W06 validation / invalidation / entry points', () => {
     expect(portfolio.getState().result.context.target).not.toBe(`portfolio:${sender}`); expect(transactionLink(receipt)).toContain('chain=a');
   });
   it('dashboard delegate entry executes the shared confirmation', async () => {
-    render(<DashboardView />); fireEvent.click(screen.getByRole('button', { name: 'DELEGATE' }));
+    render(<DashboardView />); fireEvent.click(screen.getByRole('button', { name: "위임" }));
     await waitFor(() => expect(http.mock.calls.some(([u]) => String(u).includes('/validators?'))).toBe(true));
-    fireEvent.mouseDown(screen.getByRole('combobox', { name: 'Validator' })); fireEvent.click(await screen.findByRole('option'));
+    fireEvent.mouseDown(screen.getByRole('combobox', { name: "검증자" })); fireEvent.click(await screen.findByRole('option'));
     fireEvent.change(screen.getByLabelText('수량 (표시 단위)'), { target: { value: '1.234567' } });
     await screen.findByText('표시 수량 1.234567 GXN → 전송 원본 1234567 agxn'); fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: 'Delegate Tx' })); await screen.findByRole('dialog'); await approve();
+    fireEvent.click(screen.getByRole('button', { name: "위임 실행" })); await screen.findByRole('dialog'); await approve();
     await screen.findByText(/체인 포함 성공/); expect(boundary.sign.mock.calls[0][1][0].typeUrl).toBe(stakingMessages.delegate.typeUrl);
   });
   it('validator detail entry reads its position and exposes all four shared actions', async () => {
     const detail = await getValidatorDetail(validator, createQueryClient(a)); render(<ValidatorDetailView detail={detail!} />);
-    await waitFor(() => expect((screen.getByRole('button', { name: 'Claim Operator Reward' }) as HTMLButtonElement).disabled).toBe(false));
-    fireEvent.click(screen.getByRole('button', { name: 'Claim Operator Reward' })); await screen.findByRole('dialog'); await approve();
+    await waitFor(() => expect((screen.getByRole('button', { name: "운영자 보상 받기" }) as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(screen.getByRole('button', { name: "운영자 보상 받기" })); await screen.findByRole('dialog'); await approve();
     await screen.findByText(/체인 포함 성공/); expect(boundary.sign.mock.calls[0][1][0].typeUrl).toBe(stakingMessages.commission.typeUrl);
   });
 });
@@ -390,7 +390,7 @@ describe('W06 refreshed rendered data', () => {
     const amount = screen.getByRole('textbox', { name: '수량 (표시 단위)' });
     fireEvent.change(amount, { target: { value: '2' } });
     boundary.broadcast.mockImplementation(async () => { included = true; validatorTokens = '5678'; return { code: 0, transactionHash: hash }; });
-    fireEvent.click(screen.getByRole('button', { name: 'Claim Reward' }));
+    fireEvent.click(screen.getByRole('button', { name: "보상 받기" }));
     await screen.findByRole('dialog'); await approve();
     await waitFor(() => expect(screen.getByText(/체인 포함 성공/)).toBeTruthy());
     // Let the post-inclusion refresh enter a real pending state, outside the
@@ -407,7 +407,7 @@ describe('W06 refreshed rendered data', () => {
   it('updates validator metrics and keeps result visible after position reloading', async () => {
     render(<ValidatorDetailPage />); await screen.findByText('0.001234 GXN');
     boundary.broadcast.mockImplementation(async () => { validatorTokens = '5678'; delegation = '8000000'; return { code: 0, transactionHash: hash }; });
-    fireEvent.click(screen.getByRole('button', { name: 'Claim Reward' })); await screen.findByRole('dialog'); await approve();
+    fireEvent.click(screen.getByRole('button', { name: "보상 받기" })); await screen.findByRole('dialog'); await approve();
     await screen.findByText('0.005678 GXN'); await screen.findAllByText('8 GXN');
     expect(await screen.findByText(/체인 포함 성공/)).toBeTruthy(); expect(boundary.broadcast).toHaveBeenCalledOnce();
   });

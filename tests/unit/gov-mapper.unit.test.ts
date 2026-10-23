@@ -41,3 +41,8 @@ describe("tallyPercentages", () => {
     expect(p.no).toBe(50);
   });
 });
+
+it("distinguishes a missing title from an identical on-chain title for localization", () => {
+  expect(normalizeGovV1Proposal({ id: "7" })).toMatchObject({ title: "Proposal 7", titleMissing: true });
+  expect(normalizeGovV1Proposal({ id: "7", title: "Proposal 7" })).toMatchObject({ title: "Proposal 7", titleMissing: false });
+});

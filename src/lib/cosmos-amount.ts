@@ -1,3 +1,5 @@
+
+import { ServiceError, serviceText } from '@/i18n/service-message';
 import { schemaError } from "./query-result";
 
 /** All quantities stay decimal strings; Number is only used for bounded exponents. */
@@ -5,7 +7,7 @@ export type Coin = { amount: string; denom: string };
 export type AmountMetadata = { baseDenom: string; displayDenom: string; symbol: string; decimals: number | null };
 
 export function decimalParts(value: string): [bigint, number] {
-  if (!/^\d+(?:\.\d+)?$/.test(value)) throw new Error("금액 원본이 올바르지 않습니다.");
+  if (!/^\d+(?:\.\d+)?$/.test(value)) throw new ServiceError("invalid_raw_amount");
   const [whole, fraction = ""] = value.split(".");
   return [BigInt(whole + fraction), fraction.length];
 }
@@ -24,26 +26,26 @@ function decimalString(value: bigint, places: number): string {
 export function sumCoins(coins: Coin[]): Coin[] {
   const sums = new Map<string, string>();
   for (const coin of coins) {
-    if (!coin || !coin.denom || typeof coin.amount !== "string" || !/^\d+(?:\.\d+)?$/.test(coin.amount)) schemaError("금액·denom 원본이 올바르지 않습니다.");
+    if (!coin || !coin.denom || typeof coin.amount !== "string" || !/^\d+(?:\.\d+)?$/.test(coin.amount)) schemaError(serviceText("invalid_raw_amount_or_denom"));
     sums.set(coin.denom, addDecimal(sums.get(coin.denom) ?? "0", coin.amount));
   }
   return [...sums].map(([denom, amount]) => ({ denom, amount }));
 }
 export function assertBaseAmount(value: string): void {
-  if (!/^\d+$/.test(value) || BigInt(value) <= BigInt(0)) throw new Error("수량은 0보다 큰 최소 단위 정수여야 합니다.");
+  if (!/^\d+$/.test(value) || BigInt(value) <= BigInt(0)) throw new ServiceError("amount_must_be_a_positive_integer_in_base_units");
 }
 export function displayToBase(value: string, decimals: number | null | undefined): string {
-  if (decimals == null || !Number.isInteger(decimals) || decimals < 0 || decimals > 255) throw new Error("표시 정밀도 미확인: 전송할 수 없습니다.");
-  if (!/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) throw new Error("양수 십진수 수량을 입력하세요. 지수·음수·앞자리 0은 허용하지 않습니다.");
+  if (decimals == null || !Number.isInteger(decimals) || decimals < 0 || decimals > 255) throw new ServiceError("display_precision_unknown_sending_is_blocked");
+  if (!/^(?:0|[1-9]\d*)(?:\.\d+)?$/.test(value)) throw new ServiceError("enter_a_positive_decimal_amount_using_a_period_exponents_negative");
   const [whole, fraction = ""] = value.split(".");
-  if (fraction.length > decimals) throw new Error(`허용 소수 ${decimals}자리를 초과했습니다.`);
+  if (fraction.length > decimals) throw new ServiceError("exceeds_the_allowed_decimal_places", { value0: String(decimals) });
   const base = BigInt(whole + fraction.padEnd(decimals, "0")).toString();
   assertBaseAmount(base);
   return base;
 }
 export function formatCoin(coin: Coin, metadata?: AmountMetadata | null): string {
   const [value, places] = decimalParts(coin.amount);
-  if (!metadata || metadata.baseDenom !== coin.denom || metadata.decimals == null) return `${coin.amount} ${coin.denom} (정밀도 미확인)`;
+  if (!metadata || metadata.baseDenom !== coin.denom || metadata.decimals == null) return serviceText("precision_unknown", { value0: String(coin.amount), value1: String(coin.denom) });
   const scale = places + metadata.decimals;
   const text = decimalString(value, scale);
   const [whole, fraction = ""] = text.split(".");

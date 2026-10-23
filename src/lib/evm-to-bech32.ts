@@ -1,3 +1,4 @@
+import { ServiceError } from "@/i18n/service-message";
 import { bech32 } from "bech32";
 
 const ETH_ADDRESS_RE = /^0x[0-9a-fA-F]{40}$/;
@@ -12,7 +13,7 @@ export function isEthereumAddress(value: string): boolean {
 export function ethToCosmosBech32(hexAddress: string, hrp: string): string {
   const hexDigits = hexAddress.replace(/^0x/i, "");
   if (hexDigits.length !== 40 || !/^[0-9a-fA-F]{40}$/.test(hexDigits)) {
-    throw new Error("Invalid EVM address");
+    throw new ServiceError("invalid_evm_address");
   }
   const bytes = new Uint8Array(20);
   for (let i = 0; i < 20; i++) {

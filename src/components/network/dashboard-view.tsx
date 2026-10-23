@@ -1,4 +1,9 @@
 "use client";
+import { useServiceText } from "@/i18n/use-service-text";
+import { ServiceErrorText } from "@/components/query/service-error-text";
+
+import { useTranslations } from "next-intl";
+
 
 import { CoinAmount } from "@/components/amount/coin-amount";
 import { UnbondingDetails } from "@/components/amount/unbonding-details";
@@ -51,6 +56,8 @@ function formatIntegerDisplay(value: string | null): string {
 function formatCompactAmount(value: string | null | undefined): string { return value ?? "-"; }
 
 export function DashboardView() {
+  const t = useTranslations("explorer");
+  const st = useServiceText();
   const summary = useQuery("dashboard-summary", client => getNetworkSummary(client));
   const validators = usePagedQuery("dashboard-validators", (client, cursor) => getValidatorsPage(100, client, cursor), row => row.operatorAddress);
   const versions = useQuery("application-versions", client => getApplicationVersions(client));
@@ -67,8 +74,8 @@ export function DashboardView() {
   const isMetamask = wallet.status === "connected" && wallet.walletType === "metamask";
   const [activeAction, setActiveAction] = useState<"send" | "delegate" | null>(null);
   const walletTitle = useMemo(
-    () => (wallet.status === "connected" ? `Connected (${wallet.walletType ?? "wallet"})` : "Not Connected"),
-    [wallet.status, wallet.walletType],
+    () => (wallet.status === "connected" ? t("walletConnected", { wallet: wallet.walletType ?? "wallet" }) : t("notConnected")),
+    [wallet.status, wallet.walletType, t],
   );
 
   return (
@@ -89,31 +96,30 @@ export function DashboardView() {
             </Stack>
 
             <Typography variant="body2" color="text.secondary">
-              [Guru Chain Explorer] is a lightweight explorer dashboard for tracking blocks, transactions, staking, and governance.
-            </Typography>
+               {t("guru_chain_explorer_is_a_lightweight_dashboard_for_tracking")} </Typography>
             <Stack direction="row" spacing={1} flexWrap="wrap">
-              <Chip size="small" label="Layer1" />
-              <Chip size="small" label="Interoperability" />
-              <Chip size="small" label="Ecosystem" />
-              <Chip size="small" label="Cross-chain" />
-              <Chip size="small" label="Staking" />
+              <Chip size="small" label={t("layer_1")} />
+              <Chip size="small" label={t("interoperability")} />
+              <Chip size="small" label={t("ecosystem")} />
+              <Chip size="small" label={t("cross_chain")} />
+              <Chip size="small" label={t("staking")} />
             </Stack>
           </Stack>
         </CardContent>
       </Card>
 
       <DashboardQueryInfo key={summary.result.context.chain} queries={[
-        { ...summary, label: "네트워크 지표" },
-        { ...validators, label: "검증인" },
-        { ...versions, label: "앱 버전" },
-        { ...accounts, label: "계정 수" },
+        { ...summary, label: t("network_metrics") },
+        { ...validators, label: t("validators") },
+        { ...versions, label: t("app_version_2") },
+        { ...accounts, label: t("account_count") },
       ]} />
 
       <Grid container spacing={2}>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
-              <Typography variant="caption">Height</Typography>
+              <Typography variant="caption">{t("height_3")}</Typography>
               <Typography variant="h6">
                 {loading ? <Skeleton variant="text" width={60} /> : (state?.blockHeight ?? "-")}
               </Typography>
@@ -123,42 +129,42 @@ export function DashboardView() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
-              <Typography variant="caption">Validators</Typography>
-              <Typography variant="caption" display="block">현재 조회 bonded 검증자 수</Typography>
+              <Typography variant="caption">{t("validators_2")}</Typography>
+              <Typography variant="caption" display="block">{t("bonded_validators_in_the_current_query")}</Typography>
               <Typography variant="h6">
                 {validators.busy && !validators.result.data ? <Skeleton variant="text" width={60} /> : (validators.result.data?.length ?? "-")}
               </Typography>
-              <PageControls {...validators} label="검증자" />
+              <PageControls {...validators} label={t("validators_3")} />
             </CardContent>
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
-              <Typography variant="caption">Supply</Typography>
+              <Typography variant="caption">{t("supply")}</Typography>
               <Typography variant="h6" title={state?.supply ?? "-"}>
                 {loading ? <Skeleton variant="text" width={130} /> : formatCompactAmount(state?.supply)}
               </Typography>
-              <MetricRawDetails key={summary.result.context.chain} label="공급량" raw={state?.supplyRaw} />
+              <MetricRawDetails key={summary.result.context.chain} label={t("supply_2")} raw={state?.supplyRaw} />
             </CardContent>
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
-              <Typography variant="caption">Bonded</Typography>
-              <Typography variant="caption" display="block">체인 staking pool 본딩량</Typography>
+              <Typography variant="caption">{t("bonded")}</Typography>
+              <Typography variant="caption" display="block">{t("bonded_amount_in_the_chain_staking_pool")}</Typography>
               <Typography variant="h6" title={state?.bonded ?? "-"}>
                 {loading ? <Skeleton variant="text" width={130} /> : formatCompactAmount(state?.bonded)}
               </Typography>
-              <MetricRawDetails key={summary.result.context.chain} label="본딩량" raw={state?.bondedRaw} />
+              <MetricRawDetails key={summary.result.context.chain} label={t("bonded_amount")} raw={state?.bondedRaw} />
             </CardContent>
           </Card>
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
-              <Typography variant="caption">Inflation</Typography>
+              <Typography variant="caption">{t("inflation")}</Typography>
               <Typography variant="h6">
                 {loading ? <Skeleton variant="text" width={90} /> : (state?.inflation ?? "-")}
               </Typography>
@@ -168,7 +174,7 @@ export function DashboardView() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
-              <Typography variant="caption">Avg Block Time (10)</Typography>
+              <Typography variant="caption">{t("average_block_time_10")}</Typography>
               <Typography variant="h6">
                 {loading ? <Skeleton variant="text" width={90} /> : (state ? `${state.averageBlockTimeSec?.toFixed(2) ?? "-"}s` : "-")}
               </Typography>
@@ -178,7 +184,7 @@ export function DashboardView() {
         <Grid size={{ xs: 12, sm: 6, lg: 3 }}>
           <Card variant="outlined" sx={{ height: "100%" }}>
             <CardContent>
-              <Typography variant="caption">Accounts</Typography>
+              <Typography variant="caption">{t("accounts")}</Typography>
               <Typography variant="h6">
                 {accounts.busy && accounts.result.data === null ? <Skeleton variant="text" width={90} /> : formatIntegerDisplay(accounts.result.data)}
               </Typography>
@@ -191,15 +197,12 @@ export function DashboardView() {
         <CardContent>
           <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
             <Typography variant="subtitle1" fontWeight={700}>
-              Active Proposals
-            </Typography>
+               {t("active_proposals")} </Typography>
             <Button component={Link} href="/governance" size="small" variant="outlined">
-              Governance
-            </Button>
+               {t("governance")} </Button>
           </Stack>
           <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-            활성 제안은 아직 조회하지 않았습니다. Governance에서 확인하세요.
-          </Typography>
+             {t("active_proposals_have_not_been_queried_yet_check_governance")} </Typography>
         </CardContent>
       </Card>
 
@@ -210,58 +213,56 @@ export function DashboardView() {
           </Typography>
           {isMetamask ? (
             <Alert severity="info" sx={{ mt: 1 }}>
-              MetaMask는 Cosmos SEND/DELEGATE 서명을 지원하지 않습니다. Keplr 또는 WalletConnect를 사용하세요.
-            </Alert>
+               {t("metamask_does_not_support_cosmos_send_delegate_signing_use")} </Alert>
           ) : null}
           {effectiveCosmos ? (
             <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 0.5 }}>
-              Cosmos (LCD): {effectiveCosmos}
+               {t("cosmos_lcd")} {effectiveCosmos}
             </Typography>
           ) : null}
           {wallet.status === "connected" && portfolio.result.context.chain === getActiveChainConfig().key && portfolio.result.context.target === `portfolio:${effectiveCosmos}` ? <QueryStatus result={portfolio.result} busy={portfolio.loading} refresh={() => { if (effectiveCosmos) void portfolio.refresh(effectiveCosmos); }} /> : null}
-          {wallet.status === "connected" && portfolio.details && <details><summary>자산 원본·언본딩 상세</summary>
+          {wallet.status === "connected" && portfolio.details && <details><summary>{t("raw_assets_and_unbonding_details")}</summary>
             {(["balance", "staking", "reward"] as const).map(kind => <div key={kind}>{kind}{portfolio.details?.[kind]?.map(coin => <CoinAmount key={coin.denom} coin={coin} metadata={portfolio.details?.metadata} />)}</div>)}
             {portfolio.details.unbonding && <UnbondingDetails snapshot={portfolio.details.unbonding} duration={portfolio.details.unbondingTime} metadata={portfolio.details.metadata} />}
           </details>}
           {portfolio.error ? (
             <Alert severity="warning" sx={{ mb: 1 }}>
-              {portfolio.error}
+              {<ServiceErrorText error={portfolio.error} />}
             </Alert>
           ) : null}
           <Grid container spacing={2} sx={{ mt: 0.5 }}>
             <Grid size={{ xs: 12, md: 3 }}>
-              <Typography variant="caption">Balance</Typography>
+              <Typography variant="caption">{t("balance")}</Typography>
               <Typography variant="body1">
                 {wallet.status !== "connected"
                   ? "—"
                   : portfolio.loading
                     ? <Skeleton variant="text" width={70} />
-                    : portfolio.balance}
+                    : st(portfolio.balance)}
               </Typography>
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
-              <Typography variant="caption">Staking</Typography>
+              <Typography variant="caption">{t("staking")}</Typography>
               <Typography variant="body1">
-                {wallet.status !== "connected" ? "—" : portfolio.loading ? <Skeleton variant="text" width={70} /> : portfolio.staking}
+                {wallet.status !== "connected" ? "—" : portfolio.loading ? <Skeleton variant="text" width={70} /> : st(portfolio.staking)}
               </Typography>
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
-              <Typography variant="caption">Reward</Typography>
+              <Typography variant="caption">{t("reward")}</Typography>
               <Typography variant="body1">
-                {wallet.status !== "connected" ? "—" : portfolio.loading ? <Skeleton variant="text" width={70} /> : portfolio.reward}
+                {wallet.status !== "connected" ? "—" : portfolio.loading ? <Skeleton variant="text" width={70} /> : st(portfolio.reward)}
               </Typography>
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
-              <Typography variant="caption">Unbonding</Typography>
+              <Typography variant="caption">{t("unbonding")}</Typography>
               <Typography variant="body1">
-                {wallet.status !== "connected" ? "—" : portfolio.loading ? <Skeleton variant="text" width={70} /> : portfolio.unbonding}
+                {wallet.status !== "connected" ? "—" : portfolio.loading ? <Skeleton variant="text" width={70} /> : st(portfolio.unbonding)}
               </Typography>
             </Grid>
           </Grid>
           <Stack direction={{ xs: "column", md: "row" }} spacing={1} sx={{ mt: 2 }}>
             <Button variant="contained" color="success" fullWidth>
-              SWAP
-            </Button>
+               {t("swap")} </Button>
             <Button
               variant={activeAction === "send" ? "outlined" : "contained"}
               color="info"
@@ -269,16 +270,14 @@ export function DashboardView() {
               onClick={() => setActiveAction((prev) => (prev === "send" ? null : "send"))}
               disabled={wallet.status !== "connected"}
             >
-              SEND
-            </Button>
+               {t("send")} </Button>
             <Button
               variant={activeAction === "delegate" ? "outlined" : "contained"}
               fullWidth
               onClick={() => setActiveAction((prev) => (prev === "delegate" ? null : "delegate"))}
               disabled={wallet.status !== "connected"}
             >
-              DELEGATE
-            </Button>
+               {t("delegate")} </Button>
           </Stack>
           {activeAction === "send" && <SendForm key={getActiveChainConfig().key} />}
           <SavedTransactions chainKey={getActiveChainConfig().key} />
@@ -289,13 +288,12 @@ export function DashboardView() {
       <Card variant="outlined">
         <CardContent>
           <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 1 }}>
-            Application Versions
-          </Typography>
+             {t("application_versions")} </Typography>
           <Table size="small">
             <TableHead>
               <TableRow>
-                <TableCell>Name</TableCell>
-                <TableCell>Version</TableCell>
+                <TableCell>{t("name")}</TableCell>
+                <TableCell>{t("version")}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

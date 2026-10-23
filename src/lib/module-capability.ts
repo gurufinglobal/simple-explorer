@@ -1,3 +1,5 @@
+
+import { serviceMessage } from '@/i18n/service-message';
 import type { ChainConfig } from './env';
 import { QueryError } from './query-result';
 
@@ -8,5 +10,5 @@ export function moduleEnabled(chain: ChainConfig | null | undefined, module: Spe
 export function requireModule(chain: ChainConfig, path: string): void {
   const route = /^https?:\/\//.test(path) ? new URL(path).pathname : path;
   const feature = /^\/guru\/(bex|oracle|feepolicy)\//.exec(route)?.[1] as SpecialModule | undefined;
-  if (feature && !moduleEnabled(chain, feature)) throw new QueryError({ kind: 'unsupported', message: `${feature}: 이 체인의 지원 설정이 없거나 꺼져 있습니다. 공개 조회 지원을 확인한 뒤 설정해야 합니다.` });
+  if (feature && !moduleEnabled(chain, feature)) throw new QueryError({ kind: 'unsupported', ...serviceMessage("support_is_not_configured_or_is_disabled_for_this_chain", { value0: String(feature) }) });
 }

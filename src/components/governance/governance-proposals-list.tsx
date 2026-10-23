@@ -1,4 +1,6 @@
 "use client";
+import { useLocale, useTranslations } from "next-intl";
+
 
 import Link from "@/components/layout/chain-link";
 import { useEffect, useMemo, useState } from "react";
@@ -25,14 +27,7 @@ import { getProposalTally } from "@/services/guru/governance-query.service";
 const FILTER_ALL = "all" as const;
 export type FilterKey = typeof FILTER_ALL | GovProposalStatus;
 
-const STATUS_LABEL: Record<GovProposalStatus, string> = {
-  deposit_period: "예치",
-  voting_period: "투표",
-  passed: "가결",
-  rejected: "부결",
-  failed: "실패",
-  unspecified: "기타",
-};
+
 
 function statusColor(status: GovProposalStatus): "default" | "primary" | "success" | "warning" | "error" {
   switch (status) {
@@ -61,11 +56,22 @@ type Props = {
 };
 
 export function GovernanceProposalsList({ initialProposals, available = true, filterValue, sortValue, onCriteriaChange }: Props) {
+  const t = useTranslations("governance");
+const STATUS_LABEL: Record<GovProposalStatus, string> = {
+  deposit_period: t("deposits"),
+  voting_period: t("votes"),
+  passed: t("passed"),
+  rejected: t("rejected"),
+  failed: t("failed"),
+  unspecified: t("other"),
+};
+
   const [localFilter, setFilter] = useState<FilterKey>(FILTER_ALL);
   const [localSort, setSort] = useState<SortKey>("newest");
   const filter = filterValue ?? localFilter;
   const sort = sortValue ?? localSort;
   const [liveTallyByProposalId, setLiveTallyByProposalId] = useState<Record<string, NormalizedProposal["finalTally"]>>({});
+  const locale = useLocale();
   const nowMs = useNowTick(1000);
 
   useEffect(() => {
@@ -152,33 +158,33 @@ export function GovernanceProposalsList({ initialProposals, available = true, fi
 
   return (
     <Stack spacing={2}>
-      <Typography variant="body2">필터와 정렬은 현재 조회 목록에만 적용됩니다. 조건 변경 시 첫 페이지부터 다시 조회합니다.</Typography>
+      <Typography variant="body2">{t("filtering_and_sorting_apply_only_to_the_retrieved_list")}</Typography>
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} alignItems={{ sm: "center" }}>
         <Tabs value={tabIndex} onChange={handleTab} variant="scrollable" scrollButtons="auto">
-          <Tab label="전체" />
-          <Tab label="예치" />
-          <Tab label="투표" />
-          <Tab label="가결" />
-          <Tab label="부결" />
-          <Tab label="실패" />
+          <Tab label={t("all")} />
+          <Tab label={t("deposits")} />
+          <Tab label={t("votes")} />
+          <Tab label={t("passed")} />
+          <Tab label={t("rejected")} />
+          <Tab label={t("failed")} />
         </Tabs>
         <FormControl size="small" sx={{ minWidth: 160 }}>
-          <InputLabel id="gov-sort-label">정렬</InputLabel>
+          <InputLabel id="gov-sort-label">{t("sort")}</InputLabel>
           <Select
             labelId="gov-sort-label"
-            label="정렬"
+            label={t("sort")}
             value={sort}
             onChange={(e) => { setSort(e.target.value as SortKey); onCriteriaChange?.(filter, e.target.value as SortKey); }}
           >
-            <MenuItem value="newest">최신순</MenuItem>
-            <MenuItem value="ending">마감 임박</MenuItem>
+            <MenuItem value="newest">{t("newest")}</MenuItem>
+            <MenuItem value="ending">{t("ending_soon")}</MenuItem>
           </Select>
         </FormControl>
       </Stack>
 
       {filtered.length === 0 ? (
         <Typography variant="body2" color="text.secondary">
-          {available ? "표시할 제안이 없습니다." : "제안 목록 미확인: 조회 상태를 확인하세요."}
+          {available ? t("no_proposals_to_display") : t("proposal_list_unknown_check_query_status")}
         </Typography>
       ) : (
         <Box
@@ -215,11 +221,11 @@ export function GovernanceProposalsList({ initialProposals, available = true, fi
                     </Typography>
                     <Chip size="small" label={STATUS_LABEL[p.status]} color={statusColor(p.status)} />
                   </Stack>
-                  <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600 }} noWrap title={p.title}>
-                    {p.title}
+                  <Typography variant="body2" sx={{ mt: 0.5, fontWeight: 600 }} noWrap title={p.titleMissing ? t("proposalTitle", { id: p.id }) : p.title}>
+                    {p.titleMissing ? t("proposalTitle", { id: p.id }) : p.title}
                   </Typography>
                   <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                    {endTime ? formatRelativeFutureOrPast(endTime, nowMs) : "—"}
+                    {endTime ? formatRelativeFutureOrPast(endTime, nowMs, locale) : "—"}
                   </Typography>
                   {p.status === "voting_period" ? (
                     <Box sx={{ mt: 0.75 }}>
@@ -231,14 +237,14 @@ export function GovernanceProposalsList({ initialProposals, available = true, fi
                           display: "flex",
                           bgcolor: "action.disabledBackground",
                         }}
-                        aria-label="proposal vote ratio bar"
+                        aria-label={t("proposal_vote_ratio_chart")}
                       >
                         <Box sx={{ width: `${Math.max(0, Math.min(100, tally.yes))}%`, bgcolor: "info.main" }} />
                         <Box sx={{ width: `${Math.max(0, Math.min(100, tally.no))}%`, bgcolor: "warning.main" }} />
                         <Box sx={{ width: `${Math.max(0, Math.min(100, tally.abstain))}%`, bgcolor: "grey.500" }} />
                       </Box>
                       <Typography variant="caption" display="block" sx={{ mt: 0.5 }}>
-                        Yes {tally.yes.toFixed(1)}% · No {tally.no.toFixed(1)}% · Abstain {tally.abstain.toFixed(1)}%
+                         {t("yes")} {tally.yes.toFixed(1)}{t("no_3")} {tally.no.toFixed(1)}{t("abstain_3")} {tally.abstain.toFixed(1)}%
                       </Typography>
                     </Box>
                   ) : null}

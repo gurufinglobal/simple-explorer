@@ -1,3 +1,5 @@
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getTranslations } from "next-intl/server";
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
@@ -13,22 +15,23 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-export const metadata: Metadata = {
-  title: "Guru Chain 라이트 Scanner",
-  description: "지갑 연동과 체인 탐색을 제공하는 웹 대시보드",
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const t = await getTranslations('common');
+  return { title: t('appTitle'), description: t('appDescription') };
+}
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
   return (
-    <html lang="ko" className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
+    <html lang={locale} className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <MuiProvider>
+        <NextIntlClientProvider><MuiProvider>
           {children}
-        </MuiProvider>
+        </MuiProvider></NextIntlClientProvider>
       </body>
     </html>
   );

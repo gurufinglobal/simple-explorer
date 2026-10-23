@@ -1,3 +1,5 @@
+
+import { serviceText } from '@/i18n/service-message';
 import { cursorParam, pageRows, queryPage, type LcdPagination } from '@/lib/query-page';
 import { sumCoins, type Coin, type AmountMetadata } from "@/lib/cosmos-amount";
 import { withAmountMetadata, getStakingParams } from "./amount-context.service";
@@ -199,7 +201,7 @@ async function fetchValidatorDelegationTotal(operatorAddress: string, apiClients
       coins.push({ amount: balance.amount, denom: balance.denom });
     }
     nextKey = page.pagination?.next_key ?? null;
-    if (nextKey && seen.has(nextKey)) schemaError("위임 페이지가 반복됩니다.");
+    if (nextKey && seen.has(nextKey)) schemaError(serviceText("delegation_page_repeated"));
     if (nextKey) seen.add(nextKey);
   } while (nextKey);
 

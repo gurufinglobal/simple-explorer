@@ -1,3 +1,5 @@
+
+import { ServiceError } from '@/i18n/service-message';
 import type { SessionTypes } from "@walletconnect/types";
 import type { ChainConfig } from "@/lib/env";
 import { getActiveChainConfig } from "@/lib/chain-selection";
@@ -23,7 +25,7 @@ export function normalizeWalletConnectSession(session: SessionTypes.Struct, chai
     }
   }
   // Multiple accounts for the same chain require explicit wallet selection; never guess by array order.
-  if (cosmos.size > 1 || evm.size > 1) throw new Error("같은 체인의 계정이 여러 개입니다. 지갑에서 한 계정만 승인하고 다시 연결하세요.");
+  if (cosmos.size > 1 || evm.size > 1) throw new ServiceError("multiple_accounts_on_the_same_chain_approve_only_one_in");
   return {
     sessionTopic: session.topic, bech32Address: [...cosmos][0] ?? null, evmAddress: [...evm][0] ?? null,
     connectedChains: [...chains].sort(), chainKey: chain.key, chainId: chain.chainId,
@@ -32,9 +34,9 @@ export function normalizeWalletConnectSession(session: SessionTypes.Struct, chai
 }
 
 export function assertWalletConnectApproval(session: SessionTypes.Struct, chain: ChainConfig, address: string): void {
-  if (!session || session.expiry * 1000 <= Date.now()) throw new Error("WalletConnect 세션이 만료되었습니다. 다시 연결하세요.");
+  if (!session || session.expiry * 1000 <= Date.now()) throw new ServiceError("walletconnect_session_expired_reconnect");
   const normalized = normalizeWalletConnectSession(session, chain);
   if (normalized.bech32Address !== address || !normalized.methods?.includes("cosmos_signAmino")) {
-    throw new Error("현재 체인·계정의 cosmos_signAmino 승인이 없습니다. 다시 연결하세요.");
+    throw new ServiceError("no_cosmos_signamino_approval_for_the_current_chain_and_account");
   }
 }

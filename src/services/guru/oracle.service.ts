@@ -1,3 +1,5 @@
+
+import { serviceText } from '@/i18n/service-message';
 import { schemaError } from "@/lib/query-result";
 import { moduleRows, rawText, requiredText, record } from "./module-contract";
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
@@ -164,7 +166,7 @@ function normalizeOracleResult(raw: OracleResultRaw): OracleResultRow {
 }
 
 function normalizeOracleParams(raw: OracleParamsRaw | undefined): OracleParams {
-  if (raw?.enable !== undefined && raw.enable !== null && typeof raw.enable !== "boolean") schemaError("Oracle enable 필드가 올바르지 않습니다.");
+  if (raw?.enable !== undefined && raw.enable !== null && typeof raw.enable !== "boolean") schemaError(serviceText("invalid_oracle_enable_field"));
   return {
     enable: typeof raw?.enable === "boolean" ? raw.enable : null,
     quorumRatio: rawText(raw?.quorum_ratio ?? raw?.quorumRatio),

@@ -1,3 +1,5 @@
+
+import { ServiceError } from '@/i18n/service-message';
 import {
   getChainByKey,
   getDefaultChainKey,
@@ -18,7 +20,7 @@ function parseCookieValue(rawCookie: string, key: string): string | null {
     return null;
   }
   try { return decodeURIComponent(found.slice(key.length + 1)); }
-  catch { throw new Error("저장된 체인 key를 읽을 수 없습니다. 체인을 다시 선택하세요."); }
+  catch { throw new ServiceError("could_not_read_the_saved_chain_key_select_a_chain"); }
 }
 
 export function getActiveChainKeyFromClientCookie(): string | null {
@@ -37,7 +39,7 @@ export function setActiveChainKeyCookie(key: string): void {
   if (typeof document === "undefined") {
     return;
   }
-  if (!getChainByKey(key)) throw new Error("등록되지 않은 체인입니다.");
+  if (!getChainByKey(key)) throw new ServiceError("unregistered_chain");
   let previous: string | null = null;
   try { previous = getActiveChainKeyFromClientCookie(); } catch { /* An explicit selection replaces a malformed cookie. */ }
   document.cookie = `${ACTIVE_CHAIN_COOKIE}=${encodeURIComponent(key)}; path=/; max-age=31536000; samesite=lax`;
@@ -52,7 +54,7 @@ export function getActiveChainConfig(): ChainConfig {
 export function resolveChainContext(urlKey: string | null, cookieKey: string | null = null): ChainConfig {
   const selected = urlKey ?? cookieKey ?? getDefaultChainKey();
   const chain = getChainByKey(selected);
-  if (!chain) throw new Error(`선택 체인 '${selected}' 설정이 없습니다. 체인을 다시 선택하세요.`);
+  if (!chain) throw new ServiceError("configuration_for_selected_chain_is_missing_select_a_chain_again", { value0: String(selected) });
   return chain;
 }
 
@@ -80,7 +82,7 @@ export function synchronizeRouteChain(): void {
 
 
 export function selectActiveChain(key: string): void {
-  if (!getChainByKey(key)) throw new Error("등록되지 않은 체인입니다.");
+  if (!getChainByKey(key)) throw new ServiceError("unregistered_chain");
   const url = new URL(window.location.href);
   url.searchParams.set("chain", key);
   window.history.pushState(null, "", url);

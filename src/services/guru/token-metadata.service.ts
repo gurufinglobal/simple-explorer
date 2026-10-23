@@ -1,3 +1,5 @@
+
+import { serviceText, serviceMessage } from '@/i18n/service-message';
 import { PartialQueryError, QueryError, queryError, schemaError } from "@/lib/query-result";
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
@@ -67,8 +69,8 @@ async function fetchNativeTokenMetadata(tokenRef: string, apiClients: QueryClien
 
   return {
     tokenType: "native",
-    name: response.metadata.name ?? "미확인",
-    symbol: response.metadata.symbol ?? "미확인",
+    name: response.metadata.name ?? serviceText("unknown"),
+    symbol: response.metadata.symbol ?? serviceText("unknown"),
     decimals: getDisplayDecimals(response.metadata),
     sourceChain: null,
     sourceChannel: null,
@@ -89,8 +91,8 @@ async function fetchIbcTokenMetadata(tokenRef: string, apiClients: QueryClient =
 
   return {
     tokenType: "ibc",
-    name: "미확인",
-    symbol: "미확인",
+    name: serviceText("unknown"),
+    symbol: serviceText("unknown"),
     decimals: null,
     sourceChain: "unknown",
     sourceChannel: channelId,
@@ -134,7 +136,7 @@ function normalizeDenomMetadata(metadata: {
 }
 
 export async function getTokenMetadata(tokenRef: string, apiClients: QueryClient = defaultClients): Promise<TokenMetadata | null> {
-  if (tokenRef.startsWith("evm:")) throw new QueryError({ kind: "unsupported", message: "EVM 토큰 metadata 조회는 구현되지 않았습니다." });
+  if (tokenRef.startsWith("evm:")) throw new QueryError({ kind: "unsupported", ...serviceMessage("evm_token_metadata_queries_are_not_implemented") });
   return tokenRef.startsWith("ibc:") || tokenRef.startsWith("ibc/") ? fetchIbcTokenMetadata(tokenRef, apiClients) : fetchNativeTokenMetadata(tokenRef, apiClients);
 }
 
@@ -160,11 +162,11 @@ export async function getDenomsMetadata(apiClients: QueryClient = defaultClients
       nextKey = response.pagination?.next_key;
       pageCount += 1;
       if (nextKey && seen.has(nextKey)) {
-        throw new QueryError({ kind: "incomplete", message: "Metadata cursor 반복·순환을 감지하여 중단했습니다. 현재 결과는 일부입니다." });
+        throw new QueryError({ kind: "incomplete", ...serviceMessage("stopped_after_detecting_a_repeated_or_cyclic_metadata_cursor_results") });
       }
       if (nextKey) seen.add(nextKey);
       if (pageCount >= 50 && nextKey) {
-        throw new QueryError({ kind: "incomplete", message: "Metadata 조회 한도(50페이지)에 도달했습니다. 현재 결과는 일부입니다." });
+        throw new QueryError({ kind: "incomplete", ...serviceMessage("reached_the_metadata_query_limit_50_pages_results_are_partial") });
       }
     } while (nextKey);
 

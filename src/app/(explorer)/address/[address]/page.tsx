@@ -1,4 +1,6 @@
 "use client";
+import { useTranslations } from "next-intl";
+
 
 import { CopyPageLink, CopyValue } from "@/components/explorer/copy-value";
 import { AddressTransactions } from "@/components/explorer/address-transactions";
@@ -40,6 +42,7 @@ export default function AddressDetailPage() {
   return <AddressDetailContent key={address} address={address} />;
 }
 function AddressDetailContent({ address }: { address: string }) {
+  const t = useTranslations("explorer");
   const bank = useQuery(`balances:${address}`, client => getAddressBalances(address, client));
   const account = useQuery(`account:${address}`, client => getAddressAccountInfo(address, client));
   const metadata = useQuery("address-metadata", client => getDenomsMetadata(client));
@@ -52,18 +55,17 @@ function AddressDetailContent({ address }: { address: string }) {
     <Stack spacing={2}>
       <CopyPageLink />
       <Typography variant="h5" fontWeight={700}>
-        Address Details
-      </Typography>
-      <QueryInfo label="주소 조회 정보" queries={[{ ...account, label: "계정" }, { ...bank, label: "잔액" }, { ...metadata, label: "토큰 메타데이터" }, { ...portfolio, label: "위임과 보상" }]} />
+         {t("address_details")} </Typography>
+      <QueryInfo label={t("address_query_information")} queries={[{ ...account, label: t("account") }, { ...bank, label: t("balances") }, { ...metadata, label: t("token_metadata") }, { ...portfolio, label: t("delegations_and_rewards") }]} />
       <Card variant="outlined">
         <CardContent>
           <Stack spacing={1}>
-            <Typography>Address (canonical Bech32): {address}</Typography>
-            <CopyValue label="계정 주소 Bech32 복사" value={address} />
+            <Typography>{t("address_canonical_bech32")} {address}</Typography>
+            <CopyValue label={t("copy_account_bech32_address")} value={address} />
 
-            <Typography>Account Number: {accountInfo.accountNumber ?? "-"}</Typography>
-            <Typography>Sequence: {accountInfo.sequence ?? "-"}</Typography>
-            <Typography variant="subtitle2">Balances</Typography>
+            <Typography>{t("account_number")} {accountInfo.accountNumber ?? "-"}</Typography>
+            <Typography>{t("sequence")} {accountInfo.sequence ?? "-"}</Typography>
+            <Typography variant="subtitle2">{t("balances_2")}</Typography>
 
             {profileLoading ? (
               <Stack spacing={1}>
@@ -72,7 +74,7 @@ function AddressDetailContent({ address }: { address: string }) {
                 <Skeleton variant="text" width={160} />
               </Stack>
             ) : balances.length === 0 ? (
-              bank.result.status === "empty" ? <Typography>잔액 조회 완료: 보유 코인이 없습니다.</Typography> : null
+              bank.result.status === "empty" ? <Typography>{t("balance_query_complete_no_coins_held")}</Typography> : null
             ) : (
               <List dense>
                 {balances.map((row) => (
@@ -87,8 +89,8 @@ function AddressDetailContent({ address }: { address: string }) {
       </Card>
 
 
-      <Typography>위임: {portfolio.result.data?.staking ?? "미확인"} · 보상: {portfolio.result.data?.reward ?? "미확인"}</Typography>
-      <Stack component="section" aria-label="위임 원본 금액">
+      <Typography>{t("delegated")} {portfolio.result.data?.staking ?? t("unknown")}  {t("rewards")} {portfolio.result.data?.reward ?? t("unknown")}</Typography>
+      <Stack component="section" aria-label={t("raw_delegation_amount")}>
         {portfolio.result.data?.details?.staking?.map(coin => <CoinAmount key={coin.denom} coin={coin} metadata={portfolio.result.data?.details?.metadata} />)}
       </Stack>
       {portfolio.result.data?.details?.reward?.map(coin => <CoinAmount key={coin.denom} coin={coin} metadata={metadata.result.data ?? []} />)}

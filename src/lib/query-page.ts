@@ -1,3 +1,5 @@
+
+import { serviceText } from '@/i18n/service-message';
 import { PartialQueryError, type QueryErrorInfo } from './query-result';
 
 export type LcdPagination = { next_key?: string | null; total?: string };
@@ -18,7 +20,7 @@ export function queryPage<T>(rows: T[], pagination?: LcdPagination, limit = 100)
   return {
     rows, nextCursor: pagination?.next_key || null,
     total: pagination?.total ?? null, totalVerified: false,
-    ...(pagination?.next_key === undefined && rows.length >= limit ? { stopReason: '서버가 다음 cursor를 제공하지 않아 조회 상한에서 중단했습니다. 현재 결과는 일부일 수 있습니다.' } : {}),
+    ...(pagination?.next_key === undefined && rows.length >= limit ? { stopReason: serviceText("stopped_at_the_query_limit_because_the_server_did_not") } : {}),
   };
 }
 /** Compatibility for non-paginated consumers, including receipt refresh jobs. */

@@ -1,9 +1,14 @@
+
+import { describeServiceMessage, serviceMessage, type MessageParams } from '@/i18n/service-message';
 export type ErrorView = {
   code: string;
   message: string;
+  params?: MessageParams;
 };
 
 export function mapToErrorView(error: unknown): ErrorView {
+  const known = describeServiceMessage(error);
+  if (known) return { code: known.messageCode, params: known.messageParams, message: known.message };
   if (error instanceof Error) {
     return {
       code: "UNEXPECTED_ERROR",
@@ -13,6 +18,6 @@ export function mapToErrorView(error: unknown): ErrorView {
 
   return {
     code: "UNKNOWN_ERROR",
-    message: "알 수 없는 오류가 발생했습니다.",
+    ...serviceMessage("an_unknown_error_occurred"),
   };
 }

@@ -1,3 +1,5 @@
+
+import { useTranslations } from "next-intl";
 import type { ReactNode } from "react";
 import { Table } from "@mui/material";
 
@@ -11,8 +13,9 @@ export const moduleTextCellSx = {
 } as const;
 
 export function ModuleTable({ children }: { children: ReactNode }) {
+  const t = useTranslations("query");
   return (
-    <div role="region" aria-label="모듈 표 가로 스크롤" tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}>
+    <div role="region" aria-label={t("scroll_module_table_horizontally")} tabIndex={0} style={{ maxWidth: "100%", overflowX: "auto" }}>
       <Table size="small" sx={{ minWidth: 640, whiteSpace: "nowrap", overflowWrap: "normal", wordBreak: "normal" }}>
         {children}
       </Table>

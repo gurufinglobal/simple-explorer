@@ -1,50 +1,21 @@
-/**
- * Human-readable elapsed time since `iso` (Korean), relative to `nowMs`.
- */
-export function formatRelativePastFromIso(iso: string, nowMs: number): string {
+function relative(iso: string, nowMs: number, locale: string, pastOnly: boolean): string {
   const parsed = Date.parse(iso);
-  if (Number.isNaN(parsed)) {
-    return "—";
-  }
-  const diffMs = Math.max(0, nowMs - parsed);
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) {
-    return `${sec}초 전`;
-  }
-  const min = Math.floor(sec / 60);
-  if (min < 60) {
-    return `${min}분 전`;
-  }
-  const h = Math.floor(min / 60);
-  if (h < 24) {
-    return `${h}시간 전`;
-  }
-  const d = Math.floor(h / 24);
-  return `${d}일 전`;
+  if (!Number.isFinite(parsed)) return '—';
+  const delta = pastOnly ? Math.min(0, parsed - nowMs) : parsed - nowMs;
+  const seconds = Math.floor(Math.abs(delta) / 1000);
+  const [size, unit]: [number, Intl.RelativeTimeFormatUnit] = seconds < 60 ? [1, 'second']
+    : seconds < 3600 ? [60, 'minute'] : seconds < 86400 ? [3600, 'hour'] : [86400, 'day'];
+  return new Intl.RelativeTimeFormat(locale, { numeric: 'always' }).format((delta <= 0 ? -1 : 1) * Math.floor(seconds / size), unit);
 }
-
-/** Past → "N분 전", future → "N분 후" (Korean). */
-export function formatRelativeFutureOrPast(iso: string, nowMs: number): string {
-  const parsed = Date.parse(iso);
-  if (Number.isNaN(parsed)) {
-    return "—";
-  }
-  const diffMs = parsed - nowMs;
-  if (diffMs <= 0) {
-    return formatRelativePastFromIso(iso, nowMs);
-  }
-  const sec = Math.floor(diffMs / 1000);
-  if (sec < 60) {
-    return `${sec}초 후`;
-  }
-  const min = Math.floor(sec / 60);
-  if (min < 60) {
-    return `${min}분 후`;
-  }
-  const h = Math.floor(min / 60);
-  if (h < 24) {
-    return `${h}시간 후`;
-  }
-  const d = Math.floor(h / 24);
-  return `${d}일 후`;
+/** The caller supplies the request locale and shared clock for deterministic SSR. */
+export function formatRelativePastFromIso(iso: string, nowMs: number, locale = 'ko'): string {
+  return relative(iso, nowMs, locale, true);
+}
+export function formatRelativeFutureOrPast(iso: string, nowMs: number, locale = 'ko'): string {
+  return relative(iso, nowMs, locale, false);
+}
+export function formatTimestamp(iso: string, locale: string): string {
+  const date = new Date(iso);
+  if (!Number.isFinite(date.getTime())) return '—';
+  return `${new Intl.DateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'medium', timeZone: 'UTC' }).format(date)} (UTC)`;
 }

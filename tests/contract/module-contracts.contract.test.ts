@@ -83,7 +83,7 @@ it('partial list payloads become detail objects, never arrays or false not-found
 });
 it('BEX malformed fee section preserves successful siblings and unknown fields never become zero', async () => {
   mockQueryHttp(url => url.pathname.endsWith('/exchanges') ? { exchanges: [{ id: '1' }] } : { coins: url.pathname.includes('locked') ? 'bad' : [{ denom: 'agxn', amount: '9007199254740993' }] });
-  expect((await listBexExchanges(client()))[0]).toMatchObject({ fee: '미확인', limit: '미확인', oracleRequestId: '미확인' });
+  expect((await listBexExchanges(client()))[0]).toMatchObject({ fee: '—', limit: '—', oracleRequestId: '—' });
   expect(await readQuery(context, () => getBexExchangeFees('1', client()))).toMatchObject({ status: 'partial', data: { hasLockedError: true, collected: [{ amount: '9007199254740993' }] } });
 });
 it('actual percent and synthetic percentage remain separate exact amounts', async () => {
@@ -95,7 +95,7 @@ it('actual percent and synthetic percentage remain separate exact amounts', asyn
 });
 it('Oracle nonce/time/report are raw, malformed result fails and missing params are unknown', async () => {
   const http = mockQueryHttp(url => url.pathname.endsWith('/params') ? { params: {} } : url.pathname.endsWith('/reports') ? { reports: [{ request_id: '1', nonce: '0', signature: 'unverified' }] } : { result: { request_id: '1', aggregated_time: '999999999999999999999', nonce: '0' } });
-  expect(await getOracleParams(client())).toMatchObject({ enable: null, quorumRatio: '미확인' });
+  expect(await getOracleParams(client())).toMatchObject({ enable: null, quorumRatio: '—' });
   expect(await getOracleResultAtNonceZero('1', client())).toMatchObject({ nonce: '0', aggregatedTime: '999999999999999999999' });
   expect(http.mock.calls.some(([url]) => String(url).endsWith('/result?nonce=0'))).toBe(true);
   expect((await listOracleReports({ requestId: '1' }, client()))[0]).toMatchObject({ signature: 'unverified' });

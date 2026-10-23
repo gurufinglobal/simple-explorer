@@ -1,4 +1,6 @@
 "use client";
+import { useLocale, useTranslations } from "next-intl";
+
 
 import Link from "@/components/layout/chain-link";
 import { useQuery } from "@/hooks/use-query";
@@ -22,28 +24,29 @@ import type { TxDetail } from "@/services/guru/tx-details.service";
 const POLL_MS = 3000;
 
 export function TransactionsLiveList() {
+  const t = useTranslations("explorer");
   const query = useQuery<LiveHistory<TxDetail>>("transactions", getLiveTransactions, POLL_MS);
   const txs = query.result.data?.rows ?? [];
+  const locale = useLocale();
   const nowMs = useNowTick(POLL_MS);
 
   return (
     <Stack spacing={2}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
         <Typography variant="h5" fontWeight={700}>
-          Transactions
-        </Typography>
+           {t("transactions_2")} </Typography>
       </Stack>
       <PollingInfo {...query} />
       <Card variant="outlined">
         <CardContent>
           {txs.length === 0 ? (
-            query.result.data ? <Typography variant="body2">{query.result.error ? "마지막 성공 조회 범위에서 트랜잭션이 없었습니다." : "최근 조회 범위에서 트랜잭션이 없습니다."}</Typography> : null
+            query.result.data ? <Typography variant="body2">{query.result.error ? t("no_transactions_in_the_last_successful_query_range") : t("no_transactions_in_the_recent_query_range")}</Typography> : null
           ) : (
             <List disablePadding>
               {txs.map((tx) => {
                 const relative =
                   tx.timestamp && tx.timestamp.length > 0
-                    ? formatRelativePastFromIso(tx.timestamp, nowMs)
+                    ? formatRelativePastFromIso(tx.timestamp, nowMs, locale)
                     : "—";
                 return (
                   <ListItem
@@ -61,7 +64,7 @@ export function TransactionsLiveList() {
                     />
                     <Chip
                       sx={{ flexShrink: 0 }}
-                      label={tx.code === 0 ? "Success" : "Failed"}
+                      label={tx.code === 0 ? t("success") : t("failed")}
                       color={tx.code === 0 ? "success" : "error"}
                       size="small"
                     />

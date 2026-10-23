@@ -1,4 +1,6 @@
 "use client";
+import { serviceText, ServiceError } from '@/i18n/service-message';
+
 import { bech32 } from "bech32";
 import { z } from "zod";
 import { MsgDelegate, MsgUndelegate } from "cosmjs-types/cosmos/staking/v1beta1/tx";
@@ -13,10 +15,10 @@ import { getStakingParams } from "./amount-context.service";
 import { getAddressAccountInfo, getSpendableBalances } from "./address-profile.service";
 
 export const stakingMessages = {
-  delegate: { typeUrl: "/cosmos.staking.v1beta1.MsgDelegate", label: "위임", module: "staking" },
-  undelegate: { typeUrl: "/cosmos.staking.v1beta1.MsgUndelegate", label: "위임 해제", module: "staking" },
-  reward: { typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward", label: "위임 보상 회수", module: "distribution" },
-  commission: { typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawValidatorCommission", label: "운영자 commission 회수", module: "distribution" },
+  delegate: { typeUrl: "/cosmos.staking.v1beta1.MsgDelegate", label: serviceText("delegate"), module: "staking" },
+  undelegate: { typeUrl: "/cosmos.staking.v1beta1.MsgUndelegate", label: serviceText("undelegate"), module: "staking" },
+  reward: { typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawDelegatorReward", label: serviceText("claim_delegation_rewards"), module: "distribution" },
+  commission: { typeUrl: "/cosmos.distribution.v1beta1.MsgWithdrawValidatorCommission", label: serviceText("claim_operator_commission"), module: "distribution" },
 } as const;
 export type StakingTxInput = SigningInput & { validatorAddress: string } & (
   { action: "delegate" | "undelegate"; amount: string; denom: string; displayAmount?: string }
@@ -24,10 +26,10 @@ export type StakingTxInput = SigningInput & { validatorAddress: string } & (
 );
 export function stakingBlockReason(chain: ChainConfig, action: StakingAction, wallet: SigningInput["walletType"] | null): string | null {
   const definition = stakingMessages[action];
-  if (!definition || chain.features?.[definition.module] !== true || chain.features?.staking !== true) return "이 행위의 staking/distribution 모듈 지원이 확인되지 않았습니다.";
+  if (!definition || chain.features?.[definition.module] !== true || chain.features?.staking !== true) return serviceText("staking_distribution_module_support_for_this_action_is_unverified");
   const capability = chain.stakingCapabilities?.[action];
-  if (!capability || capability.typeUrl !== definition.typeUrl) return "이 행위의 메시지·수수료 지원 근거가 없습니다. 수수료 미확인으로 전송을 차단합니다.";
-  if (!capability.signing.some(s => s.wallet === wallet && chain.signing?.some(c => c.wallet === wallet && c.method === s.method))) return "이 메시지의 지갑 서명 방식은 검증되지 않았습니다.";
+  if (!capability || capability.typeUrl !== definition.typeUrl) return serviceText("no_verified_message_or_fee_support_for_this_action_sending");
+  if (!capability.signing.some(s => s.wallet === wallet && chain.signing?.some(c => c.wallet === wallet && c.method === s.method))) return serviceText("wallet_signing_for_this_message_is_unverified");
   return null;
 }
 const integerCoin = z.object({ denom: z.string().min(1), amount: z.string().regex(/^\d+$/) });
@@ -47,7 +49,7 @@ export async function prepareStakingTx(input: StakingTxInput, assertInputCurrent
       const decoded = bech32.decode(validator);
       if (decoded.prefix !== `${chain.bech32Prefix}valoper` || bech32.fromWords(decoded.words).length !== 20) throw new Error();
       operator = bech32.encode(chain.bech32Prefix!, decoded.words);
-    } catch { throw new Error("검증자 주소의 체크섬·길이·체인 prefix를 확인하세요."); }
+    } catch { throw new ServiceError("check_the_validator_address_checksum_length_and_chain_prefix"); }
     const validatorPath = `/cosmos/staking/v1beta1/validators/${encodeURIComponent(validator)}`;
     let observedRewards: Coin[] | undefined;
     const readPosition = async () => {
@@ -57,18 +59,18 @@ export async function prepareStakingTx(input: StakingTxInput, assertInputCurrent
         getAddressAccountInfo(sender, query),
       ]);
       assertCurrent();
-      if (staking.bondDenom !== chain.bondDenom || (hasAmount && params.denom !== staking.bondDenom)) throw new Error("검증된 bond denom과 현재 staking params가 다릅니다.");
+      if (staking.bondDenom !== chain.bondDenom || (hasAmount && params.denom !== staking.bondDenom)) throw new ServiceError("verified_bond_denom_differs_from_current_staking_parameters");
       const current = z.object({ validator: z.object({ operator_address: z.string(), jailed: z.boolean(), status: z.enum(["BOND_STATUS_BONDED", "BOND_STATUS_UNBONDED", "BOND_STATUS_UNBONDING"]) }) }).parse(response).validator;
-      if (current.operator_address !== validator) throw new Error("조회 검증자와 거래 대상이 다릅니다.");
-      if (params.action === "delegate" && current.jailed) throw new Error("현재 jailed 검증자에게 위임할 수 없습니다.");
-      if (params.action === "commission" && sender !== operator) throw new Error("운영자 계정 권한이 일치하지 않습니다. commission 회수가 차단되었습니다.");
+      if (current.operator_address !== validator) throw new ServiceError("queried_validator_differs_from_the_transaction_target");
+      if (params.action === "delegate" && current.jailed) throw new ServiceError("cannot_delegate_to_a_jailed_validator");
+      if (params.action === "commission" && sender !== operator) throw new ServiceError("operator_account_permissions_do_not_match_commission_withdrawal_is_blocked");
       if (params.action === "undelegate" || params.action === "reward") {
         const position = z.object({ delegation_response: z.object({
           delegation: z.object({ delegator_address: z.string(), validator_address: z.string() }), balance: integerCoin,
         }) }).parse(await query.lcdGet(`${validatorPath}/delegations/${encodeURIComponent(sender)}`)).delegation_response;
         assertCurrent();
-        if (position.delegation.delegator_address !== sender || position.delegation.validator_address !== validator || position.balance.denom !== staking.bondDenom) throw new Error("개인 위임 포지션의 계정·검증자·denom이 다릅니다.");
-        if (params.action === "undelegate" && BigInt(position.balance.amount) < BigInt(params.amount)) throw new Error("해제 수량이 해당 검증자의 위임 잔액을 초과합니다.");
+        if (position.delegation.delegator_address !== sender || position.delegation.validator_address !== validator || position.balance.denom !== staking.bondDenom) throw new ServiceError("delegation_position_account_validator_or_denom_mismatch");
+        if (params.action === "undelegate" && BigInt(position.balance.amount) < BigInt(params.amount)) throw new ServiceError("undelegation_exceeds_your_delegated_balance_at_this_validator");
       }
       if (params.action === "reward") {
         const response = z.object({ rewards: rewardCoins }).parse(await query.lcdGet(`/cosmos/distribution/v1beta1/delegators/${encodeURIComponent(sender)}/rewards/${encodeURIComponent(validator)}`));
@@ -85,10 +87,10 @@ export async function prepareStakingTx(input: StakingTxInput, assertInputCurrent
     if (hasAmount) {
       const metadata = (await getDenomsMetadata(query)).find(m => m.baseDenom === params.denom);
       assertCurrent();
-      if (metadata?.decimals == null) throw new Error("표시 정밀도 미확인: 위임/해제 수량을 확인할 수 없습니다.");
+      if (metadata?.decimals == null) throw new ServiceError("display_precision_unknown_cannot_verify_the_delegation_or_undelegation_amount");
       const padded = params.amount.padStart(metadata.decimals + 1, "0");
       displayAmount = params.displayAmount ?? (metadata.decimals ? `${padded.slice(0, -metadata.decimals)}.${padded.slice(-metadata.decimals)}` : params.amount);
-      if (displayToBase(displayAmount, metadata.decimals) !== params.amount) throw new Error("표시 수량과 거래 원본이 다릅니다.");
+      if (displayToBase(displayAmount, metadata.decimals) !== params.amount) throw new ServiceError("display_amount_differs_from_the_raw_transaction_amount");
       unit = metadata.symbol || metadata.displayDenom;
     }
     const amount = hasAmount ? { amount: params.amount, denom: params.denom } : undefined;
@@ -99,7 +101,7 @@ export async function prepareStakingTx(input: StakingTxInput, assertInputCurrent
     return {
       message: { typeUrl: stakingMessages[params.action].typeUrl, value }, policy: capability.fee, allowedSigning: capability.signing,
       context: Object.freeze({ action: params.action, validator }),
-      display: { action: stakingMessages[params.action].label, recipient: validator, targetLabel: "전체 검증자 주소",
+      display: { action: stakingMessages[params.action].label, recipient: validator, targetLabel: serviceText("full_validator_address"),
         ...(amount ? { ...amount, displayAmount, unit } : { observedRewards: Object.freeze(observedRewards!.map(c => Object.freeze({ ...c }))) }) },
       check: async (fee: import("@cosmjs/amino").StdFee) => {
         await readPosition();
@@ -110,7 +112,7 @@ export async function prepareStakingTx(input: StakingTxInput, assertInputCurrent
         for (const coin of fee.amount) required.set(coin.denom, (required.get(coin.denom) ?? BigInt(0)) + BigInt(coin.amount));
         for (const [denom, amount] of required) {
           const available = balances.filter(c => c.denom === denom).reduce((sum, c) => sum + BigInt(c.amount), BigInt(0));
-          if (available < amount) throw new Error(`${denom} 사용 가능 잔액이 부족합니다. 현재 잔액으로 수수료${params.action === "delegate" ? "와 위임 수량" : ""}를 충당해야 합니다. 회수 예정 보상은 포함하지 않습니다.`);
+          if (available < amount) throw new ServiceError("insufficient_spendable_balance_current_balance_must_cover_fees_expected_rewards", { value0: String(denom), value1: String(params.action === "delegate" ? serviceText("and_delegation_amount") : "") });
         }
       },
     };

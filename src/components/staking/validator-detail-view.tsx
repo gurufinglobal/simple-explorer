@@ -1,4 +1,7 @@
 "use client";
+import { LocalizedTime } from "@/components/explorer/localized-time";
+import { useLocale, useTranslations } from "next-intl";
+
 
 import Link from "@/components/layout/chain-link";
 import { useQuery } from "@/hooks/use-query";
@@ -57,6 +60,8 @@ const EMPTY_POSITION: DelegatorValidatorPosition = {
 };
 
 export function ValidatorDetailView({ detail }: Props) {
+  const t = useTranslations("staking");
+  const locale = useLocale();
   const nowMs = useNowTick(1000);
   const { status, walletType } = useWalletSessionStore();
   const effectiveAddress = useEffectiveCosmosAddress();
@@ -66,64 +71,61 @@ export function ValidatorDetailView({ detail }: Props) {
   const position = positionQuery.result.data ?? EMPTY_POSITION;
   const positionLoading = positionQuery.busy && !positionQuery.result.data;
   const unbondingRelative = useMemo(
-    () => (detail.unbondingTime ? formatRelativeFutureOrPast(detail.unbondingTime, nowMs) : "-"),
-    [detail.unbondingTime, nowMs],
+    () => (detail.unbondingTime ? formatRelativeFutureOrPast(detail.unbondingTime, nowMs, locale) : "-"),
+    [detail.unbondingTime, nowMs, locale],
   );
 
-  const formatRawTokenAmount = (value: string) => value === "-" ? "미확인" : <CoinAmount coin={{ amount: value, denom: detail.bondDenom ?? "bond denom 미확인" }} metadata={detail.metadata} />;
+  const formatRawTokenAmount = (value: string) => value === "-" ? t("unknown") : <CoinAmount coin={{ amount: value, denom: detail.bondDenom ?? t("bond_denom_unknown") }} metadata={detail.metadata} />;
   const renderAmount = (key: string, value: string, source: typeof detail | typeof position) => source.amountCoins?.[key]
-    ? source.amountCoins[key].length ? source.amountCoins[key].map(coin => <CoinAmount key={coin.denom} coin={coin} metadata={source.metadata} />) : "보유 항목 없음"
+    ? source.amountCoins[key].length ? source.amountCoins[key].map(coin => <CoinAmount key={coin.denom} coin={coin} metadata={source.metadata} />) : t("no_holdings")
     : formatRawTokenAmount(value);
   return (
     <Stack spacing={2}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Typography variant="h5" fontWeight={700}>
-          Validator 상세
-        </Typography>
+           {t("validator_details")} </Typography>
         <Button component={Link} href="/staking" variant="outlined" size="small">
-          목록
-        </Button>
+           {t("list")} </Button>
       </Stack>
 
       {isMetamask ? (
-        <Alert severity="info">MetaMask는 Cosmos staking 서명을 지원하지 않습니다. Keplr 또는 WalletConnect를 사용하세요.</Alert>
+        <Alert severity="info">{t("metamask_does_not_support_cosmos_staking_signing_use_keplr")}</Alert>
       ) : null}
 
       <Card variant="outlined">
         <CardContent>
           <Stack spacing={1}>
             <Typography variant="subtitle1" fontWeight={700}>
-              기본 정보
+               {t("basic_information")} </Typography>
+            <Typography variant="body2">
+              <strong>{t("moniker")}</strong> {detail.moniker}
             </Typography>
             <Typography variant="body2">
-              <strong>Moniker:</strong> {detail.moniker}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Operator Address:</strong>{" "}
+              <strong>{t("operator_address")}</strong>{" "}
               <Typography component="span" variant="body2" sx={monospace()}>
                 {detail.operatorAddress}
               </Typography>
             </Typography>
             <Typography variant="body2">
-              <strong>Operator Account:</strong>{" "}
+              <strong>{t("operator_account")}</strong>{" "}
               <Typography component="span" variant="body2" sx={monospace()}>
                 {detail.operatorAccountAddress}
               </Typography>
             </Typography>
             <Stack direction="row" spacing={1} alignItems="center">
               <Typography variant="body2">
-                <strong>Status:</strong>
+                <strong>{t("status")}</strong>
               </Typography>
-              <Chip size="small" label={detail.jailed ? "jailed" : statusLabel(detail.status)} color={detail.jailed ? "warning" : "success"} />
+              <Chip size="small" label={detail.jailed ? t("jailed") : (["bonded", "unbonding", "unbonded"].includes(statusLabel(detail.status)) ? t(statusLabel(detail.status) as "bonded" | "unbonding" | "unbonded") : detail.status)} color={detail.jailed ? "warning" : "success"} />
             </Stack>
             <Typography variant="body2">
-              <strong>Description:</strong> {detail.details || "-"}
+              <strong>{t("description")}</strong> {detail.details || "-"}
             </Typography>
             <Typography variant="body2">
-              <strong>Website:</strong> {detail.website || "-"}
+              <strong>{t("website")}</strong> {detail.website || "-"}
             </Typography>
             <Typography variant="body2">
-              <strong>Identity:</strong> {detail.identity || "-"}
+              <strong>{t("identity")}</strong> {detail.identity || "-"}
             </Typography>
           </Stack>
         </CardContent>
@@ -133,37 +135,36 @@ export function ValidatorDetailView({ detail }: Props) {
         <CardContent>
           <Stack spacing={1}>
             <Typography variant="subtitle1" fontWeight={700}>
-              스테이킹 지표
+               {t("staking_metrics")} </Typography>
+            <Typography variant="body2">
+              <strong>{t("voting_power")}</strong> {formatRawTokenAmount(detail.votingPower)}
             </Typography>
             <Typography variant="body2">
-              <strong>Voting Power:</strong> {formatRawTokenAmount(detail.votingPower)}
+              <strong>{t("total_delegation")}</strong> {renderAmount("totalDelegationAmount", detail.totalDelegationAmount, detail)}
             </Typography>
             <Typography variant="body2">
-              <strong>Total Delegation:</strong> {renderAmount("totalDelegationAmount", detail.totalDelegationAmount, detail)}
+              <strong>{t("self_delegation")}</strong> {renderAmount("selfDelegationAmount", detail.selfDelegationAmount, detail)}
             </Typography>
             <Typography variant="body2">
-              <strong>Self Delegation:</strong> {renderAmount("selfDelegationAmount", detail.selfDelegationAmount, detail)}
+              <strong>{t("delegator_shares")}</strong> {detail.delegatorShares}
             </Typography>
             <Typography variant="body2">
-              <strong>Delegator Shares:</strong> {detail.delegatorShares}
+              <strong>{t("commission_rate")}</strong> {formatCommissionPercent(detail.commission)}
             </Typography>
             <Typography variant="body2">
-              <strong>Commission Rate:</strong> {formatCommissionPercent(detail.commission)}
+              <strong>{t("outstanding_rewards")}</strong> {renderAmount("outstandingRewardsAmount", detail.outstandingRewardsAmount, detail)}
             </Typography>
             <Typography variant="body2">
-              <strong>Outstanding Rewards:</strong> {renderAmount("outstandingRewardsAmount", detail.outstandingRewardsAmount, detail)}
+              <strong>{t("commission_rewards")}</strong> {renderAmount("commissionRewardsAmount", detail.commissionRewardsAmount, detail)}
             </Typography>
             <Typography variant="body2">
-              <strong>Commission Rewards:</strong> {renderAmount("commissionRewardsAmount", detail.commissionRewardsAmount, detail)}
+              <strong>{t("minimum_self_delegation")}</strong> {formatRawTokenAmount(detail.minSelfDelegation)}
             </Typography>
             <Typography variant="body2">
-              <strong>Min Self Delegation:</strong> {formatRawTokenAmount(detail.minSelfDelegation)}
+              <strong>{t("unbonding_height")}</strong> {detail.unbondingHeight}
             </Typography>
             <Typography variant="body2">
-              <strong>Unbonding Height:</strong> {detail.unbondingHeight}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Unbonding Time:</strong> {detail.unbondingTime || "-"} {detail.unbondingTime ? `(${unbondingRelative})` : ""}
+              <strong>{t("unbonding_time")}</strong> {detail.unbondingTime ? <LocalizedTime value={detail.unbondingTime} /> : "-"} {detail.unbondingTime ? `(${unbondingRelative})` : ""}
             </Typography>
           </Stack>
         </CardContent>
@@ -173,10 +174,9 @@ export function ValidatorDetailView({ detail }: Props) {
         <CardContent>
           <Stack spacing={1.5}>
             <Typography variant="subtitle1" fontWeight={700}>
-              내 포지션 및 액션
-            </Typography>
+               {t("my_position_and_actions")} </Typography>
             <Typography variant="body2" color="text.secondary">
-              현재 지갑: {effectiveAddress ?? "미연결"}
+               {t("current_wallet")} {effectiveAddress ?? t("disconnected")}
             </Typography>
             <QueryStatus {...positionQuery} />
             {positionLoading ? (
@@ -187,16 +187,16 @@ export function ValidatorDetailView({ detail }: Props) {
               </Stack>
             ) : null}
             <Typography variant="body2">
-              <strong>My Delegation:</strong> {renderAmount("delegationAmount", position.delegationAmount, position)}
+              <strong>{t("my_delegation")}</strong> {renderAmount("delegationAmount", position.delegationAmount, position)}
             </Typography>
             <Typography variant="body2">
-              <strong>My Unbonding:</strong> {renderAmount("unbondingAmount", position.unbondingAmount, position)}
+              <strong>{t("my_unbonding")}</strong> {renderAmount("unbondingAmount", position.unbondingAmount, position)}
             </Typography>
             <Typography variant="body2">
-              <strong>My Reward:</strong> {renderAmount("rewardAmount", position.rewardAmount, position)}
+              <strong>{t("my_reward")}</strong> {renderAmount("rewardAmount", position.rewardAmount, position)}
             </Typography>
             <Typography variant="body2">
-              <strong>Operator Wallet:</strong> {position.isOperator ? "Yes" : "No"}
+              <strong>{t("operator_wallet")}</strong> {position.isOperator ? t("yes") : t("no")}
             </Typography>
             {position.unbondingSnapshot && <UnbondingDetails snapshot={position.unbondingSnapshot} duration={position.unbondingDuration} metadata={position.metadata} />}
             <Divider />

@@ -1,3 +1,4 @@
+import { ServiceError } from "@/i18n/service-message";
 import { PartialQueryError, QueryError, combinedError, queryError, type QueryErrorInfo } from "@/lib/query-result";
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
@@ -76,7 +77,7 @@ async function fetchFirstAvailable(paths: string[], apiClients: QueryClient): Pr
       if (queryError(error).status !== 404) throw error;
     }
   }
-  throw lastError ?? new Error("request failed");
+  throw lastError ?? new ServiceError("request_failed");
 }
 
 export async function getChainParamsSections(apiClients: QueryClient = defaultClients): Promise<ParamsSectionResult[]> {

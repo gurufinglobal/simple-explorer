@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '../helpers/render';
 import { AddressTransactions } from '@/components/explorer/address-transactions';
 import { getAddressTransactionsPage } from '@/services/guru/transactions.service';
 import { setActiveChainKeyCookie } from '@/lib/chain-selection';
@@ -11,7 +11,7 @@ import { restoreHttpBoundary } from '../helpers/network-summary';
 afterEach(() => { cleanup(); document.cookie = 'gf_chain=; max-age=0; path=/'; restoreHttpBoundary(); });
 const tx = (hash: string, height: string) => ({ txhash: hash, height, code: 0 });
 const response = (rows: ReturnType<typeof tx>[], total = String(rows.length)) => ({ tx_responses: rows, txs: [], pagination: null, total });
-const links = () => screen.getAllByRole('link').map(link => link.textContent?.split('Height:')[0]);
+const links = () => screen.getAllByRole('link').map(link => link.textContent?.split("높이:")[0]);
 function sdkPage(url: URL, rows: ReturnType<typeof tx>[]) {
   // SDK defaults to page 1/limit 100 if the non-deprecated fields are absent.
   const page = Number(url.searchParams.get('page') || 1), limit = Number(url.searchParams.get('limit') || 100);

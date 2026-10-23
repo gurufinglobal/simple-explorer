@@ -1,3 +1,6 @@
+import type { ServiceCode, MessageParams } from "@/i18n/service-message";
+
+import { serviceText } from '@/i18n/service-message';
 import type { StdFee } from "@cosmjs/amino";
 import type { Coin } from "@/lib/cosmos-amount";
 
@@ -17,7 +20,7 @@ export type TransactionPhase = "input" | "validating" | "confirming" | "signing"
 export type TransactionReceipt = {
   chainKey: string; chainId: string; sender: string; hash: string | null;
   status: "pending" | "success" | "failed" | "cancelled";
-  message: string; code?: number; estimatedFee: Coin[];
+  message: string; messageCode?: ServiceCode; messageParams?: MessageParams; code?: number; estimatedFee: Coin[];
   staking?: StakingContext;
   governance?: GovernanceContext;
   proposalIdWarning?: string;
@@ -33,5 +36,5 @@ export function transactionLink(receipt: Pick<TransactionReceipt, "chainKey" | "
   return `/tx/${encodeURIComponent(receipt.hash ?? "")}?chain=${encodeURIComponent(receipt.chainKey)}`;
 }
 export function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "요청 결과를 확인할 수 없습니다.";
+  return error instanceof Error ? error.message : serviceText("could_not_verify_the_request_result");
 }

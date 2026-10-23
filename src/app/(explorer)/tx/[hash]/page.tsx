@@ -1,4 +1,7 @@
 "use client";
+import { formatTimestamp } from "@/lib/relative-time";
+import { useLocale, useTranslations } from "next-intl";
+
 
 import { CopyPageLink, CopyValue } from "@/components/explorer/copy-value";
 import Link from "@/components/layout/chain-link";
@@ -29,6 +32,8 @@ export default function TxDetailPage() {
   return <TxDetailContent hash={hash} />;
 }
 function TxDetailContent({ hash }: { hash: string }) {
+  const t = useTranslations("explorer");
+  const locale = useLocale();
   const query = useQuery(`transaction:${hash}`, client => getTxDetail(hash, client));
   const tx = query.result.data;
   if (!tx) return <QueryStatus {...query} />;
@@ -40,20 +45,19 @@ function TxDetailContent({ hash }: { hash: string }) {
       ? `${((gasUsedNumber / gasWantedNumber) * 100).toFixed(2)}%`
       : "-";
 
-  const timestampLabel = tx.timestamp ? new Date(tx.timestamp).toLocaleString("ko-KR") : "-";
-  const statusLabel = tx.code === 0 ? "Success" : "Failed";
+  const timestampLabel = tx.timestamp ? formatTimestamp(tx.timestamp, locale) : "-";
+  const statusLabel = tx.code === 0 ? t("success") : t("failed");
   const statusColor = tx.code === 0 ? "success" : "error";
   const feeLabel = tx.feeAmount.length > 0 ? tx.feeAmount.map((coin) => `${coin.amount} ${coin.denom}`).join(", ") : "-";
 
   return (
     <Stack spacing={2}>
       <CopyPageLink />
-      {tx.messages.some(message => message.shortType === "MsgEthereumTx") && <Alert severity="info">Cosmos 거래 요약입니다. EVM transaction hash 대응, receipt/log 및 EVM 관련 주소는 제공하지 않습니다.</Alert>}
+      {tx.messages.some(message => message.shortType === "MsgEthereumTx") && <Alert severity="info">{t("cosmos_transaction_summary_evm_transaction_hash_mapping_receipts_logs")}</Alert>}
       <QueryStatus {...query} />
       <Stack direction={{ xs: "column", md: "row" }} justifyContent="space-between" alignItems={{ md: "center" }}>
         <Typography variant="h5" fontWeight={700}>
-          트랜잭션 상세
-        </Typography>
+           {t("transaction_details")} </Typography>
         <Chip size="small" label={statusLabel} color={statusColor} />
       </Stack>
 
@@ -61,14 +65,13 @@ function TxDetailContent({ hash }: { hash: string }) {
         <CardContent>
           <Stack spacing={1.25}>
             <Typography variant="subtitle2" color="text.secondary">
-              요약
-            </Typography>
+               {t("summary")} </Typography>
             <Typography sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>
-              <strong>Cosmos tx hash (hex):</strong> {tx.hash}
+              <strong>{t("cosmos_tx_hash_hex")}</strong> {tx.hash}
             </Typography>
-            <CopyValue label="Cosmos tx hash hex 복사" value={tx.hash} />
+            <CopyValue label={t("copy_cosmos_transaction_hash_hex")} value={tx.hash} />
             <Typography>
-              <strong>Height:</strong>{" "}
+              <strong>{t("height")}</strong>{" "}
               {tx.height !== "0" ? (
                 <Link href={`/blocks/${tx.height}`} style={{ color: "inherit" }}>
                   {tx.height}
@@ -78,17 +81,17 @@ function TxDetailContent({ hash }: { hash: string }) {
               )}
             </Typography>
             <Typography>
-              <strong>Timestamp:</strong> {timestampLabel}
+              <strong>{t("timestamp")}</strong> {timestampLabel}
             </Typography>
             <Typography>
-              <strong>Code:</strong> {tx.code}
+              <strong>{t("code")}</strong> {tx.code}
               {tx.codespace ? ` (${tx.codespace})` : ""}
             </Typography>
             <Typography>
-              <strong>Messages:</strong> {tx.messages.length}
+              <strong>{t("messages")}</strong> {tx.messages.length}
             </Typography>
             <Typography>
-              <strong>Memo:</strong> {tx.memo || "-"}
+              <strong>{t("memo")}</strong> {tx.memo || "-"}
             </Typography>
           </Stack>
         </CardContent>
@@ -98,28 +101,27 @@ function TxDetailContent({ hash }: { hash: string }) {
         <CardContent>
           <Stack spacing={1.25}>
             <Typography variant="subtitle2" color="text.secondary">
-              실행 정보
+               {t("execution_information")} </Typography>
+            <Typography>
+              <strong>{t("gas_used")}</strong> {tx.gasUsed}
             </Typography>
             <Typography>
-              <strong>Gas Used:</strong> {tx.gasUsed}
+              <strong>{t("gas_wanted")}</strong> {tx.gasWanted}
             </Typography>
             <Typography>
-              <strong>Gas Wanted:</strong> {tx.gasWanted}
+              <strong>{t("gas_utilization")}</strong> {gasRatio}
             </Typography>
             <Typography>
-              <strong>Gas Utilization:</strong> {gasRatio}
+              <strong>{t("fee")}</strong> {feeLabel}
             </Typography>
             <Typography>
-              <strong>Fee:</strong> {feeLabel}
+              <strong>{t("fee_payer")}</strong> {tx.feePayer || "-"}
             </Typography>
             <Typography>
-              <strong>Fee Payer:</strong> {tx.feePayer || "-"}
+              <strong>{t("fee_granter")}</strong> {tx.feeGranter || "-"}
             </Typography>
             <Typography>
-              <strong>Fee Granter:</strong> {tx.feeGranter || "-"}
-            </Typography>
-            <Typography>
-              <strong>Timeout Height:</strong> {tx.timeoutHeight}
+              <strong>{t("timeout_height")}</strong> {tx.timeoutHeight}
             </Typography>
           </Stack>
         </CardContent>
@@ -128,12 +130,10 @@ function TxDetailContent({ hash }: { hash: string }) {
       <Card variant="outlined">
         <CardContent>
           <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-            메시지 타입
-          </Typography>
+             {t("message_types")} </Typography>
           {tx.messages.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              메시지 정보가 없습니다.
-            </Typography>
+               {t("no_message_information_available")} </Typography>
           ) : (
             <List dense disablePadding>
               {tx.messages.map((message, index) => (
@@ -156,12 +156,10 @@ function TxDetailContent({ hash }: { hash: string }) {
       <Card variant="outlined">
         <CardContent>
           <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-            관련 주소
-          </Typography>
+             {t("related_addresses")} </Typography>
           {tx.participantAddresses.length === 0 ? (
             <Typography variant="body2" color="text.secondary">
-              주소 정보를 추출하지 못했습니다.
-            </Typography>
+               {t("could_not_extract_address_information")} </Typography>
           ) : (
             <Stack spacing={0.75}>
               {tx.participantAddresses.map((address) => (
@@ -179,8 +177,7 @@ function TxDetailContent({ hash }: { hash: string }) {
       <Card variant="outlined">
         <CardContent>
           <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-            Raw Log
-          </Typography>
+             {t("raw_log")} </Typography>
           <Divider sx={{ mb: 1 }} />
           <Typography
             component="pre"

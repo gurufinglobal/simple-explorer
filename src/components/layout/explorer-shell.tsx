@@ -1,4 +1,7 @@
 "use client";
+import { useServiceText } from "@/i18n/use-service-text";
+import { useTranslations } from "next-intl";
+
 import { moduleEnabled } from "@/lib/module-capability";
 
 import Link from "@/components/layout/chain-link";
@@ -34,6 +37,7 @@ import TuneOutlinedIcon from "@mui/icons-material/TuneOutlined";
 import MenuIcon from "@mui/icons-material/Menu";
 import { WalletPortfolioHydrator } from "@/components/wallet/wallet-portfolio-hydrator";
 import { HeaderWalletMenu } from "@/components/wallet/header-wallet-menu";
+import { LocaleSelector } from "./locale-selector";
 import { ChainSelector } from "@/components/layout/chain-selector";
 import { TopNavSearch } from "@/components/search/top-nav-search";
 import { getActiveChainConfigFromClientCookie, synchronizeRouteChain, withChain } from "@/lib/chain-selection";
@@ -50,25 +54,30 @@ type MenuItem = {
   requiresOracle?: boolean;
 };
 
-const menus: MenuItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: <DashboardOutlinedIcon /> },
-  { href: "/staking", label: "Staking", icon: <AccountBalanceOutlinedIcon /> },
-  { href: "/blocks", label: "Blocks", icon: <ViewAgendaOutlinedIcon /> },
-  { href: "/transactions", label: "Transactions", icon: <ReceiptLongOutlinedIcon /> },
-  { href: "/governance", label: "Governance", icon: <HowToVoteOutlinedIcon /> },
-  { href: "/bex", label: "BEX", icon: <CurrencyExchangeOutlinedIcon />, requiresBex: true },
-  { href: "/feepolicy", label: "FeePolicy", icon: <LocalAtmOutlinedIcon />, requiresFeePolicy: true },
-  { href: "/oracle", label: "Oracle", icon: <QueryStatsOutlinedIcon />, requiresOracle: true },
-  { href: "/params", label: "Params", icon: <TuneOutlinedIcon /> },
-  { href: "/tokens", label: "Tokens", icon: <TokenOutlinedIcon /> },
-  { href: "/operations", label: "IBC Channels", icon: <SettingsOutlinedIcon /> },
-];
+
 
 export function ExplorerShell({ children }: { children: ReactNode }) {
-  return <Suspense fallback={<Alert severity="info">체인 설정 확인 중…</Alert>}><ExplorerShellContent>{children}</ExplorerShellContent></Suspense>;
+  const t = useTranslations("navigation");
+  return <Suspense fallback={<Alert severity="info">{t("checking_chain_configuration")}</Alert>}><ExplorerShellContent>{children}</ExplorerShellContent></Suspense>;
 }
 
 function ExplorerShellContent({ children }: { children: ReactNode }) {
+  const t = useTranslations("navigation");
+  const st = useServiceText();
+const menus: MenuItem[] = [
+  { href: "/dashboard", label: t("dashboard"), icon: <DashboardOutlinedIcon /> },
+  { href: "/staking", label: t("staking"), icon: <AccountBalanceOutlinedIcon /> },
+  { href: "/blocks", label: t("blocks"), icon: <ViewAgendaOutlinedIcon /> },
+  { href: "/transactions", label: t("transactions"), icon: <ReceiptLongOutlinedIcon /> },
+  { href: "/governance", label: t("governance"), icon: <HowToVoteOutlinedIcon /> },
+  { href: "/bex", label: t("bex"), icon: <CurrencyExchangeOutlinedIcon />, requiresBex: true },
+  { href: "/feepolicy", label: t("fee_policy"), icon: <LocalAtmOutlinedIcon />, requiresFeePolicy: true },
+  { href: "/oracle", label: t("oracle"), icon: <QueryStatsOutlinedIcon />, requiresOracle: true },
+  { href: "/params", label: t("parameters"), icon: <TuneOutlinedIcon /> },
+  { href: "/tokens", label: t("tokens"), icon: <TokenOutlinedIcon /> },
+  { href: "/operations", label: t("ibc_channels"), icon: <SettingsOutlinedIcon /> },
+];
+
   const search = useSearchParams();
   const routeChain = search.get("chain");
   const pathname = usePathname();
@@ -79,7 +88,7 @@ function ExplorerShellContent({ children }: { children: ReactNode }) {
   useEffect(() => {
     const sync = () => {
       try { setActiveChain(getActiveChainConfigFromClientCookie()); setConfigError(null); }
-      catch (e) { setActiveChain(null); setConfigError(e instanceof Error ? e.message : "체인 설정 오류"); }
+      catch (e) { setActiveChain(null); setConfigError(e instanceof Error ? e.message : t("chain_configuration_error")); }
     };
     synchronizeRouteChain();
     sync();
@@ -93,7 +102,7 @@ function ExplorerShellContent({ children }: { children: ReactNode }) {
       window.removeEventListener("explorer:chain-changed", sync);
       window.removeEventListener("popstate", onPopState);
     };
-  }, [routeChain]);
+  }, [routeChain, t]);
 
   const ready = activeChain && (routeChain === null || routeChain === activeChain.key);
 
@@ -110,7 +119,7 @@ function ExplorerShellContent({ children }: { children: ReactNode }) {
     return true;
   });
 
-  const navigation = <Box component="nav" aria-label="탐색 메뉴">
+  const navigation = <Box component="nav" aria-label={t("navigation")}>
     <Toolbar sx={{ px: 0 }}>
       <Box sx={{ width: "100%" }}><ChainSelector /></Box>
     </Toolbar>
@@ -139,15 +148,15 @@ function ExplorerShellContent({ children }: { children: ReactNode }) {
         }}
       >
         <Toolbar sx={{ justifyContent: "space-between", gap: { xs: 1, md: 2 }, flexWrap: { xs: "wrap", md: "nowrap" }, py: { xs: 1, md: 0 } }}>
-          <IconButton aria-label="탐색 메뉴 열기" aria-expanded={menuOpen} onClick={() => setMenuOpen(true)} sx={{ display: { md: "none" } }}>
+          <IconButton aria-label={t("open_navigation")} aria-expanded={menuOpen} onClick={() => setMenuOpen(true)} sx={{ display: { md: "none" } }}>
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" noWrap component="div" sx={{ display: { xs: "none", lg: "block" } }}>
-            Guru Chain Explorer
-          </Typography>
+             {t("guru_chain_explorer")} </Typography>
           <Box sx={{ flex: { xs: "1 1 100%", md: 1 }, minWidth: 0, maxWidth: { md: 640 }, order: { xs: 1, md: 0 } }}>
             {ready && <TopNavSearch />}
           </Box>
+          <LocaleSelector />
           <Box sx={{ minWidth: 0, flex: { xs: 1, md: "initial" }, overflowWrap: "anywhere" }}>
             {ready && <HeaderWalletMenu />}
           </Box>
@@ -168,12 +177,12 @@ function ExplorerShellContent({ children }: { children: ReactNode }) {
         {navigation}
       </Drawer>
       <Drawer open={menuOpen && !desktop} onClose={() => setMenuOpen(false)} sx={{ display: { md: "none" }, "& .MuiDrawer-paper": { width: drawerWidth } }}>
-        <Button onClick={() => setMenuOpen(false)}>탐색 메뉴 닫기</Button>
+        <Button onClick={() => setMenuOpen(false)}>{t("close_navigation")}</Button>
         {navigation}
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, minWidth: 0, overflowWrap: "anywhere", p: { xs: 2, md: 3 }, ml: 0 }}>
         <Toolbar sx={{ display: { xs: "none", md: "flex" } }} />
-        {configError ? <Alert severity="error">{configError} 탐색 메뉴에서 체인을 선택하세요.</Alert> : ready ? <Box key={activeChain.key}><WalletPortfolioHydrator />{children}</Box> : <Alert severity="info">체인 설정 확인 중…</Alert>}
+        {configError ? <Alert severity="error">{st(configError)}  {t("select_a_chain_in_the_navigation_menu")}</Alert> : ready ? <Box key={activeChain.key}><WalletPortfolioHydrator />{children}</Box> : <Alert severity="info">{t("checking_chain_configuration")}</Alert>}
       </Box>
     </Box>
   );

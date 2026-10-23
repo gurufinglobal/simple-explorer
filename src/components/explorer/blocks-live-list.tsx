@@ -1,4 +1,6 @@
 "use client";
+import { useLocale, useTranslations } from "next-intl";
+
 
 import Link from "@/components/layout/chain-link";
 import { useQuery } from "@/hooks/use-query";
@@ -24,8 +26,10 @@ function hasTransactions(txCount: number | string): boolean {
 }
 
 export function BlocksLiveList() {
+  const t = useTranslations("explorer");
   const query = useQuery<LiveHistory<BlockDetail>>("blocks", getLiveBlocks, POLL_MS);
   const blocks = query.result.data?.rows ?? [];
+  const locale = useLocale();
   const nowMs = useNowTick(POLL_MS);
 
   const averageBlockTimeSec = (() => {
@@ -57,15 +61,14 @@ export function BlocksLiveList() {
     <Stack spacing={2}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
         <Typography variant="h5" fontWeight={700}>
-          Blocks
-        </Typography>
+           {t("blocks")} </Typography>
       </Stack>
       <Typography variant="body2" color="text.secondary">
-        현재 목록 평균 블록 생성 시간: {averageBlockTimeSec !== null ? `${averageBlockTimeSec.toFixed(2)}s` : "-"}
+         {t("average_block_time_in_the_current_list")} {averageBlockTimeSec !== null ? `${averageBlockTimeSec.toFixed(2)}s` : "-"}
       </Typography>
       <PollingInfo {...query} />
       {blocks.length === 0 ? (
-        (query.result.status === "success" || query.result.status === "empty") ? <Typography variant="body2">조회한 블록이 없습니다.</Typography> : null
+        (query.result.status === "success" || query.result.status === "empty") ? <Typography variant="body2">{t("no_blocks_retrieved")}</Typography> : null
       ) : (
         <Box
           sx={{
@@ -101,10 +104,10 @@ export function BlocksLiveList() {
                   #{block.height}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.25 }}>
-                  {formatRelativePastFromIso(block.time, nowMs)}
+                  {formatRelativePastFromIso(block.time, nowMs, locale)}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" display="block" sx={{ mt: 0.5 }}>
-                  Tx {block.txCount}
+                   {t("tx")} {block.txCount}
                 </Typography>
                 <Typography
                   variant="caption"
@@ -117,7 +120,7 @@ export function BlocksLiveList() {
                     lineHeight: 1.3,
                   }}
                 >
-                  블록 hash (hex): {lcdBytesToHex(block.hash)?.slice(0, 10) ?? "미확인"}…
+                   {t("block_hash_hex")} {lcdBytesToHex(block.hash)?.slice(0, 10) ?? t("unknown")}…
                 </Typography>
               </CardContent>
             </Card>

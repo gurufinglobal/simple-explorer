@@ -1,3 +1,5 @@
+
+import { ServiceError } from '@/i18n/service-message';
 import type { AccountData, DirectSignResponse, OfflineSigner } from "@cosmjs/proto-signing";
 import type { AminoSignResponse, StdSignDoc } from "@cosmjs/amino";
 import type { SignDoc } from "cosmjs-types/cosmos/tx/v1beta1/tx";
@@ -30,7 +32,7 @@ function keplrAccountNumber(value: KeplrDirectResponse["signed"]["accountNumber"
     (value.unsigned || value.high >= 0)) {
     return (BigInt(value.high >>> 0) << BigInt(32)) | BigInt(value.low >>> 0);
   }
-  throw new Error("Keplr가 잘못된 서명 계정 번호를 반환했습니다.");
+  throw new ServiceError("keplr_returned_an_invalid_signing_account_number");
 }
 
 /** Registration is opt-in and requires explicit derivation and currency evidence. */
@@ -40,7 +42,7 @@ export function buildKeplrChainInfo(chain: ChainConfig) {
   if (!registration || !chain.chainId || !chain.rpcUrl || !chain.bech32Prefix || chain.decimals === undefined ||
     !chain.nativeDenom || chain.nativeDenom !== chain.bondDenom || chain.nativeDenom !== chain.feeDenom ||
     registration.bech32Config.bech32PrefixAccAddr !== chain.bech32Prefix) {
-    throw new Error("Keplr 등록을 위한 coin type·prefix·단일 자산 정보가 확인되지 않았습니다.");
+    throw new ServiceError("coin_type_prefix_or_single_asset_information_for_keplr_registration");
   }
   const step = registration.gasPriceStep;
   if (isGuruReleaseProfile(chain) && (registration.coinType !== 60 ||
@@ -49,9 +51,9 @@ export function buildKeplrChainInfo(chain: ChainConfig) {
     registration.bech32Config.bech32PrefixValPub !== "guruvaloperpub" ||
     registration.bech32Config.bech32PrefixConsAddr !== "guruvalcons" ||
     registration.bech32Config.bech32PrefixConsPub !== "guruvalconspub")) {
-    throw new Error("Keplr coin type·prefix가 Guru 릴리스 소스와 다릅니다.");
+    throw new ServiceError("keplr_coin_type_or_prefix_differs_from_the_guru_release");
   }
-  if (step.low > step.average || step.average > step.high) throw new Error("Keplr 수수료 가격 순서가 올바르지 않습니다.");
+  if (step.low > step.average || step.average > step.high) throw new ServiceError("invalid_keplr_fee_price_ordering");
   const currency = { coinDenom: registration.currency, coinMinimalDenom: chain.nativeDenom, coinDecimals: chain.decimals };
   return {
     chainId: chain.chainId, chainName: chain.name, rpc: chain.rpcUrl, rest: chain.lcdUrl,
@@ -63,11 +65,11 @@ export function buildKeplrChainInfo(chain: ChainConfig) {
 
 export async function getKeplrSigner(chain: ChainConfig, assertCurrent: () => void, register = false): Promise<KeplrSigner> {
   const keplr = window.keplr;
-  if (!keplr) throw new Error("Keplr 지갑을 찾을 수 없습니다.");
+  if (!keplr) throw new ServiceError("keplr_wallet_not_found");
   assertCurrent();
   if (register && chain.keplrRegistration) {
     const info = buildKeplrChainInfo(chain);
-    if (!keplr.experimentalSuggestChain) throw new Error("현재 Keplr는 체인 등록 API를 제공하지 않습니다.");
+    if (!keplr.experimentalSuggestChain) throw new ServiceError("this_keplr_version_does_not_provide_the_chain_registration_api");
     await keplr.experimentalSuggestChain(info);
     assertCurrent();
   }
@@ -79,7 +81,7 @@ export async function getKeplrSigner(chain: ChainConfig, assertCurrent: () => vo
     : keplr.getOfflineSigner ? keplr.getOfflineSigner(chain.chainId!)
     : window.getOfflineSigner?.(chain.chainId!);
   assertCurrent();
-  if (!signer) throw new Error("Keplr signer를 찾을 수 없습니다.");
+  if (!signer) throw new ServiceError("keplr_signer_not_found");
   return signer;
 }
 
@@ -87,7 +89,7 @@ export async function readKeplrAccounts(signer: KeplrSigner, chain: ChainConfig,
   assertCurrent();
   const accounts = await signer.getAccounts();
   assertCurrent();
-  if (accounts.length !== 1 || !accounts[0].address) throw new Error("Keplr에서 하나의 계정을 선택하고 다시 연결하세요.");
+  if (accounts.length !== 1 || !accounts[0].address) throw new ServiceError("select_one_account_in_keplr_and_reconnect");
   const account = { ...accounts[0] };
   // Wallet key is authoritative even when LCD pub_key is null for a first-use account.
   if (window.keplr?.getKey) {
@@ -100,18 +102,18 @@ export async function readKeplrAccounts(signer: KeplrSigner, chain: ChainConfig,
     const algorithmsMatch = guru
       ? account.algo === "secp256k1" && key.algo === "ethsecp256k1"
       : !account.algo || account.algo === key.algo;
-    if (!algorithmsMatch) throw new Error("Keplr signer·wallet key 알고리즘이 체인 서명 프로필과 다릅니다.");
+    if (!algorithmsMatch) throw new ServiceError("keplr_signer_or_wallet_key_algorithm_differs_from_the_chain");
     if (key.bech32Address !== account.address ||
       (account.pubkey?.length && (account.pubkey.length !== key.pubKey.length || account.pubkey.some((v, i) => v !== key.pubKey[i])))) {
-      throw new Error("Keplr signer와 wallet key의 계정·공개키가 다릅니다.");
+      throw new ServiceError("keplr_signer_and_wallet_key_account_or_public_key_do");
     }
-    if (forSigning && (key.isNanoLedger || key.isKeystone)) throw new Error("이 하드웨어 계정의 서명은 아직 검증되지 않았습니다.");
+    if (forSigning && (key.isNanoLedger || key.isKeystone)) throw new ServiceError("signing_with_this_hardware_account_is_not_verified_yet");
     account.pubkey = key.pubKey.slice();
     if (!guru) account.algo = key.algo;
     if (guru) assertCosmosWalletKey(chain, account.address, account.pubkey, account.algo!);
   }
   if (forSigning) {
-    if (!account.pubkey || !account.algo) throw new Error("지갑 공개키·알고리즘을 확인하지 못했습니다.");
+    if (!account.pubkey || !account.algo) throw new ServiceError("could_not_verify_the_wallet_public_key_or_algorithm");
     assertCosmosWalletKey(chain, account.address, account.pubkey, account.algo);
   }
   return [account];
@@ -123,7 +125,7 @@ export function cosmosKeplrSigner(signer: KeplrSigner, chain: ChainConfig, asser
   const getAccounts = async (): Promise<readonly AccountData[]> => {
     const accounts = await readKeplrAccounts(signer, chain, assertCurrent, true);
     return accounts.map((account): AccountData => {
-      if (account.algo !== "secp256k1" || !account.pubkey) throw new Error("지원하지 않는 signer 공개키입니다.");
+      if (account.algo !== "secp256k1" || !account.pubkey) throw new ServiceError("unsupported_signer_public_key");
       return { address: account.address, algo: account.algo, pubkey: account.pubkey.slice() };
     });
   };
@@ -132,5 +134,5 @@ export function cosmosKeplrSigner(signer: KeplrSigner, chain: ChainConfig, asser
     return { ...response, signed: { ...response.signed, accountNumber: keplrAccountNumber(response.signed.accountNumber) } };
   } };
   if (signer.signAmino) return { getAccounts, signAmino: (who, doc) => signer.signAmino!(who, doc) };
-  throw new Error("Keplr signer에 지원하는 서명 메서드가 없습니다.");
+  throw new ServiceError("keplr_signer_has_no_supported_signing_method");
 }

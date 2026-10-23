@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import "@testing-library/jest-dom/vitest";
 import { afterEach, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from "../helpers/render";
 import userEvent from "@testing-library/user-event";
 import { DashboardView } from "@/components/network/dashboard-view";
 import { DashboardQueryInfo } from "@/components/network/dashboard-query-info";
@@ -20,7 +20,7 @@ function mockDashboard() {
   const http = mockNetworkSummaryHttp();
   const respond = http.getMockImplementation()!;
   http.mockImplementation((input, init) => String(input).includes("/validators?")
-    ? Promise.resolve(Response.json({ validators: [{ operator_address: "validator", tokens: "1", description: { moniker: "Validator" } }] }))
+    ? Promise.resolve(Response.json({ validators: [{ operator_address: "validator", tokens: "1", description: { moniker: "검증자" } }] }))
     : respond(input, init));
   return http;
 }

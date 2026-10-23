@@ -1,3 +1,5 @@
+
+import { ServiceError } from '@/i18n/service-message';
 import { z } from "zod";
 
 const FeePolicySchema = z.discriminatedUnion("mode", [
@@ -167,13 +169,13 @@ export function parseChainConfigs(raw: string | undefined): ChainConfig[] {
   if (raw === undefined) return [];
   let json: unknown;
   try { json = JSON.parse(raw); }
-  catch { throw new Error("체인 설정 JSON이 올바르지 않습니다. 설정을 수정하고 새로고침하세요."); }
+  catch { throw new ServiceError("invalid_chain_configuration_json_correct_the_configuration_and_refresh"); }
   const parsed = z.array(ChainConfigSchema).min(1).safeParse(json);
-  if (!parsed.success) throw new Error("체인 endpoint 또는 설정 필드가 올바르지 않습니다.");
-  if (new Set(parsed.data.map(c => c.key)).size !== parsed.data.length) throw new Error("중복 체인 key입니다.");
+  if (!parsed.success) throw new ServiceError("invalid_chain_endpoint_or_configuration_field");
+  if (new Set(parsed.data.map(c => c.key)).size !== parsed.data.length) throw new ServiceError("duplicate_chain_key");
   for (const chain of parsed.data) {
     for (const url of [chain.lcdUrl, chain.rpcUrl, chain.evmRpcUrl]) {
-      if (url && !/^https?:\/\//.test(url)) throw new Error("체인 endpoint는 HTTP(S) URL이어야 합니다.");
+      if (url && !/^https?:\/\//.test(url)) throw new ServiceError("chain_endpoints_must_be_http_s_urls");
     }
   }
   return parsed.data.map(chain => {
@@ -247,7 +249,7 @@ export function getDefaultChainKey(): string {
   if (env.NEXT_PUBLIC_DEFAULT_CHAIN_KEY && chains.some((chain) => chain.key === env.NEXT_PUBLIC_DEFAULT_CHAIN_KEY)) {
     return env.NEXT_PUBLIC_DEFAULT_CHAIN_KEY;
   }
-  if (env.NEXT_PUBLIC_DEFAULT_CHAIN_KEY) throw new Error("기본 체인 key가 설정 목록에 없습니다. 체인을 선택하세요.");
+  if (env.NEXT_PUBLIC_DEFAULT_CHAIN_KEY) throw new ServiceError("the_default_chain_key_is_missing_from_the_configuration_select");
   return chains[0].key;
 }
 

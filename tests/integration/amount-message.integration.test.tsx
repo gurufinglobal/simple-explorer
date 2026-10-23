@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cosmosAddress, cosmosPubkey, cosmosSigningProfile } from "../helpers/cosmos-signing";
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '../helpers/render';
 import { bech32 } from 'bech32';
 import { GovernanceNewProposalForm } from '@/components/governance/governance-new-proposal-form';
 import { DashboardView } from '@/components/network/dashboard-view';
@@ -108,15 +108,15 @@ describe('AC02-4 real message generation with only SDK/network/wallet boundaries
   it('dashboard SEND confirms display/base and resets approval when the account generation changes', async () => {
     render(<DashboardView />);
     await act(async () => { await connectExtension('keplr'); });
-    fireEvent.click(screen.getByRole('button', { name: 'SEND' }));
+    fireEvent.click(screen.getByRole('button', { name: "송금" }));
     fireEvent.change(screen.getByLabelText('수신 주소'), { target: { value: address } });
     fireEvent.change(screen.getByLabelText('수량 (표시 단위)'), { target: { value: '1.234567' } });
     await screen.findByText('표시 수량 1.234567 GXN → 전송 원본 1234567 agxn');
     fireEvent.click(screen.getByRole('checkbox'));
     await act(async () => { await connectExtension('keplr'); });
-    expect((screen.getByRole('button', { name: 'Send Tx' }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: "송금 실행" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.click(screen.getByRole('checkbox'));
-    fireEvent.click(screen.getByRole('button', { name: 'Send Tx' }));
+    fireEvent.click(screen.getByRole('button', { name: "송금 실행" }));
     fireEvent.click(await screen.findByRole('button', { name: '확인하고 지갑 서명' }));
     await waitFor(() => expect(boundary.sign).toHaveBeenCalled());
     expect(boundary.sign.mock.calls[0][1][0].value.amount).toEqual([{ amount: '1234567', denom: 'agxn' }]);

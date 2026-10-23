@@ -1,3 +1,5 @@
+
+import { serviceMessage } from '@/i18n/service-message';
 import { resolveChainContext } from "@/lib/chain-selection";
 import { createQueryClient } from "@/services/clients";
 import { getAddressBalances } from "@/services/guru/address-profile.service";
@@ -17,12 +19,12 @@ export async function lookupByQuery(queryInput?: string, options: {
   if (resolution.status !== 200 || !("candidates" in resolution.body)) return resolution;
   const body = resolution.body;
   const resolvedType = options.candidate ?? (body.hasConflict ? null : body.resolvedType);
-  if (!resolvedType) return { status: 409, body: { ...body, message: "조회할 후보를 선택하세요." } };
-  if (!body.candidates.includes(resolvedType)) return { status: 400, body: { message: "유효한 후보를 선택하세요." } };
+  if (!resolvedType) return { status: 409, body: { ...body, ...serviceMessage("select_a_query_candidate") } };
+  if (!body.candidates.includes(resolvedType)) return { status: 400, body: { ...serviceMessage("select_a_valid_candidate") } };
   const client = createQueryClient(chain);
   const query = body.normalized;
   const data = resolvedType === "txHash" ? await getTxDetail(query, client)
     : resolvedType === "address" ? await getAddressBalances(query, client)
     : await getBlockDetail(query, client);
-  return data ? { status: 200, body: { resolvedType, data } } : { status: 404, body: { message: "대상을 찾을 수 없습니다." } };
+  return data ? { status: 200, body: { resolvedType, data } } : { status: 404, body: { ...serviceMessage("target_not_found") } };
 }

@@ -1,3 +1,5 @@
+
+import { serviceText } from '@/i18n/service-message';
 import { schemaError } from "@/lib/query-result";
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
@@ -73,7 +75,7 @@ async function getBalances(address: string, apiClients: QueryClient, kind: "bala
       balances.push({ denom: item.denom, amount: item.amount });
     }
     cursor = response.pagination?.next_key ?? null;
-    if (cursor && seen.has(cursor)) schemaError("잔액 페이지가 반복됩니다.");
+    if (cursor && seen.has(cursor)) schemaError(serviceText("balance_page_repeated"));
     if (cursor) seen.add(cursor);
   } while (cursor);
   return balances;
@@ -86,7 +88,7 @@ export async function getAddressAccountInfo(address: string, apiClients: QueryCl
   );
   const accountNumber = readDeepStringField(response.account, "account_number");
   const sequence = readDeepStringField(response.account, "sequence");
-  if (accountNumber === null || sequence === null) schemaError("계정 번호/sequence를 확인할 수 없습니다.");
+  if (accountNumber === null || sequence === null) schemaError(serviceText("could_not_verify_account_number_or_sequence"));
   return {
     accountNumber,
     sequence,

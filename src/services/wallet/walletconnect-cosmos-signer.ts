@@ -1,4 +1,6 @@
 "use client";
+import { ServiceError } from "@/i18n/service-message";
+
 
 import type { AccountData, AminoSignResponse, StdSignDoc } from "@cosmjs/amino";
 import type { OfflineSigner } from "@cosmjs/proto-signing";
@@ -29,12 +31,12 @@ export function createWalletConnectOfflineSigner(params: {
     signAmino: async (signer: string, signDoc: StdSignDoc): Promise<AminoSignResponse> => {
       params.assertCurrent();
       if (signer !== signerAddress || signDoc.chain_id !== chainId || !pubkey.length) {
-        throw new Error("Signer address mismatch");
+        throw new ServiceError("signer_address_mismatch");
       }
       const client = await getOrCreateSignClient();
       params.assertCurrent();
       const chain = getActiveChainConfig();
-      if (chain.chainId !== chainId) throw new Error("WalletConnect chain mismatch");
+      if (chain.chainId !== chainId) throw new ServiceError("walletconnect_chain_mismatch");
       assertWalletConnectApproval(client.session.get(topic), chain, signerAddress);
       const result = await client.request({
         topic,

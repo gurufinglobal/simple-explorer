@@ -1,4 +1,6 @@
 "use client";
+import { useTranslations } from "next-intl";
+
 import { ModuleTable, moduleTextCellSx } from "@/components/query/module-table";
 import { withChain } from "@/lib/chain-selection";
 
@@ -33,6 +35,7 @@ function isActiveStatus(status: string): boolean {
 }
 
 export function BexList() {
+  const t = useTranslations("modules");
   const query = useQuery("bex-exchanges", client => listBexExchanges(client));
   const loading = query.busy && !query.result.data;
   const supported = query.result.data !== null;
@@ -57,13 +60,11 @@ export function BexList() {
   return (
     <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
       <Typography variant="h5" fontWeight={700}>
-        BEX Exchanges
-      </Typography>
+         {t("bex_exchanges")} </Typography>
       <Typography variant="body2" color="text.secondary">
-        fee·limit는 원문입니다. 비율·금액 단위와 적용 의미는 미확인입니다.
-      </Typography>
+         {t("fee_and_limit_are_raw_values_their_units_and_2")} </Typography>
 
-      <QueryStatus {...query} label="교환 목록" />
+      <QueryStatus {...query} label={t("exchanges")} />
 
       {loading ? (
         <Card variant="outlined">
@@ -71,11 +72,11 @@ export function BexList() {
             <ModuleTable>
               <TableHead>
                 <TableRow>
-                  <TableCell>ID</TableCell>
-                  <TableCell>Pair</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Fee</TableCell>
-                  <TableCell>Oracle Ref. ID</TableCell>
+                  <TableCell>{t("id")}</TableCell>
+                  <TableCell>{t("pair")}</TableCell>
+                  <TableCell>{t("status")}</TableCell>
+                  <TableCell>{t("fee")}</TableCell>
+                  <TableCell>{t("oracle_reference_id")}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -93,18 +94,18 @@ export function BexList() {
           </CardContent>
         </Card>
       ) : !supported ? null : items.length === 0 ? (
-        <Typography variant="body2">표시할 BEX exchange가 없습니다.</Typography>
+        <Typography variant="body2">{t("no_bex_exchanges_to_display")}</Typography>
       ) : (
         <Card variant="outlined">
           <CardContent>
             <ModuleTable>
               <TableHead>
                 <TableRow>
-                  <TableCell>ID</TableCell>
-                  <TableCell>Pair</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Fee</TableCell>
-                  <TableCell>Oracle Ref. ID</TableCell>
+                  <TableCell>{t("id")}</TableCell>
+                  <TableCell>{t("pair")}</TableCell>
+                  <TableCell>{t("status")}</TableCell>
+                  <TableCell>{t("fee")}</TableCell>
+                  <TableCell>{t("oracle_reference_id")}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>

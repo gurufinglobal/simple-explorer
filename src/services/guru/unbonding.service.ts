@@ -1,3 +1,5 @@
+
+import { serviceText } from '@/i18n/service-message';
 import { addDecimal, type Coin } from "@/lib/cosmos-amount";
 import { schemaError } from "@/lib/query-result";
 import { apiClients, type QueryClient } from "@/services/clients";
@@ -20,12 +22,12 @@ export async function getUnbonding(address: string, denom: string, client: Query
     if (!response.blockHeight || response.blockHeight !== height) consistent = false;
     const rows = validator ? [response.data.unbond ?? schemaError()] : response.data.unbonding_responses ?? schemaError();
     for (const row of rows) for (const entry of row.entries ?? schemaError()) {
-      if (!entry.balance || !/^\d+$/.test(entry.balance)) schemaError("언본딩 잔액이 올바르지 않습니다.");
+      if (!entry.balance || !/^\d+$/.test(entry.balance)) schemaError(serviceText("invalid_unbonding_balance"));
       total = addDecimal(total, entry.balance);
-      entries.push({ amount: entry.balance, denom, validator: row.validator_address ?? validator ?? "미확인", completionTime: entry.completion_time ?? null, creationHeight: entry.creation_height ?? null, queryHeight: response.blockHeight });
+      entries.push({ amount: entry.balance, denom, validator: row.validator_address ?? validator ?? serviceText("unknown"), completionTime: entry.completion_time ?? null, creationHeight: entry.creation_height ?? null, queryHeight: response.blockHeight });
     }
     cursor = response.data.pagination?.next_key ?? null;
-    if (cursor && seen.has(cursor)) schemaError("언본딩 페이지가 반복됩니다.");
+    if (cursor && seen.has(cursor)) schemaError(serviceText("unbonding_page_repeated"));
     if (cursor) seen.add(cursor);
   } while (cursor);
   return { entries, total: { amount: total, denom }, queryHeight: consistent ? height : null };
