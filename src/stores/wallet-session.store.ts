@@ -1,7 +1,7 @@
 
 import { serviceText } from '@/i18n/service-message';
 import { create } from "zustand";
-import type { WalletConnectNormalizedSession } from "@/types/walletconnect";
+import type { WalletConnectCapabilities, WalletConnectMode, WalletConnectNormalizedSession } from "@/types/walletconnect";
 import { useWalletPortfolioStore } from "@/stores/wallet-portfolio.store";
 
 export type WalletStatus = "disconnected" | "connecting" | "connected" | "error";
@@ -9,13 +9,14 @@ export type WalletConnectorKind = "keplr" | "metamask" | "walletconnect";
 export type SessionMeta = {
   sessionTopic?: string | null; connectedChains?: string[];
   chainKey?: string; chainId?: string; pubkey?: Uint8Array | null;
-  methods?: string[];
+  expiry?: number; methods?: string[]; capabilities?: WalletConnectCapabilities; wcMode?: WalletConnectMode;
 };
 export type WalletSessionState = {
   status: WalletStatus; bech32Address: string | null; evmAddress: string | null;
   walletType: WalletConnectorKind | null; sessionTopic: string | null;
   connectedChains: string[]; lastError: string | null;
   chainKey: string | null; chainId: string | null; pubkey: Uint8Array | null;
+  expiry: number | null; capabilities: WalletConnectCapabilities; wcMode: WalletConnectMode | null;
   methods: string[]; generation: number;
   writeStatus: "blocked" | "checking" | "ready"; writeReason: string | null;
   startConnecting: () => number | null;
@@ -25,7 +26,7 @@ export type WalletSessionState = {
 };
 const cleared = {
   bech32Address: null, evmAddress: null, walletType: null, sessionTopic: null,
-  connectedChains: [], chainKey: null, chainId: null, pubkey: null, methods: [],
+  connectedChains: [], chainKey: null, chainId: null, pubkey: null, methods: [], capabilities: {}, wcMode: null, expiry: null,
   writeStatus: "blocked" as const, writeReason: serviceText("read_only_connect_your_wallet"), lastError: null,
 };
 export const useWalletSessionStore = create<WalletSessionState>((set, get) => ({
@@ -43,7 +44,7 @@ export const useWalletSessionStore = create<WalletSessionState>((set, get) => ({
     set({ ...cleared, status: "connected", walletType, bech32Address, evmAddress,
       sessionTopic: meta?.sessionTopic ?? null, connectedChains: meta?.connectedChains ?? [],
       chainKey: meta?.chainKey ?? null, chainId: meta?.chainId ?? null,
-      pubkey: meta?.pubkey ?? null, methods: meta?.methods ?? [],
+      pubkey: meta?.pubkey ?? null, methods: meta?.methods ?? [], capabilities: meta?.capabilities ?? {}, wcMode: meta?.wcMode ?? null, expiry: meta?.expiry ?? null,
       generation: get().generation + 1, writeReason: serviceText("checking_transaction_eligibility"),
     });
   },

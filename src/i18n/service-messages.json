@@ -319,5 +319,11 @@
   "and_delegation_amount": "와 위임 수량",
   "block_transaction_limit_notice": " 블록별 최대 150건 조회: 추가 거래 또는 전체 개수 미확인 구간이 있어 전체 이력이 아닙니다.",
   "related_read_failed": "{value0}: {value1}",
-  "simulated_gas": "simulate gas {value0} × {value1}/10000 · {value2}"
+  "simulated_gas": "simulate gas {value0} × {value1}/10000 · {value2}",
+  "wc_evm_chain_unverified": "선택 체인의 EVM chain ID(십진수)가 확인되지 않았습니다.",
+  "wc_request_not_approved": "이 메서드·체인·계정의 승인이 없습니다. 지갑을 다시 연결하세요.",
+  "wc_evm_transaction_mismatch": "거래 계정 또는 체인이 연결된 EVM 세션과 다릅니다.",
+  "wc_public_key_unavailable": "검증된 공개키를 얻을 수 없어 조회 전용입니다. 지원되는 지갑 공개키 경로를 사용하세요. 입금만으로 공개키가 공개되지는 않습니다.",
+  "wc_evm_cosmos_read_only": "EVM 세션이 연결되었습니다. Cosmos 작업은 Cosmos 연결이 필요합니다.",
+  "wc_pairing_expired": "연결 요청이 만료되었습니다. 다시 연결하여 새 QR 코드를 생성하세요."
 }

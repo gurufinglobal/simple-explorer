@@ -19,6 +19,7 @@ export async function verifyLcdChain(chain: ChainConfig): Promise<string> {
 export function writeBlockReason(chain: ChainConfig, state: WalletSessionState): string | null {
   if (state.status !== "connected") return serviceText("read_only_connect_your_wallet");
   if (state.chainKey !== chain.key || !chain.chainId || state.chainId !== chain.chainId) return serviceText("chain_and_wallet_connection_do_not_match_reconnect");
+  if (state.wcMode === "evm") return serviceText("wc_evm_cosmos_read_only");
   if (state.walletType === "metamask") return serviceText("metamask_is_read_only_for_cosmos_reconnect_with_keplr_or");
   if (!chain.rpcUrl) return serviceText("rpc_endpoint_missing_only_lcd_queries_are_available");
   if (!chain.bech32Prefix || !chain.nativeDenom || !chain.bondDenom || !chain.feeDenom || chain.decimals === undefined) return serviceText("prefix_denom_or_decimals_verification_is_incomplete_read_only");
@@ -31,7 +32,8 @@ export function writeBlockReason(chain: ChainConfig, state: WalletSessionState):
   if (!state.bech32Address) return serviceText("no_cosmos_account_for_the_current_chain_reconnect");
   try { if (bech32.decode(state.bech32Address).prefix !== chain.bech32Prefix) return serviceText("account_prefix_differs_from_the_selected_chain_reconnect"); }
   catch { return serviceText("invalid_cosmos_account_address_reconnect"); }
-  if (state.walletType === "walletconnect" && (!state.sessionTopic || !state.methods.includes("cosmos_signAmino"))) return serviceText("no_cosmos_signamino_approval_for_the_current_chain_reconnect");
+  if (state.walletType === "walletconnect" && (!state.sessionTopic || !state.methods.includes(state.wcMode === "keplr" ? "keplr_signAmino" : "cosmos_signAmino"))) return serviceText("wc_request_not_approved");
+  if (state.walletType === "walletconnect" && !state.pubkey?.length) return serviceText("wc_public_key_unavailable");
   if (!state.pubkey?.length) return serviceText("could_not_obtain_the_account_public_key_check_the_wallet");
   return null;
 }

@@ -325,7 +325,13 @@
       "and_delegation_amount": " and delegation amount",
       "block_transaction_limit_notice": " Up to 150 transactions per block: some ranges have more transactions or an unknown total, so this is not the full history.",
       "related_read_failed": "{value0}: {value1}",
-      "simulated_gas": "Simulated gas {value0} × {value1}/10000 · {value2}"
+      "simulated_gas": "Simulated gas {value0} × {value1}/10000 · {value2}",
+      "wc_evm_chain_unverified": "The selected chain has no verified decimal EVM chain ID.",
+      "wc_request_not_approved": "This method, chain, or account is not approved. Reconnect your wallet.",
+      "wc_evm_transaction_mismatch": "The transaction account or chain differs from the connected EVM session.",
+      "wc_public_key_unavailable": "A verified public key is unavailable. Read only. Use a supported wallet key path; receiving funds does not guarantee a published key.",
+      "wc_evm_cosmos_read_only": "EVM session connected. Cosmos actions require a separate Cosmos connection.",
+      "wc_pairing_expired": "The connection request expired. Reconnect to create a new QR code."
     },
     "externalError": "The request could not be completed.",
     "originalDetail": "Original detail",
@@ -986,6 +992,11 @@
     "error": "Connection error",
     "disconnected": "Disconnected",
     "connected": "Connected",
-    "mobileWallet": "QR / mobile wallet"
+    "mobileWallet": "QR / mobile wallet",
+    "wc_cosmos": "WalletConnect · Cosmos (Amino)",
+    "wc_keplr": "WalletConnect · Keplr mobile (Amino)",
+    "wc_evm": "WalletConnect · EVM",
+    "wc_not_configured": "WalletConnect project ID is not configured.",
+    "wc_return_hint": "After approving in the wallet, return to this browser. If the app does not open, use QR or copy the URI. Device and wallet compatibility must be verified."
   }
 }
