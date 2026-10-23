@@ -86,7 +86,7 @@ export function TransactionResult({ receipt }: { receipt: TransactionReceipt }) 
   </Stack>;
 }
 
-export function SavedTransactions({ chainKey, excludeHash }: { chainKey: string; excludeHash?: string | null }) {
+export function SavedTransactions({ chainKey, excludeHash, account }: { chainKey: string; excludeHash?: string | null; account?: string }) {
   const t = useTranslations("transaction");
   const [records, setRecords] = useState<TransactionReceipt[]>([]);
   useEffect(() => {
@@ -95,7 +95,7 @@ export function SavedTransactions({ chainKey, excludeHash }: { chainKey: string;
     window.addEventListener(receiptEvent, load); window.addEventListener("storage", load);
     return () => { window.removeEventListener(receiptEvent, load); window.removeEventListener("storage", load); };
   }, []);
-  const visible = records.filter(r => r.chainKey === chainKey && r.hash !== excludeHash);
+  const visible = records.filter(r => r.chainKey === chainKey && r.hash !== excludeHash && (account === undefined || r.sender === account));
   return visible.length ? <details><summary>{t("saved_transaction_results")}{visible.length})</summary>
     {visible.map(r => <SavedTransaction key={`${r.chainKey}:${r.hash}`} receipt={r} />)}
   </details> : null;

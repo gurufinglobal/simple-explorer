@@ -22,7 +22,7 @@ export function AddressTransactions({ address }: { address: string }) {
     <List dense disablePadding>{query.rows.map(tx => <ListItem key={tx.hash} disablePadding>
       <ListItemButton component={Link} href={`/tx/${tx.hash}`}>
         <ListItemText primary={tx.hash} secondary={t("transactionSummary", { height: tx.height, used: tx.gasUsed, wanted: tx.gasWanted })} />
-        <Chip label={tx.code === 0 ? 'Success' : 'Failed'} color={tx.code === 0 ? 'success' : 'error'} size="small" />
+        <Chip label={t(tx.code === 0 ? "transactionSuccess" : "transactionFailed")} color={tx.code === 0 ? 'success' : 'error'} size="small" />
       </ListItemButton>
     </ListItem>)}</List>
   </Stack>;

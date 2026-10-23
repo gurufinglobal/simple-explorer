@@ -11,7 +11,7 @@ import { evmNetwork } from "@/services/evm/network";
 import { prepareEvmContract, submitEvmTransfer, useEvmResults, type EvmSnapshot } from "@/services/evm/transfer";
 import { lookupEvmTransaction, type EvmLookup } from "@/services/evm/lookup";
 
-export function EvmContractForm() {
+export function EvmContractForm({ writeEnabled = true }: { writeEnabled?: boolean }) {
   const t = useTranslations("evm");
   const wallet = useWalletSessionStore();
   const busy = useEvmResults(s => s.busy);
@@ -49,7 +49,7 @@ export function EvmContractForm() {
     finally { lock.current = false; setWorking(false); }
   };
   const confirm = async () => {
-    if (lock.current || busy || !review || review.key !== key) return;
+    if (!writeEnabled || lock.current || busy || !review || review.key !== key) return;
     lock.current = true; setWorking(true); setError(undefined);
     try { await submitEvmTransfer(review.snapshot); }
     catch (error) { if (latest.current === key) setError(error); }
@@ -69,7 +69,7 @@ export function EvmContractForm() {
     {selected && <Typography component="pre" sx={{ whiteSpace: "pre-wrap" }}>{JSON.stringify(selected.inputs, null, 2)}</Typography>}
     <TextField label={t("arguments")} multiline minRows={2} value={args} onChange={e => setArgs(e.target.value)} helperText={t("argumentsHelp")} />
     {selected?.stateMutability === "payable" && <TextField label={t("contractValue")} value={value} onChange={e => setValue(e.target.value)} />}
-    <Button disabled={working || busy || !!configError || !!abiError || !selected || !address || !readOnly && wallet.status !== "connected"} onClick={() => void run()}>{t(readOnly ? "readContract" : "reviewContract")}</Button>
+    <Button disabled={working || busy || !!configError || !!abiError || !selected || !address || !readOnly && (!writeEnabled || wallet.status !== "connected")} onClick={() => void run()}>{t(readOnly ? "readContract" : "reviewContract")}</Button>
     {error != null && <Alert severity="error"><ServiceErrorText error={error} /></Alert>}
     {result?.key === key && <Stack role="status"><Typography>{t("readResult")}</Typography><Typography component="pre" sx={{ whiteSpace: "pre-wrap" }}>{result.value}</Typography></Stack>}
     <Dialog open={!!snapshot} onClose={() => { if (!working) setReview(undefined); }} fullWidth>
@@ -89,7 +89,7 @@ export function EvmContractForm() {
         </>}
       </Stack></DialogContent><DialogActions>
         <Button disabled={working} onClick={() => setReview(undefined)}>{t("cancel")}</Button>
-        <Button disabled={working || busy || review?.key !== key} onClick={() => void confirm()}>{t("confirm")}</Button>
+        <Button disabled={!writeEnabled || working || busy || review?.key !== key} onClick={() => void confirm()}>{t("confirm")}</Button>
       </DialogActions>
     </Dialog>
   </Stack>;

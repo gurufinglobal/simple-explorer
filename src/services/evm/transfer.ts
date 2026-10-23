@@ -61,7 +61,9 @@ async function verifyWallet(provider: InjectedProvider, chain: ChainConfig, from
   if (typeof id !== "string" || !/^0x[0-9a-f]+$/i.test(id) || BigInt(id) !== BigInt(evmNetwork(chain).id)) throw new ServiceError("evm_chain_mismatch");
   if (!Array.isArray(accounts) || typeof accounts[0] !== "string" || accounts[0].toLowerCase() !== from.toLowerCase()) throw new ServiceError("chain_wallet_or_account_changed_reconnect_and_review_the_transaction");
 }
-async function readAccount(chain: ChainConfig, from: Address, token?: string): Promise<EvmAccount> {
+/** Public reads do not require wallet signing permission. Metadata is checked on this chain. */
+export async function readEvmAccount(chain: ChainConfig, account: string, token?: string): Promise<EvmAccount> {
+  const from = address(account);
   const client = await verifyEvmRpc(chain);
   const [balance, nonce] = await Promise.all([client.getBalance({ address: from, blockTag: "pending" }), client.getTransactionCount({ address: from, blockTag: "pending" })]);
   const native = { ...evmNetwork(chain).nativeCurrency, balance };
@@ -82,8 +84,16 @@ async function readAccount(chain: ChainConfig, from: Address, token?: string): P
 export async function loadEvmAccount(token?: string): Promise<EvmAccount> {
   const ctx = context();
   await verifyWallet(ctx.provider, ctx.chain, ctx.from, ctx.assertCurrent);
-  const result = await readAccount(ctx.chain, ctx.from, token); ctx.assertCurrent();
+  const result = await readEvmAccount(ctx.chain, ctx.from, token); ctx.assertCurrent();
   return result;
+}
+/** Read-only capability probe. Every prepare/submit still repeats the live checks. */
+export async function verifyEvmWriteCapability(): Promise<boolean> {
+  const ctx = context();
+  await verifyWallet(ctx.provider, ctx.chain, ctx.from, ctx.assertCurrent);
+  await verifyEvmRpc(ctx.chain);
+  ctx.assertCurrent();
+  return true;
 }
 export function prepareEvmTransfer(input: { recipient: string; amount: string; token?: string }) {
   return prepareEvmRequest(input);
@@ -98,7 +108,7 @@ async function prepareEvmRequest(input: { recipient: string; amount: string; tok
   const invocation = contractInput ? contractInvocation(contractInput, evmNetwork(chain).nativeCurrency.decimals) : undefined;
   if (invocation && ["view", "pure"].includes(invocation.fn.stateMutability)) throw new ServiceError("evm_write_only");
   await verifyWallet(provider, chain, from, assertCurrent);
-  const account = await readAccount(chain, from, input.token); assertCurrent();
+  const account = await readEvmAccount(chain, from, input.token); assertCurrent();
   const asset = account.token ?? account.native;
   if (!/^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(input.amount) || (input.amount.split(".")[1]?.length ?? 0) > asset.decimals) throw new ServiceError("evm_invalid_amount");
   const amount = parseUnits(input.amount, asset.decimals);
@@ -170,7 +180,7 @@ export async function submitEvmTransfer(snapshot: EvmSnapshot): Promise<string> 
   try {
     binding.assertCurrent();
     if (Date.now() - snapshot.createdAt > 120000) throw new ServiceError("evm_review_expired");
-    const current = await readAccount(snapshot.chain, snapshot.from, snapshot.asset.address);
+    const current = await readEvmAccount(snapshot.chain, snapshot.from, snapshot.asset.address);
     binding.assertCurrent();
     if (current.nonce !== snapshot.nonce || (current.token && (current.token.decimals !== snapshot.asset.decimals || current.token.symbol !== snapshot.asset.symbol))) throw new ServiceError("evm_review_expired");
     if ((current.token ?? current.native).balance < snapshot.amount || current.native.balance < snapshot.maxFee + (snapshot.asset.address ? ZERO : snapshot.amount)) throw new ServiceError("evm_insufficient_balance");

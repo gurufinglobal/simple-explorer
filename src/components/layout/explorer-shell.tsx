@@ -23,6 +23,7 @@ import {
   useMediaQuery,
   useTheme,
 } from "@mui/material";
+import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
 import DashboardOutlinedIcon from "@mui/icons-material/DashboardOutlined";
 import AccountBalanceOutlinedIcon from "@mui/icons-material/AccountBalanceOutlined";
 import ViewAgendaOutlinedIcon from "@mui/icons-material/ViewAgendaOutlined";
@@ -64,7 +65,9 @@ export function ExplorerShell({ children }: { children: ReactNode }) {
 function ExplorerShellContent({ children }: { children: ReactNode }) {
   const t = useTranslations("navigation");
   const st = useServiceText();
+const pt = useTranslations("walletPage");
 const menus: MenuItem[] = [
+  { href: "/wallet", label: pt("title"), icon: <AccountBalanceWalletOutlinedIcon /> },
   { href: "/dashboard", label: t("dashboard"), icon: <DashboardOutlinedIcon /> },
   { href: "/staking", label: t("staking"), icon: <AccountBalanceOutlinedIcon /> },
   { href: "/blocks", label: t("blocks"), icon: <ViewAgendaOutlinedIcon /> },
