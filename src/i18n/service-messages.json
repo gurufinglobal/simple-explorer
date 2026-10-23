@@ -325,5 +325,20 @@
   "wc_evm_transaction_mismatch": "거래 계정 또는 체인이 연결된 EVM 세션과 다릅니다.",
   "wc_public_key_unavailable": "검증된 공개키를 얻을 수 없어 조회 전용입니다. 지원되는 지갑 공개키 경로를 사용하세요. 입금만으로 공개키가 공개되지는 않습니다.",
   "wc_evm_cosmos_read_only": "EVM 세션이 연결되었습니다. Cosmos 작업은 Cosmos 연결이 필요합니다.",
-  "wc_pairing_expired": "연결 요청이 만료되었습니다. 다시 연결하여 새 QR 코드를 생성하세요."
+  "wc_pairing_expired": "연결 요청이 만료되었습니다. 다시 연결하여 새 QR 코드를 생성하세요.",
+  "evm_select_provider": "탐색된 MetaMask provider를 선택하세요.",
+  "evm_unconfigured": "검증된 EVM 체인·RPC·통화·수수료 설정이 필요합니다.",
+  "evm_chain_mismatch": "EVM 체인이 선택한 네트워크와 다릅니다.",
+  "evm_invalid_address": "올바른 EVM 주소와 체크섬을 입력하세요.",
+  "evm_connect": "이 네트워크에 MetaMask 또는 WalletConnect EVM을 연결하세요.",
+  "evm_token_metadata": "ERC20 코드·소수 자릿수·심볼·잔액을 검증하지 못했습니다.",
+  "evm_request_pending": "지갑 요청이 이미 진행 중입니다. 재전송하지 마세요.",
+  "evm_invalid_amount": "자산 소수 자릿수 범위 안에서 양수 수량을 입력하세요.",
+  "evm_insufficient_balance": "전송 수량과 최대 수수료를 충당할 자산 또는 네이티브 잔액이 부족합니다.",
+  "evm_token_transfer_failed": "ERC20 전송 시뮬레이션이 성공을 반환하지 않았습니다.",
+  "evm_invalid_fee": "EVM 수수료 추정값이 유효하지 않습니다.",
+  "evm_review_expired": "거래 확인 내용이 만료되었거나 변경되었습니다. 다시 확인하세요.",
+  "evm_receipt_mismatch": "영수증이 제출한 거래와 다릅니다.",
+  "evm_unknown": "제출 결과 미확인입니다. 자동 재서명·재전송하지 않습니다. 추가 전송 전에 지갑을 확인하세요.",
+  "evm_user_rejected": "지갑 요청을 사용자가 거절했습니다."
 }

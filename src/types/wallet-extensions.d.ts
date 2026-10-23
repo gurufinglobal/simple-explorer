@@ -9,6 +9,8 @@ type KeplrExtension = {
 };
 
 type EthereumProvider = {
+  isMetaMask?: boolean; isBraveWallet?: boolean; isCoinbaseWallet?: boolean;
+  providers?: EthereumProvider[];
   on?: (event: string, listener: (...args: unknown[]) => void) => void;
   removeListener?: (event: string, listener: (...args: unknown[]) => void) => void;
   request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;

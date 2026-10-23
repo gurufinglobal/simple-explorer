@@ -1,4 +1,5 @@
 // @vitest-environment jsdom
+import { bindInjectedProvider } from "@/services/wallet/injected-provider";
 import { cosmosAddress, cosmosPubkey, cosmosSigningProfile } from "../helpers/cosmos-signing";
 import { amountResponse } from "../helpers/amounts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -230,7 +231,9 @@ describe("W03 connection and session lifecycle", () => {
   it.each(["accountsChanged", "chainChanged", "disconnect"])("MetaMask %s clears the read-only account and removes listeners", async event => {
     const on = vi.fn(); const removeListener = vi.fn();
     window.ethereum = { on, removeListener, request: vi.fn().mockResolvedValue([`0x${"1".repeat(40)}`]) };
-    detach = attachWalletLifecycle(); await connectExtension("metamask"); expect(store.getState().writeReason).toContain("조회 전용");
+    detach = attachWalletLifecycle();
+    bindInjectedProvider(window.ethereum);
+    store.getState().connect("metamask", null, `0x${"1".repeat(40)}`, { chainKey: "a", chainId: "a-1" });
     on.mock.calls.find(([name]) => name === event)![1]([]); expect(store.getState().evmAddress).toBeNull();
     detach(); detach = undefined; expect(removeListener).toHaveBeenCalledWith(event, expect.any(Function));
   });

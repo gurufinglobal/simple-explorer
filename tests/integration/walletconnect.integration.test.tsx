@@ -80,6 +80,18 @@ describe("W04 namespace grants and EVM request boundary", () => {
     expect(sdk.request).toHaveBeenCalledTimes(1);
     expect(sdk.request).toHaveBeenCalledWith({ topic: "selected-topic", chainId: "eip155:631", request: { method: "eth_sendTransaction", params: [tx] } });
   });
+  it("preserves a dispatched hash after the approved session is deleted", async () => {
+    await connectQr(() => {}, "evm");
+    const provider = createWalletConnectEvmProvider();
+    const pending = deferred<string>(); sdk.request.mockReturnValue(pending.promise);
+    const send = provider.request({ method: "eth_sendTransaction", params: [{ from: evm }] });
+    await waitFor(() => expect(sdk.request).toHaveBeenCalledTimes(1));
+    store.getState().disconnect(); sdk.get.mockReturnValue(undefined);
+    pending.resolve(`0x${"ab".repeat(32)}`);
+    await expect(send).resolves.toBe(`0x${"ab".repeat(32)}`);
+    await expect(provider.request({ method: "eth_sendTransaction", params: [{ from: evm }] })).rejects.toThrow();
+    expect(sdk.request).toHaveBeenCalledTimes(1);
+  });
   it.each(["missing-method", "wrong-chain", "wrong-account", "expired", "nan-expiry", "missing-session", "wrong-topic", "multiple-accounts", "wrong-from", "wrong-tx-chain", "personal_sign", "disconnected"])("%s makes zero wallet requests", async failure => {
     await connectQr(() => {}, "evm"); const provider = createWalletConnectEvmProvider();
     const live = session();

@@ -33,6 +33,12 @@ export const ChainConfigSchema = z.object({
   evmRpcUrl: z.url().optional(),
   wsUrl: z.url().optional(),
   evmChainId: z.string().min(1).optional(),
+  // Separate EVM metadata and fee evidence; never infer from Cosmos decimals.
+  evm: z.object({
+    nativeCurrency: z.object({ name: z.string().min(1), symbol: z.string().min(1).max(11), decimals: z.number().int().min(0).max(255) }),
+    feeMode: z.enum(["legacy", "eip1559"]),
+    evidence: z.string().min(1),
+  }).optional(),
   bech32Prefix: z.string().min(1).optional(),
   denom: z.string().min(1).optional(),
   chainId: z.string().min(1).optional(),

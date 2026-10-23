@@ -40,6 +40,7 @@ import {
 } from "@/services/guru/network-summary.service";
 import { useEffectiveCosmosAddress } from "@/hooks/use-effective-cosmos-address";
 import { getValidatorsPage } from "@/services/guru/staking.service";
+import { EvmTransactionResults } from "@/components/transactions/evm-transfer-form";
 import { SendForm } from "@/components/transactions/send-form";
 import { SavedTransactions } from "@/components/transactions/transaction-result";
 import { StakingForm } from "@/components/transactions/staking-form";
@@ -280,6 +281,7 @@ export function DashboardView() {
                {t("delegate")} </Button>
           </Stack>
           {activeAction === "send" && <SendForm key={getActiveChainConfig().key} />}
+          <EvmTransactionResults />
           <SavedTransactions chainKey={getActiveChainConfig().key} />
           {activeAction === "delegate" && <StakingForm key={getActiveChainConfig().key} validators={validatorOptions} />}
         </CardContent>

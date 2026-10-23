@@ -123,3 +123,31 @@ BEX fee/limit, FeePolicy discount_type/amount, Oracle nonce·결과 시각·repo
 `src/server/handlers`는 내부 함수입니다. Next route handler 등록 없이 공개 HTTP API라고 해석하지 않습니다. Faucet 지급·WebSocket 연결·재위임 제출·서버 지갑 세션의 미사용 모의 성공 경로는 제거했습니다. 실제 조회 갱신은 HTTP polling, 지갑 상태는 클라이언트 wallet lifecycle/store, 구현된 staking 행위는 실제 signer guard를 사용합니다. Faucet·WS·재위임을 향후 제품에 연결하려면 별도 범위와 수용 기준이 필요합니다.
 
 개별 token metadata는 bank metadata/IBC trace 응답만 사용합니다. 응답 없는 symbol·name·decimals는 추정하지 않으며 EVM token metadata는 미지원입니다. IBC trace의 base denom만으로 원체인 symbol·name을 확정하지 않습니다.
+
+## EVM 조회·전송 설정과 경계
+
+EVM 전송은 헤더에서 탐색된 **MetaMask provider를 직접 선택**하거나 **WalletConnect · EVM**으로 연결한 뒤, 대시보드 **Send**에서 사용합니다. 조회는 지정 public RPC, 서명·방송 요청은 선택한 지갑으로 보냅니다. Cosmos 전송·staking·governance 권한과 EVM 주소 변환 제한은 별도로 유지합니다.
+
+`NEXT_PUBLIC_CHAINS` 항목에 다음 EVM 필드가 모두 필요합니다. 예시는 합성 값이며 배포 체인 지원 근거가 아닙니다. 기존 TGXN 프리셋에 EVM 지원을 자동으로 추가하지 않습니다.
+
+```json
+{
+  "evmChainId": "631",
+  "evmRpcUrl": "https://verified-evm.example.invalid",
+  "evm": {
+    "nativeCurrency": { "name": "Example", "symbol": "EX", "decimals": 18 },
+    "feeMode": "legacy",
+    "evidence": "검증한 체인 버전·RPC·통화·수수료 근거를 기재"
+  }
+}
+```
+
+- `evmChainId`는 선행 0 없는 양의 십진 문자열이며 JS safe integer 범위입니다. RPC `eth_chainId`와 지갑 체인을 확인합니다. MetaMask 네트워크 전환에서 4902가 반환되면 검증된 설정으로 추가한 뒤 전환·체인 ID를 다시 확인합니다.
+- `evm.nativeCurrency.decimals`는 Cosmos denom의 decimals와 별개입니다. EIP-1559 지원이 확인된 체인만 `feeMode: "eip1559"`를 사용합니다. legacy gasPrice와 EIP-1559 필드를 혼합하지 않습니다.
+- ERC20은 사용자가 입력한 contract 주소의 code·decimals·symbol·balanceOf를 검증하고 transfer simulation의 성공을 요구합니다. metadata는 토큰의 진위를 보증하지 않습니다. 비표준 반환값·metadata 실패는 전송을 차단합니다.
+- 확인창은 수신자·자산/contract·정밀 수량·nonce·gas·최대 수수료를 고정합니다. 2분 뒤에는 다시 확인해야 합니다. 서명 직전 계정·체인·nonce·잔액·토큰 단위를 다시 검사합니다.
+- 방송 후 계정/체인 변경으로 거래가 취소되었다고 표시하지 않습니다. 60초 지갑 응답 지연·hash 없는 모호한 결과는 `unknown`이며 자동 재서명·재전송하지 않습니다. 지갑 응답이 남아 있으면 중복 제출을 잠그고, 늦게 도착한 hash도 보존합니다.
+- 영수증은 최초 1회 조회하고 pending 상태에서 **영수증 재조회**로 다시 확인합니다. RPC timeout·미포함은 성공/실패 확정이 아닙니다. 실제 네트워크 수수료는 receipt의 gasUsed × effectiveGasPrice입니다.
+- 앱 제출 결과 최근 20건을 `explorer:evm-results:v1`에 공개 요청·결과 metadata만 저장합니다. 지갑 provider·WC topic·서명 데이터는 저장하지 않습니다. 새로고침 중 응답 대기 요청은 unknown으로 복원하며 저장한 요청은 재서명할 수 없습니다. 브라우저 저장소 실패는 화면에 표시합니다. 전체 주소 거래/내부 trace 이력은 제공하지 않습니다.
+
+현재 실기기·실지갑·실거래 검증과 운영 EVM 설정 변경은 미실행입니다. 실제 테스트는 체인·공개 계정·자산·금액/수수료 상한·기간·허용 작업 승인 후 수행합니다. 구현 회귀 테스트는 `tests/integration/evm-transfer.integration.test.tsx`, `metamask-provider.integration.test.tsx`, `walletconnect-evm-transfer.integration.test.tsx`에서 실제 서비스·UI를 실행하고 지갑/JSON-RPC 경계만 mock합니다.
