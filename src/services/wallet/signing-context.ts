@@ -51,8 +51,8 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
     const session = await getActiveWalletConnectSession(state.sessionTopic!);
     assertCurrent();
     if (!session) throw new ServiceError("walletconnect_session_missing_reconnect");
-    assertWalletConnectApproval(session, chain, address);
-    signer = createWalletConnectOfflineSigner({ topic: state.sessionTopic!, chainId: chain.chainId!, signerAddress: address, pubkey: state.pubkey!, assertCurrent });
+    assertWalletConnectApproval(session, chain, address, state.wcMode ?? "cosmos", state.sessionTopic!);
+    signer = createWalletConnectOfflineSigner({ mode: state.wcMode ?? "cosmos", topic: state.sessionTopic!, chainId: chain.chainId!, signerAddress: address, pubkey: state.pubkey!, assertCurrent });
   }
   const getAccounts = async () => {
     assertCurrent();

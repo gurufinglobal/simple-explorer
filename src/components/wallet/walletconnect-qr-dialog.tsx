@@ -12,9 +12,12 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import type { WalletConnectMode } from "@/types/walletconnect";
+import { walletConnectMobileLink } from "@/services/wallet/walletconnect-mobile";
 import { QRCodeSVG } from "qrcode.react";
 
 type WalletConnectQrDialogProps = {
+  mode?: WalletConnectMode;
   open: boolean;
   uri: string | null;
   title?: string;
@@ -27,15 +30,14 @@ type WalletConnectQrDialogProps = {
  */
 export function WalletConnectQrDialog({
   open,
+  mode = "cosmos",
   uri,
   title = "WalletConnect",
   error,
   onClose,
 }: WalletConnectQrDialogProps) {
   const t = useTranslations("wallet");
-  const universalLink = uri
-    ? `https://walletconnect.com/wc?uri=${encodeURIComponent(uri)}`
-    : null;
+  const universalLink = uri && !error && typeof navigator !== "undefined" ? walletConnectMobileLink(uri, mode, navigator.userAgent) : null;
 
   async function copyUri() {
     if (!uri) return;
@@ -53,11 +55,12 @@ export function WalletConnectQrDialog({
         <Stack spacing={2} alignItems="center">
           <Typography variant="body2" color="text.secondary" textAlign="center">
              {t("scan_with_a_walletconnect_compatible_wallet_or_open_the")} </Typography>
-          {uri ? (
+          {uri && !error ? (
             <QRCodeSVG value={uri} size={220} level="M" includeMargin />
           ) : (
             <Typography variant="body2">{t("preparing_pairing")}</Typography>
           )}
+          <Typography variant="body2">{t("wc_return_hint")}</Typography>
           {error ? (
             <Typography variant="body2" color="error" textAlign="center">
               {<ServiceErrorText error={error} />}
@@ -65,10 +68,10 @@ export function WalletConnectQrDialog({
           ) : null}
           <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="center">
             <Button onClick={onClose}>{t("cancel_connection")}</Button>
-            <Button variant="outlined" onClick={() => void copyUri()} disabled={!uri}>
+            <Button variant="outlined" onClick={() => void copyUri()} disabled={!uri || Boolean(error)}>
                {t("copy_uri")} </Button>
             {universalLink ? (
-              <Button component="a" href={universalLink} target="_blank" rel="noreferrer" variant="contained">
+              <Button component="a" href={universalLink} rel="noreferrer" variant="contained">
                  {t("open_wallet")} </Button>
             ) : null}
           </Stack>

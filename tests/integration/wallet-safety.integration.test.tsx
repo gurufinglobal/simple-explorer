@@ -69,7 +69,7 @@ function response(input: string) {
   if (amountResponse(url)) return amountResponse(url);
   if (url.pathname.includes("node_info")) return { default_node_info: { network: chainId } };
   if (url.port === "26657") return { result: { node_info: { network: chainId } } };
-  if (url.pathname.includes("/auth/")) return { account: { pub_key: { key: Buffer.from(pubkey).toString("base64") } } };
+  if (url.pathname.includes("/auth/")) return { account: { "@type": cosmosSigningProfile.accountTypeUrl, address, pub_key: { "@type": cosmosSigningProfile.pubkeyTypeUrl, key: Buffer.from(pubkey).toString("base64") } } };
   return { balances: [{ denom: "agxn", amount: "1000000000000000000" }], total: [], delegation_responses: [], unbonding_responses: [] };
 }
 beforeEach(() => {
@@ -284,14 +284,14 @@ describe("W03 connection and session lifecycle", () => {
     fireEvent.mouseDown(screen.getByRole("combobox")); fireEvent.click(screen.getByRole("option", { name: "Chain A" }));
     expect(getActiveChainConfig().key).toBe("a"); expect(screen.queryByRole("alert")).toBeNull();
   });
-  it.each(["base_account", "base_vesting_account", "missing"])("WC handles %s public key response without inventing a key", async shape => {
+  it.each(["base_account", "base_vesting_account", "missing"])("WC blocks unverified %s public key wrappers without inventing a key", async shape => {
     boundary.connect.mockResolvedValue({ approval: async () => session() });
     const baseAccount = { pub_key: { key: Buffer.from(pubkey).toString("base64") } };
     const account = shape === "base_account" ? { base_account: baseAccount } : shape === "base_vesting_account" ? { base_vesting_account: { base_account: baseAccount } } : {};
     http.mockImplementation(async input => Response.json(String(input).includes("/auth/") ? { account } : response(String(input))));
     await connectQr(() => {});
     expect(store.getState().status).toBe("connected");
-    expect(store.getState().writeStatus).toBe(shape === "missing" ? "blocked" : "ready");
+    expect(store.getState().writeStatus).toBe("blocked");
     if (shape === "missing") expect(store.getState().writeReason).toContain("공개키");
   });
   it("malformed JSON is visible without requesting a fallback endpoint", () => {
@@ -353,13 +353,13 @@ describe("W03 pending WalletConnect session invalidation", () => {
     boundary.sessionGet.mockReturnValue(next);
     boundary.connect.mockResolvedValue({ approval: async () => next });
     await act(async () => { await connectQr(() => {}); });
-    expect(store.getState()).toMatchObject({ status: "connected", bech32Address: addressB, sessionTopic: "next-topic", writeStatus: "ready" });
+    expect(store.getState()).toMatchObject({ status: "connected", bech32Address: addressB, sessionTopic: "next-topic", writeStatus: "blocked" });
     expect((screen.getByRole("button", { name: "제안 전송" }) as HTMLButtonElement).disabled).toBe(true);
     fireEvent.change(screen.getByLabelText("초기 예치 (표시 단위)"), { target: { value: "1" } });
     await screen.findByText(/전송 원본 1000000000000000000 agxn/);
     fireEvent.click(screen.getByRole("checkbox", { name: "표시 수량과 전송 원본을 확인했습니다" }));
     expect((screen.getByRole("button", { name: "제안 전송" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText(/gov v1 Amino 변환/)).toBeTruthy();
+    expect(store.getState().writeReason).toContain("공개키");
     expect(boundary.request).not.toHaveBeenCalled();
     expect(boundary.broadcast).not.toHaveBeenCalled();
   });

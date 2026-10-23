@@ -25,14 +25,14 @@ describe("wallet session store", () => {
     expect(useWalletSessionStore.getState().status).toBe("connecting");
 
     useWalletSessionStore.getState().connect("metamask", null, "0xabc", {
-      sessionTopic: "topic-1",
+      capabilities: {}, sessionTopic: "topic-1",
       connectedChains: ["eip155:1"],
     });
     expect(useWalletSessionStore.getState().sessionTopic).toBe("topic-1");
     expect(useWalletSessionStore.getState().connectedChains).toEqual(["eip155:1"]);
 
     useWalletSessionStore.getState().applyWalletConnectNormalized({
-      sessionTopic: "wc-topic",
+      capabilities: {}, sessionTopic: "wc-topic",
       evmAddress: "0x1",
       bech32Address: "guru1x",
       connectedChains: ["cosmos:x"],

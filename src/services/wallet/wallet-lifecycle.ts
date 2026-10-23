@@ -3,14 +3,13 @@ import { serviceText, ServiceError } from '@/i18n/service-message';
 
 import { getActiveChainConfig } from "@/lib/chain-selection";
 import type { ChainConfig } from "@/lib/env";
-import type { WalletConnectNormalizedSession } from "@/types/walletconnect";
+import type { WalletConnectMode, WalletConnectNormalizedSession } from "@/types/walletconnect";
 import { useWalletSessionStore as store } from "@/stores/wallet-session.store";
 import { connectWallet } from "./wallet-connector";
-import { normalizeWalletConnectSession } from "./walletconnect-session";
+import { assertWalletConnectRequest, normalizeWalletConnectSession, walletConnectMethods } from "./walletconnect-session";
 import { connectWalletConnectPairing, disconnectWalletConnectByTopic, getActiveWalletConnectSession, getOrCreateSignClient, getWalletConnectProjectId } from "./walletconnect-client";
 import { verifyLcdChain, verifyChainEndpoints, writeBlockReason } from "./chain-eligibility";
-import { getAccountPubkeyBytes } from "@/services/guru/governance-query.service";
-import { createQueryClient } from "@/services/clients";
+import { walletConnectPublicKey } from "./walletconnect-public-key";
 
 function message(error: unknown) { return error instanceof Error ? error.message : serviceText("wallet_connection_failed_reconnect"); }
 function isCurrent(generation: number, key: string) {
@@ -19,15 +18,16 @@ function isCurrent(generation: number, key: string) {
 }
 // An approved topic already has a lifecycle while its account key is still loading.
 let pendingApproval: { topic: string; generation: number } | null = null;
-type ApprovalIdentity = Pick<WalletConnectNormalizedSession, "sessionTopic" | "bech32Address" | "evmAddress" | "methods">;
+type ApprovalIdentity = Pick<WalletConnectNormalizedSession, "sessionTopic" | "bech32Address" | "evmAddress" | "methods"> & Partial<Pick<WalletConnectNormalizedSession, "capabilities">> & { wcMode?: WalletConnectMode | null };
 async function assertLiveApproval(chain: ChainConfig, expected: ApprovalIdentity): Promise<void> {
   const session = await getActiveWalletConnectSession(expected.sessionTopic).catch(() => undefined);
   if (!session || session.topic !== expected.sessionTopic || !Number.isFinite(session.expiry) || session.expiry * 1000 <= Date.now()) {
     throw new ServiceError("walletconnect_session_is_missing_or_expired_reconnect_your_wallet");
   }
-  const live = normalizeWalletConnectSession(session, chain);
+  const live = normalizeWalletConnectSession(session, chain, expected.wcMode ?? undefined);
   if (live.bech32Address !== expected.bech32Address || live.evmAddress !== expected.evmAddress ||
-    JSON.stringify(live.methods ?? []) !== JSON.stringify([...(expected.methods ?? [])].sort())) {
+    JSON.stringify(live.methods ?? []) !== JSON.stringify([...(expected.methods ?? [])].sort()) ||
+    (expected.capabilities && Object.keys(expected.capabilities).length > 0 && JSON.stringify(live.capabilities) !== JSON.stringify(expected.capabilities))) {
     throw new ServiceError("walletconnect_chain_account_or_approval_changed_reconnect_your_wallet");
   }
 }
@@ -70,34 +70,52 @@ export async function connectExtension(wallet: "keplr" | "metamask"): Promise<vo
     await refreshWriteEligibility();
   } catch (error) { if (store.getState().generation === generation) store.getState().setError(message(error)); }
 }
-export async function connectQr(onUri: (uri: string | null) => void): Promise<void> {
+export const WALLETCONNECT_PAIRING_TIMEOUT_MS = 5 * 60 * 1000;
+export async function connectQr(onUri: (uri: string | null) => void, mode: WalletConnectMode = "cosmos"): Promise<void> {
   const generation = store.getState().startConnecting();
   if (generation === null) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  let approvedTopic: string | undefined;
   try {
     const selected = getActiveChainConfig();
-    const chainId = await verifyLcdChain(selected);
+    const chainId = mode === "evm" ? selected.chainId : await verifyLcdChain(selected);
     const chain = { ...selected, chainId };
     if (!isCurrent(generation, chain.key)) return;
-    const pairing = await connectWalletConnectPairing(chain);
+    const pairing = await connectWalletConnectPairing(chain, mode);
     if (isCurrent(generation, chain.key)) onUri(pairing.uri ?? null);
     // Always consume approval so an approval after cancellation can be disconnected.
-    const session = await pairing.approval();
-    if (!isCurrent(generation, chain.key)) { await disconnectWalletConnectByTopic(session.topic).catch(() => {}); return; }
+    const approval = pairing.approval().then(async session => {
+      if (!isCurrent(generation, chain.key)) await disconnectWalletConnectByTopic(session.topic).catch(() => {});
+      return session;
+    });
+    const session = await Promise.race([approval, new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new ServiceError("wc_pairing_expired")), WALLETCONNECT_PAIRING_TIMEOUT_MS);
+    })]);
+    clearTimeout(timer);
+    approvedTopic = session.topic;
+    if (!isCurrent(generation, chain.key)) return;
     pendingApproval = { topic: session.topic, generation };
-    const normalized = normalizeWalletConnectSession(session, chain);
+    const normalized = normalizeWalletConnectSession(session, chain, mode);
     if (session.expiry * 1000 <= Date.now() || (!normalized.bech32Address && !normalized.evmAddress)) {
       await disconnectWalletConnectByTopic(session.topic).catch(() => {});
       throw new ServiceError("no_approved_account_for_this_chain_or_the_session_expired");
     }
+    const address = (mode === "evm" ? normalized.evmAddress : normalized.bech32Address)!;
+    for (const method of walletConnectMethods(mode)) assertWalletConnectRequest(session, session.topic, chain, mode, address, method);
     const pubkey = normalized.bech32Address
-      ? await getAccountPubkeyBytes(normalized.bech32Address, createQueryClient(chain)).catch(() => null) : null;
+      ? await walletConnectPublicKey(chain, session.topic, normalized.bech32Address, mode, () => {
+        if (!isCurrent(generation, chain.key)) throw new ServiceError("connection_cancelled");
+      }).catch(() => null) : null;
     if (!isCurrent(generation, chain.key)) { await disconnectWalletConnectByTopic(session.topic).catch(() => {}); return; }
     await assertLiveApproval(chain, normalized);
     if (!isCurrent(generation, chain.key)) { await disconnectWalletConnectByTopic(session.topic).catch(() => {}); return; }
     store.getState().connect("walletconnect", normalized.bech32Address, normalized.evmAddress, { ...normalized, pubkey });
     await refreshWriteEligibility();
-  } catch (error) { if (store.getState().generation === generation) store.getState().setError(message(error)); }
-  finally { if (pendingApproval?.generation === generation) pendingApproval = null; }
+  } catch (error) {
+    if (store.getState().generation === generation) { store.getState().setError(message(error)); onUri(null); }
+    if (approvedTopic) await disconnectWalletConnectByTopic(approvedTopic).catch(() => {});
+  }
+  finally { clearTimeout(timer); if (pendingApproval?.generation === generation) pendingApproval = null; }
 }
 export async function disconnectWallet(): Promise<void> {
   const topic = store.getState().sessionTopic;
@@ -114,7 +132,27 @@ export function attachWalletLifecycle(): () => void {
     if (state.status === "disconnected" || (wallet && state.walletType && state.walletType !== wallet)) return;
     state.setError(serviceText("chain_account_or_session_changed_reconnect_your_wallet"));
   };
+  let expiryTimer: ReturnType<typeof setTimeout> | undefined;
+  const scheduleExpiry = () => {
+    clearTimeout(expiryTimer);
+    const state = store.getState();
+    if (state.status !== "connected" || state.walletType !== "walletconnect" || !state.expiry) return;
+    const generation = state.generation;
+    expiryTimer = setTimeout(() => {
+      if (store.getState().generation !== generation) return;
+      if (state.expiry! * 1000 <= Date.now()) invalidate("walletconnect");
+      else scheduleExpiry();
+    }, Math.max(0, Math.min(state.expiry * 1000 - Date.now(), 2147483647)));
+  };
+  const unsubscribe = store.subscribe(scheduleExpiry);
+  scheduleExpiry();
   const onChain = () => { store.getState().disconnect(); };
+  const onReturn = () => {
+    if (document.visibilityState !== "hidden" && store.getState().walletType === "walletconnect") void refreshWriteEligibility();
+  };
+  window.addEventListener("pageshow", onReturn);
+  window.addEventListener("focus", onReturn);
+  document.addEventListener("visibilitychange", onReturn);
   const onKeplr = () => invalidate("keplr");
   const onEthereum = () => invalidate("metamask");
   window.addEventListener("explorer:chain-changed", onChain);
@@ -130,15 +168,23 @@ export function attachWalletLifecycle(): () => void {
       if (state.sessionTopic === args.topic ||
         (pendingApproval?.topic === args.topic && pendingApproval.generation === state.generation)) invalidate("walletconnect");
     };
+    const onEvent = (args: { topic: string; params: { event: { name: string } } }) => {
+      if (["accountsChanged", "chainChanged"].includes(args.params.event.name)) onSession(args);
+    };
+    client.on("session_event", onEvent);
     client.on("session_update", onSession);
     client.on("session_delete", onSession);
     client.on("session_expire", onSession);
     detachWc = () => {
+      client.off("session_event", onEvent);
       client.off("session_update", onSession); client.off("session_delete", onSession); client.off("session_expire", onSession);
     };
   }).catch(() => {});
   return () => {
-    disposed = true; detachWc?.();
+    disposed = true; detachWc?.(); unsubscribe(); clearTimeout(expiryTimer);
+    window.removeEventListener("pageshow", onReturn);
+    window.removeEventListener("focus", onReturn);
+    document.removeEventListener("visibilitychange", onReturn);
     window.removeEventListener("explorer:chain-changed", onChain);
     window.removeEventListener("keplr_keystorechange", onKeplr);
     ethereum?.removeListener?.("accountsChanged", onEthereum);
