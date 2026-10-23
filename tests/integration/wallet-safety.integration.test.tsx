@@ -5,6 +5,7 @@ import { amountResponse } from "../helpers/amounts";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "../helpers/render";
 import { bech32 } from "bech32";
+import type { KeplrSigner } from "@/services/wallet/keplr";
 import type { OfflineSigner } from "@cosmjs/proto-signing";
 import type { SessionTypes } from "@walletconnect/types";
 import type { ChainConfig } from "@/lib/env";
@@ -51,7 +52,9 @@ const a: ChainConfig = {
 const b = { ...a, key: "b", name: "Chain B", chainId: "b-1", lcdUrl: "https://b.test:1317", rpcUrl: "https://b.test:26657" };
 const base = { walletType: "keplr" as const, sessionTopic: null, bech32Address: address };
 let http: ReturnType<typeof vi.fn<typeof fetch>>;
-let sign: ReturnType<typeof vi.fn>;
+type SignDirect = NonNullable<KeplrSigner["signDirect"]>;
+const signResponse: Awaited<ReturnType<SignDirect>> = { signed: { chainId: "a-1", bodyBytes: new Uint8Array(), authInfoBytes: new Uint8Array(), accountNumber: BigInt(0) }, signature: { pub_key: { type: "tendermint/PubKeySecp256k1", value: Buffer.from(pubkey).toString("base64") }, signature: "" } };
+let sign: ReturnType<typeof vi.fn<SignDirect>>;
 let detach: (() => void) | undefined;
 function configure(chains: ChainConfig[] = [a, b]) {
   vi.stubEnv("NEXT_PUBLIC_CHAINS", JSON.stringify(chains));
@@ -79,7 +82,7 @@ beforeEach(() => {
   document.cookie = "gf_chain=; max-age=0; path=/";
   resetWalletConnectClientForTests(); store.getState().disconnect();
   http = vi.fn<typeof fetch>(async input => Response.json(response(String(input)))); vi.stubGlobal("fetch", http);
-  sign = vi.fn().mockResolvedValue({ signed: { chainId: "a-1", bodyBytes: new Uint8Array(), authInfoBytes: new Uint8Array(), accountNumber: BigInt(0) }, signature: { pub_key: { type: "tendermint/PubKeySecp256k1", value: Buffer.from(pubkey).toString("base64") }, signature: "" } });
+  sign = vi.fn<SignDirect>().mockResolvedValue(signResponse);
   window.keplr = { enable: vi.fn().mockResolvedValue(undefined) };
   window.getOfflineSigner = vi.fn(() => ({ getAccounts: async () => [{ address, pubkey, algo: "secp256k1" }], signDirect: sign }));
   boundary.request.mockImplementation(async args => ({ signed: args.request.params.signDoc, signature: {} }));
@@ -110,7 +113,7 @@ describe("W03 chain configuration and signing boundaries", () => {
     document.cookie = "gf_chain=missing; path=/"; expect(() => getActiveChainConfig()).toThrow();
   });
   it("new browser uses the displayed default for the actual connection request", async () => {
-    render(<ChainSelector />); await connectExtension("keplr");
+    render(<ChainSelector id="test-chain" />); await connectExtension("keplr");
     expect(screen.getByRole("combobox").textContent).toContain("Chain A");
     expect(String(http.mock.calls[0][0])).toContain("https://a.test:1317/");
     expect(store.getState().chainId).toBe("a-1");
@@ -134,9 +137,9 @@ describe("W03 chain configuration and signing boundaries", () => {
     await expect(send()).rejects.toThrow("주소"); expect(sign).not.toHaveBeenCalled(); expect(boundary.broadcast).not.toHaveBeenCalled();
   });
   it("disconnect while wallet signature is pending prevents broadcast", async () => {
-    connected(); const pending = deferred<unknown>(); sign.mockReturnValue(pending.promise);
+    connected(); const pending = deferred<Awaited<ReturnType<SignDirect>>>(); sign.mockReturnValue(pending.promise);
     const result = send(); await waitFor(() => expect(sign).toHaveBeenCalledTimes(1));
-    store.getState().disconnect(); pending.resolve({});
+    store.getState().disconnect(); pending.resolve(signResponse);
     await expect(result).rejects.toThrow("변경"); expect(boundary.broadcast).not.toHaveBeenCalled();
   });
   it.each([
@@ -277,13 +280,13 @@ describe("W03 connection and session lifecycle", () => {
   });
   it("selector preserves an invalid saved key and lets the user explicitly recover", () => {
     document.cookie = "gf_chain=missing; path=/";
-    render(<ChainSelector />); expect(screen.getByRole("alert").textContent).toContain("설정이 없습니다");
+    render(<ChainSelector id="test-chain" />); expect(screen.getByRole("alert").textContent).toContain("설정이 없습니다");
     fireEvent.mouseDown(screen.getByRole("combobox")); fireEvent.click(screen.getByRole("option", { name: "Chain B" }));
     expect(getActiveChainConfig().key).toBe("b"); expect(screen.queryByRole("alert")).toBeNull();
   });
   it("malformed cookie can be replaced by an explicit selection", () => {
     document.cookie = "gf_chain=%; path=/";
-    render(<ChainSelector />); expect(screen.getByRole("alert").textContent).toContain("읽을 수 없습니다");
+    render(<ChainSelector id="test-chain" />); expect(screen.getByRole("alert").textContent).toContain("읽을 수 없습니다");
     fireEvent.mouseDown(screen.getByRole("combobox")); fireEvent.click(screen.getByRole("option", { name: "Chain A" }));
     expect(getActiveChainConfig().key).toBe("a"); expect(screen.queryByRole("alert")).toBeNull();
   });
@@ -298,7 +301,7 @@ describe("W03 connection and session lifecycle", () => {
     if (shape === "missing") expect(store.getState().writeReason).toContain("공개키");
   });
   it("malformed JSON is visible without requesting a fallback endpoint", () => {
-    vi.stubEnv("NEXT_PUBLIC_CHAINS", "{"); render(<ChainSelector />);
+    vi.stubEnv("NEXT_PUBLIC_CHAINS", "{"); render(<ChainSelector id="test-chain" />);
     expect(screen.getByRole("alert").textContent).toContain("JSON"); expect(http).not.toHaveBeenCalled();
   });
   it("actual header exposes cancellation and blocks duplicate connect buttons", async () => {

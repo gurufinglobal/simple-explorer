@@ -21,7 +21,7 @@ beforeEach(() => {
 afterEach(() => { cleanup(); window.history.replaceState(null, "", "/"); document.cookie = "gf_chain=; max-age=0; path=/"; vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 it("renders TGXN and sends client LCD/RPC requests to the same defaults as the server", async () => {
-  render(<ChainSelector />);
+  render(<ChainSelector id="test-chain" />);
   expect(screen.getByRole("combobox").textContent).toBe("TGXN");
   const chain = getActiveChainConfig();
   expect(chain).toMatchObject({ key: "tgxn", chainId: "guru_631-1", denom: "agxn", nativeDenom: "agxn", bondDenom: "agxn" });
@@ -44,7 +44,7 @@ it("honors JSON and default key overrides, then preserves a valid saved cookie",
   vi.stubEnv("NEXT_PUBLIC_LCD_URL", "https://ignored.example:1317");
   expect(getActiveChainConfig().key).toBe("first");
   document.cookie = "gf_chain=saved; path=/";
-  render(<ChainSelector />);
+  render(<ChainSelector id="test-chain" />);
   expect(screen.getByRole("combobox").textContent).toBe("Saved");
   const http = vi.fn<typeof fetch>(async () => Response.json({ default_node_info: { network: "guru_631-1" }, application_version: { name: "synthetic" } }));
   vi.stubGlobal("fetch", http);
@@ -56,7 +56,7 @@ it("honors JSON and default key overrides, then preserves a valid saved cookie",
 
 it.each(["default", "missing", "%E0%A4%A"])("preserves invalid cookie %s until explicit TGXN selection", cookie => {
   document.cookie = `gf_chain=${cookie}; path=/`;
-  render(<ChainSelector />);
+  render(<ChainSelector id="test-chain" />);
   expect(screen.getByRole("alert").textContent).toContain("다시 선택");
   expect(() => getActiveChainConfig()).toThrow();
   expect(document.cookie).toContain(`gf_chain=${cookie}`);
@@ -72,7 +72,7 @@ it.each(["{broken", "", "[]", '[{"key":"bad","name":"Bad","lcdUrl":"invalid"}]',
 ])("does not hide invalid chain configuration %s behind the dev preset", raw => {
   vi.stubEnv("NEXT_PUBLIC_CHAINS", raw);
   expect(() => getConfiguredChains()).toThrow();
-  render(<ChainSelector />);
+  render(<ChainSelector id="test-chain" />);
   expect(screen.getByRole("alert")).toBeTruthy();
   expect(screen.queryByText("TGXN")).toBeNull();
 });

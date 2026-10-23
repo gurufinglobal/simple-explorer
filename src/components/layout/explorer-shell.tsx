@@ -122,9 +122,10 @@ const menus: MenuItem[] = [
     return true;
   });
 
-  const navigation = <Box component="nav" aria-label={t("navigation")}>
+  // Stable landmark IDs also distinguish the simultaneously mounted drawer instances.
+  const navigation = (id: string) => <Box component="nav" aria-label={t("navigation")}>
     <Toolbar sx={{ px: 0 }}>
-      <Box sx={{ width: "100%" }}><ChainSelector /></Box>
+      <Box sx={{ width: "100%" }}><ChainSelector id={id} /></Box>
     </Toolbar>
     <Box sx={{ overflow: "auto" }}>
       <List>
@@ -159,7 +160,7 @@ const menus: MenuItem[] = [
           <Box sx={{ flex: { xs: "1 1 100%", md: 1 }, minWidth: 0, maxWidth: { md: 640 }, order: { xs: 1, md: 0 } }}>
             {ready && <TopNavSearch />}
           </Box>
-          <LocaleSelector />
+          <LocaleSelector id="explorer-language" />
           <Box sx={{ minWidth: 0, flex: { xs: 1, md: "initial" }, overflowWrap: "anywhere" }}>
             {ready && <HeaderWalletMenu />}
           </Box>
@@ -177,11 +178,11 @@ const menus: MenuItem[] = [
           },
         }}
       >
-        {navigation}
+        {navigation("desktop-chain")}
       </Drawer>
       <Drawer open={menuOpen && !desktop} onClose={() => setMenuOpen(false)} sx={{ display: { md: "none" }, "& .MuiDrawer-paper": { width: drawerWidth } }}>
         <Button onClick={() => setMenuOpen(false)}>{t("close_navigation")}</Button>
-        {navigation}
+        {navigation("mobile-chain")}
       </Drawer>
       <Box component="main" sx={{ flexGrow: 1, minWidth: 0, overflowWrap: "anywhere", p: { xs: 2, md: 3 }, ml: 0 }}>
         <Toolbar sx={{ display: { xs: "none", md: "flex" } }} />
