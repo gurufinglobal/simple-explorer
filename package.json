@@ -24,7 +24,7 @@
     "@walletconnect/sign-client": "^2.23.9",
     "bech32": "^2.0.0",
     "cosmjs-types": "^0.9.0",
-    "next": "^15.5.14",
+    "next": "^15.5.28",
     "next-intl": "^4.14.9",
     "qrcode.react": "^4.2.0",
     "react": "^19.2.4",
@@ -44,12 +44,17 @@
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "@vitejs/plugin-react": "^6.0.1",
-    "@vitest/coverage-v8": "^2.1.9",
+    "@vitest/coverage-v8": "^4.1.12",
     "eslint": "^9",
-    "eslint-config-next": "^15.5.14",
+    "eslint-config-next": "^15.5.28",
     "jsdom": "26.1.0",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vitest": "^2.1.9"
+    "vitest": "^4.1.12"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "^8.5.31"
+    }
   }
 }

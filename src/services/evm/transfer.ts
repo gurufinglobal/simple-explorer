@@ -191,6 +191,9 @@ export async function submitEvmTransfer(snapshot: EvmSnapshot): Promise<string> 
       binding.assertCurrent();
     }
     await verifyWallet(binding.provider, snapshot.chain, snapshot.from, binding.assertCurrent);
+    // Public RPC and wallet preflight can outlive the review. No await may separate
+    // this last expiry check from dispatch; already dispatched requests keep their outcome.
+    if (Date.now() - snapshot.createdAt > 120000) throw new ServiceError("evm_review_expired");
     consumed.add(snapshot);
     const id = crypto.randomUUID();
     useEvmResults.setState(state => ({ results: [{ id, snapshot, status: "submitting" }, ...state.results] }));

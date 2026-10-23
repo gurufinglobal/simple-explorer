@@ -36,7 +36,7 @@ let broadcastBytes: Uint8Array;
 let accountKeyType: string | null;
 let sequence: bigint;
 let broadcast: ReturnType<typeof vi.fn>;
-let accountQuery: ReturnType<typeof vi.fn>;
+let accountQuery: ReturnType<typeof vi.fn<typeof accountAny>>;
 function configure(overrides: Partial<ChainConfig> = {}) {
   vi.stubEnv('NEXT_PUBLIC_CHAINS', JSON.stringify([{ ...chain, ...overrides }]));
   vi.stubEnv('NEXT_PUBLIC_DEFAULT_CHAIN_KEY', chain.key);

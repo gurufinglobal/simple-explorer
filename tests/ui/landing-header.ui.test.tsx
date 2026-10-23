@@ -32,7 +32,7 @@ it('saves once while pending, refreshes only on success and avoids saving the cu
   const user = userEvent.setup();
   let finish!: () => void;
   setLocale.mockImplementation(() => new Promise<void>(resolve => { finish = resolve; }));
-  render(<LocaleSelector variant="menu" />, { locale: 'en' });
+  render(<LocaleSelector id="test-language" variant="menu" />, { locale: 'en' });
   const trigger = screen.getByRole('button', { name: 'Language' });
   await user.click(trigger); await user.click(screen.getByRole('menuitemradio', { name: 'English' }));
   expect(setLocale).not.toHaveBeenCalled();
@@ -51,7 +51,7 @@ it('saves once while pending, refreshes only on success and avoids saving the cu
 it.each(['en', 'ko'] as const)('shows a translated %s save failure and allows retry', async locale => {
   const user = userEvent.setup();
   setLocale.mockRejectedValueOnce(new Error('boundary failure')).mockResolvedValueOnce(undefined);
-  render(<LocaleSelector variant="menu" />, { locale });
+  render(<LocaleSelector id="test-language" variant="menu" />, { locale });
   const trigger = screen.getByRole('button', { name: locale === 'en' ? 'Language' : '언어' });
   const other = locale === 'en' ? '한국어' : 'English';
   await user.click(trigger); await user.click(screen.getByRole('menuitemradio', { name: other }));
@@ -63,7 +63,7 @@ it.each(['en', 'ko'] as const)('shows a translated %s save failure and allows re
 });
 
 it('keeps the explorer selector as a labeled select by default', () => {
-  render(<LocaleSelector />, { locale: 'en' });
+  render(<LocaleSelector id="test-language" />, { locale: 'en' });
   expect(screen.getByRole('combobox', { name: 'Language' })).toBeTruthy();
   expect(screen.queryByRole('button', { name: 'Language' })).toBeNull();
 });

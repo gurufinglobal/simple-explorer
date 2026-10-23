@@ -1,5 +1,5 @@
 'use client';
-import { useId, useState, useTransition } from 'react';
+import { useState, useTransition } from 'react';
 import { useLocale, useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { Alert, FormControl, IconButton, InputLabel, ListItemIcon, ListItemText, Menu, MenuItem, Select, Stack } from '@mui/material';
@@ -7,10 +7,10 @@ import LanguageIcon from '@mui/icons-material/Language';
 import CheckIcon from '@mui/icons-material/Check';
 import { setLocale } from '@/i18n/actions';
 
-export function LocaleSelector({ variant = 'select' }: { variant?: 'select' | 'menu' }) {
+// The layout owns a page-unique ID that stays stable across SSR/Suspense replay.
+export function LocaleSelector({ id, variant = 'select' }: { id: string; variant?: 'select' | 'menu' }) {
   const locale = useLocale();
   const t = useTranslations('common');
-  const id = useId();
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [failed, setFailed] = useState(false);
