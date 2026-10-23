@@ -9,9 +9,10 @@ import { ServiceErrorText } from "@/components/query/service-error-text";
 import { evmNetwork } from "@/services/evm/network";
 import { loadEvmAccount, restoreEvmResults, prepareEvmTransfer, refreshEvmReceipt, submitEvmTransfer, useEvmResults, type EvmAccount, type EvmSnapshot } from "@/services/evm/transfer";
 
-export function EvmTransactionResults() {
+export function EvmTransactionResults({ chainKey, account }: { chainKey?: string; account?: string } = {}) {
   const t = useTranslations("evm");
-  const results = useEvmResults(state => state.results);
+  const stored = useEvmResults(state => state.results);
+  const results = stored.filter(result => (!chainKey || result.snapshot.chain.key === chainKey) && (account === undefined || result.snapshot.from.toLowerCase() === account.toLowerCase()));
   const storageWarning = useEvmResults(state => state.storageWarning);
   useEffect(() => restoreEvmResults(), []);
   return results.length > 0 && <Stack spacing={2} sx={{ overflowWrap: "anywhere", mt: 2 }}>

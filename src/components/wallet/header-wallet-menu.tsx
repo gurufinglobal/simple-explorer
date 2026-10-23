@@ -1,4 +1,5 @@
 "use client";
+import Link from "@/components/layout/chain-link";
 import { ServiceErrorText } from "@/components/query/service-error-text";
 
 import { useServiceText } from "@/i18n/use-service-text";
@@ -17,6 +18,7 @@ import { WalletConnectQrDialog } from "./walletconnect-qr-dialog";
 
 export function HeaderWalletMenu() {
   const t = useTranslations("wallet");
+  const pt = useTranslations("walletPage");
   const st = useServiceText();
   const et = useTranslations("evm");
   const state = useWalletSessionStore();
@@ -53,6 +55,8 @@ export function HeaderWalletMenu() {
       {state.writeReason && <Typography variant="caption" role="status">{evm ? et("cosmosBlocked") : st(state.writeReason)}</Typography>}
     </Stack>
     <Menu slotProps={{ paper: { sx: { overflowWrap: "anywhere" } } }} anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
+      <MenuItem component={Link} href="/wallet" onClick={() => setAnchor(null)}><ListItemText primary={pt("title")} /></MenuItem>
+      <Divider />
       {(["cosmos", "keplr", "evm"] as const).map(option => <MenuItem key={option} disabled={!configured || state.status === "connecting"} onClick={() => void startQr(option)}><ListItemText primary={t(`wc_${option}`)} secondary={configured ? t("mobileWallet") : t("wc_not_configured")} /></MenuItem>)}
       <MenuItem disabled={state.status === "connecting"} onClick={() => extension("keplr")}><ListItemText primary="Keplr" /></MenuItem>
       <MenuItem disabled={state.status === "connecting"} onClick={() => extension("metamask")}><ListItemText primary="MetaMask" /></MenuItem>
