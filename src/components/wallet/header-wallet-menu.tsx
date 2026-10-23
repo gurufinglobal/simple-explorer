@@ -12,15 +12,18 @@ import { useWalletSessionStore } from "@/stores/wallet-session.store";
 import { getActiveChainConfig } from "@/lib/chain-selection";
 import type { WalletConnectMode } from "@/types/walletconnect";
 import { getWalletConnectProjectId } from "@/services/wallet/walletconnect-client";
+import { MetaMaskDialog } from "./metamask-dialog";
 import { WalletConnectQrDialog } from "./walletconnect-qr-dialog";
 
 export function HeaderWalletMenu() {
   const t = useTranslations("wallet");
   const st = useServiceText();
+  const et = useTranslations("evm");
   const state = useWalletSessionStore();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [mode, setMode] = useState<WalletConnectMode>("cosmos");
   const configured = Boolean(getWalletConnectProjectId());
+  const [metamask, setMetamask] = useState(false);
   const [qr, setQr] = useState(false);
   const [uri, setUri] = useState<string | null>(null);
   useEffect(() => attachWalletLifecycle(), []);
@@ -29,10 +32,11 @@ export function HeaderWalletMenu() {
   }, [state.status]);
   let selectedChain = t("chain_configuration_error");
   try { const chain = getActiveChainConfig(); selectedChain = chain.chainId ?? chain.name; } catch {}
+  const evm = state.status === "connected" && (state.walletType === "metamask" || state.wcMode === "evm");
   const address = state.bech32Address ?? state.evmAddress;
   const label = state.status === "connected" && address ? `${address.slice(0, 6)}…${address.slice(-4)}`
     : state.status === "connecting" ? t("connecting") : state.status === "error" ? t("error") : t("disconnected");
-  const extension = (wallet: "keplr" | "metamask") => { setAnchor(null); void connectExtension(wallet); };
+  const extension = (wallet: "keplr" | "metamask") => { setAnchor(null); if (wallet === "metamask") setMetamask(true); else void connectExtension(wallet); };
   const startQr = async (mode: WalletConnectMode) => {
     if (useWalletSessionStore.getState().status === "connecting") return;
     setMode(mode); setAnchor(null); setUri(null); setQr(true);
@@ -43,10 +47,10 @@ export function HeaderWalletMenu() {
     <Stack spacing={0.5}>
       <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
         <Chip size="small" label={label} color={state.status === "connected" ? "success" : "default"} />
-        <Typography variant="caption">{selectedChain} · {state.writeStatus === "ready" ? t("transactions_enabled") : state.writeStatus === "checking" ? t("checking") : t("read_only")}</Typography>
+        <Typography variant="caption">{selectedChain} · {evm ? et("connected") : state.writeStatus === "ready" ? t("transactions_enabled") : state.writeStatus === "checking" ? t("checking") : t("read_only")}</Typography>
         <IconButton color="inherit" aria-label={t("wallet_menu")} aria-haspopup="menu" aria-expanded={Boolean(anchor)} onClick={event => setAnchor(event.currentTarget)}><AccountBalanceWalletOutlinedIcon /></IconButton>
       </Stack>
-      {state.writeReason && <Typography variant="caption" role="status">{st(state.writeReason)}</Typography>}
+      {state.writeReason && <Typography variant="caption" role="status">{evm ? et("cosmosBlocked") : st(state.writeReason)}</Typography>}
     </Stack>
     <Menu slotProps={{ paper: { sx: { overflowWrap: "anywhere" } } }} anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
       {(["cosmos", "keplr", "evm"] as const).map(option => <MenuItem key={option} disabled={!configured || state.status === "connecting"} onClick={() => void startQr(option)}><ListItemText primary={t(`wc_${option}`)} secondary={configured ? t("mobileWallet") : t("wc_not_configured")} /></MenuItem>)}
@@ -56,6 +60,7 @@ export function HeaderWalletMenu() {
       <MenuItem disabled={state.status === "disconnected"} onClick={() => { setAnchor(null); setQr(false); void disconnectWallet(); }}><ListItemText primary={state.status === "connecting" ? t("cancel_connection") : t("disconnect")} /></MenuItem>
       {state.lastError && <Alert severity="error">{<ServiceErrorText error={state.lastError} />}</Alert>}
     </Menu>
+    <MetaMaskDialog open={metamask} onClose={() => setMetamask(false)} />
     <WalletConnectQrDialog mode={mode} open={qr} uri={uri} error={state.lastError} onClose={() => { setQr(false); setUri(null); void disconnectWallet(); }} />
   </>;
 }

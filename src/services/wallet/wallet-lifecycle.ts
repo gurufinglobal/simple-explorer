@@ -1,4 +1,6 @@
 "use client";
+import { providerErrorCode } from "@/services/evm/network";
+import type { InjectedProvider } from "./injected-provider";
 import { serviceText, ServiceError } from '@/i18n/service-message';
 
 import { getActiveChainConfig } from "@/lib/chain-selection";
@@ -11,7 +13,12 @@ import { connectWalletConnectPairing, disconnectWalletConnectByTopic, getActiveW
 import { verifyLcdChain, verifyChainEndpoints, writeBlockReason } from "./chain-eligibility";
 import { walletConnectPublicKey } from "./walletconnect-public-key";
 
-function message(error: unknown) { return error instanceof Error ? error.message : serviceText("wallet_connection_failed_reconnect"); }
+function message(error: unknown) {
+  const code = providerErrorCode(error);
+  if (code === 4001) return serviceText("evm_user_rejected");
+  if (code === -32002) return serviceText("evm_request_pending");
+  return error instanceof Error ? error.message : serviceText("wallet_connection_failed_reconnect");
+}
 function isCurrent(generation: number, key: string) {
   try { return store.getState().generation === generation && getActiveChainConfig().key === key; }
   catch { return false; }
@@ -59,12 +66,12 @@ export async function refreshWriteEligibility(): Promise<void> {
     if (store.getState().generation === generation) store.setState({ writeStatus: "blocked", writeReason: message(error) });
   }
 }
-export async function connectExtension(wallet: "keplr" | "metamask"): Promise<void> {
+export async function connectExtension(wallet: "keplr" | "metamask", provider?: InjectedProvider): Promise<void> {
   const generation = store.getState().startConnecting();
   if (generation === null) return;
   try {
     const chain = getActiveChainConfig();
-    const result = await connectWallet(wallet, chain, () => { if (!isCurrent(generation, chain.key)) throw new ServiceError("connection_cancelled"); });
+    const result = await connectWallet(wallet, chain, () => { if (!isCurrent(generation, chain.key)) throw new ServiceError("connection_cancelled"); }, provider);
     if (!isCurrent(generation, chain.key)) return;
     store.getState().connect(result.walletType, result.bech32Address, result.evmAddress, result);
     await refreshWriteEligibility();
@@ -154,13 +161,8 @@ export function attachWalletLifecycle(): () => void {
   window.addEventListener("focus", onReturn);
   document.addEventListener("visibilitychange", onReturn);
   const onKeplr = () => invalidate("keplr");
-  const onEthereum = () => invalidate("metamask");
   window.addEventListener("explorer:chain-changed", onChain);
   window.addEventListener("keplr_keystorechange", onKeplr);
-  const ethereum = window.ethereum;
-  ethereum?.on?.("accountsChanged", onEthereum);
-  ethereum?.on?.("chainChanged", onEthereum);
-  ethereum?.on?.("disconnect", onEthereum);
   if (getWalletConnectProjectId()) void getOrCreateSignClient().then(client => {
     if (disposed) return;
     const onSession = (args: { topic: string }) => {
@@ -187,9 +189,6 @@ export function attachWalletLifecycle(): () => void {
     document.removeEventListener("visibilitychange", onReturn);
     window.removeEventListener("explorer:chain-changed", onChain);
     window.removeEventListener("keplr_keystorechange", onKeplr);
-    ethereum?.removeListener?.("accountsChanged", onEthereum);
-    ethereum?.removeListener?.("chainChanged", onEthereum);
-    ethereum?.removeListener?.("disconnect", onEthereum);
     store.getState().disconnect();
   };
 }

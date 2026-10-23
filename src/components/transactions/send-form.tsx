@@ -1,4 +1,5 @@
 "use client";
+import { EvmTransferForm } from "./evm-transfer-form";
 import { ServiceErrorText } from "@/components/query/service-error-text";
 
 import { useServiceText } from "@/i18n/use-service-text";
@@ -17,6 +18,10 @@ import { TransactionConfirmDialog } from "./transaction-confirm-dialog";
 import { TransactionResult } from "./transaction-result";
 
 export function SendForm() {
+  const wallet = useWalletSessionStore();
+  return wallet.walletType === "metamask" || wallet.wcMode === "evm" ? <EvmTransferForm /> : <CosmosSendForm />;
+}
+function CosmosSendForm() {
   const t = useTranslations("transaction");
   const st = useServiceText();
   const chain = getActiveChainConfig();

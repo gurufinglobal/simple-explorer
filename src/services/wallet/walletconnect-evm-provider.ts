@@ -5,7 +5,7 @@ import { useWalletSessionStore as store } from "@/stores/wallet-session.store";
 import { getOrCreateSignClient } from "./walletconnect-client";
 import { assertWalletConnectRequest, walletConnectChainId } from "./walletconnect-session";
 
-/** Bound EIP-1193 subset. Transaction preparation/UI belongs to the next stage. */
+/** Bound EIP-1193 subset; approval is checked immediately before wallet dispatch. */
 export function createWalletConnectEvmProvider() {
   const state = store.getState();
   const chain = getActiveChainConfig();
@@ -37,8 +37,7 @@ export function createWalletConnectEvmProvider() {
       if (method === "eth_accounts") return [address];
       if (method === "eth_chainId") return `0x${BigInt(chain.evmChainId!).toString(16)}`;
       const result = await client.request({ topic: topic!, chainId, request: { method, params: [tx] } });
-      assertCurrent();
-      assertWalletConnectRequest(client.session.get(topic!), topic!, chain, "evm", address!, method);
+      // Wallet dispatch may already have broadcast. Preserve its result even if context changed.
       return result;
     },
   };

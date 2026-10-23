@@ -1,3 +1,5 @@
+import { bindInjectedProvider, type InjectedProvider } from "./injected-provider";
+import { switchEvmChain } from "@/services/evm/network";
 
 import { ServiceError } from '@/i18n/service-message';
 import type { SessionTypes } from "@walletconnect/types";
@@ -14,11 +16,11 @@ export type WalletConnectResult = SessionMeta & {
 export function walletConnectSessionToResult(session: SessionTypes.Struct, chain = getActiveChainConfig()): WalletConnectResult {
   return { walletType: "walletconnect", ...normalizeWalletConnectSession(session, chain) };
 }
-export async function connectWallet(walletType: "keplr" | "metamask", chain: ChainConfig = getActiveChainConfig(), assertCurrent: () => void = () => {}): Promise<WalletConnectResult> {
+export async function connectWallet(walletType: "keplr" | "metamask", chain: ChainConfig = getActiveChainConfig(), assertCurrent: () => void = () => {}, provider?: InjectedProvider): Promise<WalletConnectResult> {
   if (typeof window === "undefined") throw new ServiceError("connect_your_wallet_in_the_browser");
-  const chainId = await verifyLcdChain(chain);
-  assertCurrent();
   if (walletType === "keplr") {
+    const chainId = await verifyLcdChain(chain);
+    assertCurrent();
     const verifiedChain = { ...chain, chainId };
     const signer = await getKeplrSigner(verifiedChain, assertCurrent, true);
     const accounts = await readKeplrAccounts(signer, verifiedChain, assertCurrent);
@@ -26,8 +28,11 @@ export async function connectWallet(walletType: "keplr" | "metamask", chain: Cha
       chainKey: chain.key, chainId, pubkey: accounts[0].pubkey,
       connectedChains: [`cosmos:${chainId}`] };
   }
-  if (!window.ethereum?.request) throw new ServiceError("metamask_wallet_not_found");
-  const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
+  if (!provider) throw new ServiceError("evm_select_provider");
+  await switchEvmChain(provider, chain, assertCurrent);
+  const accounts = await provider.request({ method: "eth_requestAccounts" });
+  assertCurrent();
   if (!Array.isArray(accounts) || typeof accounts[0] !== "string" || !/^0x[0-9a-f]{40}$/i.test(accounts[0])) throw new ServiceError("metamask_account_not_found");
-  return { walletType, bech32Address: null, evmAddress: accounts[0], chainKey: chain.key, chainId };
+  bindInjectedProvider(provider);
+  return { walletType, bech32Address: null, evmAddress: accounts[0], chainKey: chain.key, chainId: chain.chainId };
 }
