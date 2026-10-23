@@ -340,5 +340,12 @@
   "evm_review_expired": "거래 확인 내용이 만료되었거나 변경되었습니다. 다시 확인하세요.",
   "evm_receipt_mismatch": "영수증이 제출한 거래와 다릅니다.",
   "evm_unknown": "제출 결과 미확인입니다. 자동 재서명·재전송하지 않습니다. 추가 전송 전에 지갑을 확인하세요.",
-  "evm_user_rejected": "지갑 요청을 사용자가 거절했습니다."
+  "evm_user_rejected": "지갑 요청을 사용자가 거절했습니다.",
+  "evm_invalid_abi": "ABI JSON 형식·크기·함수 signature를 확인하세요. 중복 signature는 허용하지 않습니다.",
+  "evm_invalid_arguments": "ABI 인자 타입·배열 길이·정수 범위·크기를 확인하세요. 정수는 JSON 문자열이어야 합니다.",
+  "evm_contract_value": "payable 함수만 네이티브 value를 보낼 수 있습니다. 수량과 소수 자릿수를 확인하세요.",
+  "evm_no_code": "선택한 체인의 해당 주소에 컨트랙트 코드가 없습니다.",
+  "evm_read_only": "읽기 호출은 view 또는 pure 함수만 허용합니다.",
+  "evm_write_only": "view 또는 pure 함수는 읽기 호출을 사용하세요.",
+  "evm_invalid_hash": "0x로 시작하는 32바이트 EVM hash를 입력하세요. Cosmos hash와 구분합니다."
 }

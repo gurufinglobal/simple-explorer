@@ -1,7 +1,8 @@
 "use client";
+import { contractInvocation, requireContractCode, type ContractInput } from "./contract";
 import { loadEvmResults, saveEvmResults } from "./result-storage";
 import { create } from "zustand";
-import { createWalletClient, custom, encodeFunctionData, erc20Abi, formatUnits, getAddress, isAddress, numberToHex, parseUnits, type Address, type Hex } from "viem";
+import { createWalletClient, custom, encodeFunctionData, erc20Abi, formatUnits, getAddress, isAddress, numberToHex, parseUnits, type Address, type Hex, type TransactionReceipt } from "viem";
 import { ServiceError } from "@/i18n/service-message";
 import { getActiveChainConfig } from "@/lib/chain-selection";
 import type { ChainConfig } from "@/lib/env";
@@ -14,6 +15,7 @@ export type EvmAsset = Readonly<{ address?: Address; symbol: string; decimals: n
 export type EvmAccount = { native: EvmAsset; token?: EvmAsset; nonce: number };
 export type EvmSnapshot = Readonly<{
   chain: ChainConfig; from: Address; to: Address; asset: EvmAsset; amount: bigint; displayAmount: string;
+  contract?: Readonly<{ signature: string; arguments: string; mutability: string }>;
   nonce: number; gas: bigint; maxFee: bigint; createdAt: number;
   transaction: Readonly<{ from: Address; to: Address; value: Hex; data?: Hex; chainId: Hex; nonce: Hex; gas: Hex; gasPrice?: Hex; maxFeePerGas?: Hex; maxPriorityFeePerGas?: Hex }>;
 }>;
@@ -83,19 +85,31 @@ export async function loadEvmAccount(token?: string): Promise<EvmAccount> {
   const result = await readAccount(ctx.chain, ctx.from, token); ctx.assertCurrent();
   return result;
 }
-export async function prepareEvmTransfer(input: { recipient: string; amount: string; token?: string }): Promise<EvmSnapshot> {
+export function prepareEvmTransfer(input: { recipient: string; amount: string; token?: string }) {
+  return prepareEvmRequest(input);
+}
+export function prepareEvmContract(input: ContractInput) {
+  return prepareEvmRequest({ recipient: input.address, amount: input.value || "0" }, input);
+}
+async function prepareEvmRequest(input: { recipient: string; amount: string; token?: string }, contractInput?: ContractInput): Promise<EvmSnapshot> {
   if (useEvmResults.getState().busy) throw new ServiceError("evm_request_pending");
   const { chain, from, provider, assertCurrent } = context();
   const to = address(input.recipient);
+  const invocation = contractInput ? contractInvocation(contractInput, evmNetwork(chain).nativeCurrency.decimals) : undefined;
+  if (invocation && ["view", "pure"].includes(invocation.fn.stateMutability)) throw new ServiceError("evm_write_only");
   await verifyWallet(provider, chain, from, assertCurrent);
   const account = await readAccount(chain, from, input.token); assertCurrent();
   const asset = account.token ?? account.native;
   if (!/^(0|[1-9][0-9]*)(\.[0-9]+)?$/.test(input.amount) || (input.amount.split(".")[1]?.length ?? 0) > asset.decimals) throw new ServiceError("evm_invalid_amount");
   const amount = parseUnits(input.amount, asset.decimals);
-  if (amount <= ZERO || amount > UINT256 || amount > asset.balance) throw new ServiceError("evm_insufficient_balance");
+  if ((invocation ? amount < ZERO : amount <= ZERO) || amount > UINT256 || amount > asset.balance) throw new ServiceError("evm_insufficient_balance");
   const client = await verifyEvmRpc(chain); assertCurrent();
-  const data = asset.address ? encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [to, amount] }) : undefined;
+  const data = invocation?.data ?? (asset.address ? encodeFunctionData({ abi: erc20Abi, functionName: "transfer", args: [to, amount] }) : undefined);
   const value = asset.address ? ZERO : amount;
+  if (invocation) {
+    await requireContractCode(client, to);
+    await client.call({ account: from, to, data, value }); assertCurrent();
+  }
   // Reverts and explicit false returns are not valid ERC20 previews.
   if (asset.address) {
     const simulation = await client.simulateContract({ address: asset.address, abi: erc20Abi, functionName: "transfer", args: [to, amount], account: from });
@@ -114,7 +128,7 @@ export async function prepareEvmTransfer(input: { recipient: string; amount: str
   // Only freeze metadata copied from configuration, never provider objects.
   const frozenChain = Object.freeze({ ...chain, evm: Object.freeze({ ...chain.evm!, nativeCurrency: Object.freeze({ ...chain.evm!.nativeCurrency }) }) });
   const snapshot: EvmSnapshot = Object.freeze({ chain: frozenChain, from, to, asset: Object.freeze({ ...asset }), amount,
-    displayAmount: formatUnits(amount, asset.decimals), nonce: account.nonce, gas, maxFee, createdAt: Date.now(),
+    ...(invocation ? { contract: invocation.summary } : {}), displayAmount: formatUnits(amount, asset.decimals), nonce: account.nonce, gas, maxFee, createdAt: Date.now(),
     transaction: Object.freeze({ from, to: asset.address ?? to, value: numberToHex(value), ...(data ? { data } : {}),
       chainId: numberToHex(network.id), nonce: numberToHex(account.nonce), gas: numberToHex(gas),
       ...(fee.maxFeePerGas !== undefined ? { maxFeePerGas: numberToHex(fee.maxFeePerGas), maxPriorityFeePerGas: numberToHex(fee.maxPriorityFeePerGas!) } : { gasPrice: numberToHex(fee.gasPrice!) }) }),
@@ -124,6 +138,16 @@ export async function prepareEvmTransfer(input: { recipient: string; amount: str
 function update(id: string, changes: Partial<EvmResult>) {
   useEvmResults.setState(state => ({ results: state.results.map(result => result.id === id ? { ...result, ...changes } : result) }));
 }
+/** Reconcile verified public receipts with original app submissions, never replacing terminal outcomes. */
+export function recordEvmReceipt(chain: ChainConfig, receipt: TransactionReceipt) {
+  if (!["success", "reverted"].includes(receipt.status)) return;
+  useEvmResults.setState(state => ({ results: state.results.map(result =>
+    result.hash?.toLowerCase() === receipt.transactionHash.toLowerCase() && result.snapshot.chain.evmChainId === chain.evmChainId &&
+    result.snapshot.from.toLowerCase() === receipt.from.toLowerCase() && result.snapshot.transaction.to.toLowerCase() === receipt.to?.toLowerCase() &&
+    !["success", "reverted"].includes(result.status)
+      ? { ...result, status: receipt.status, actualFee: receipt.gasUsed * receipt.effectiveGasPrice, error: undefined }
+      : result) }));
+}
 export async function refreshEvmReceipt(id: string) {
   const result = useEvmResults.getState().results.find(item => item.id === id);
   if (!result?.hash || result.status === "success" || result.status === "reverted") return;
@@ -131,7 +155,7 @@ export async function refreshEvmReceipt(id: string) {
     const client = await verifyEvmRpc(result.snapshot.chain);
     const receipt = await client.getTransactionReceipt({ hash: result.hash });
     if (receipt.transactionHash.toLowerCase() !== result.hash.toLowerCase() || receipt.from.toLowerCase() !== result.snapshot.from.toLowerCase() || receipt.to?.toLowerCase() !== result.snapshot.transaction.to.toLowerCase() || !["success", "reverted"].includes(receipt.status)) throw new ServiceError("evm_receipt_mismatch");
-    update(id, { status: receipt.status === "success" ? "success" : "reverted", actualFee: receipt.gasUsed * receipt.effectiveGasPrice, error: undefined });
+    recordEvmReceipt(result.snapshot.chain, receipt);
   } catch (error) {
     // Missing receipt and transport timeout are both unconfirmed, never definitive failure.
     if (!["success", "reverted"].includes(useEvmResults.getState().results.find(item => item.id === id)?.status ?? "")) update(id, { status: "pending", error });
@@ -150,6 +174,12 @@ export async function submitEvmTransfer(snapshot: EvmSnapshot): Promise<string> 
     binding.assertCurrent();
     if (current.nonce !== snapshot.nonce || (current.token && (current.token.decimals !== snapshot.asset.decimals || current.token.symbol !== snapshot.asset.symbol))) throw new ServiceError("evm_review_expired");
     if ((current.token ?? current.native).balance < snapshot.amount || current.native.balance < snapshot.maxFee + (snapshot.asset.address ? ZERO : snapshot.amount)) throw new ServiceError("evm_insufficient_balance");
+    if (snapshot.contract) {
+      const client = await verifyEvmRpc(snapshot.chain);
+      await requireContractCode(client, snapshot.to);
+      await client.call({ account: snapshot.from, to: snapshot.to, data: snapshot.transaction.data, value: snapshot.amount });
+      binding.assertCurrent();
+    }
     await verifyWallet(binding.provider, snapshot.chain, snapshot.from, binding.assertCurrent);
     consumed.add(snapshot);
     const id = crypto.randomUUID();

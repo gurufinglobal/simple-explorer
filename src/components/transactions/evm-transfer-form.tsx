@@ -15,11 +15,12 @@ export function EvmTransactionResults() {
   const storageWarning = useEvmResults(state => state.storageWarning);
   useEffect(() => restoreEvmResults(), []);
   return results.length > 0 && <Stack spacing={2} sx={{ overflowWrap: "anywhere", mt: 2 }}>
-    <Typography variant="h6">{t("history")}</Typography>{storageWarning && <Alert severity="warning">{t("storageWarning")}</Alert>}<Alert severity="info">{t("pendingNotice")}</Alert>
+    <Typography variant="h6">{t("history")}</Typography>{storageWarning && <Alert severity="warning">{t("storageWarning")}</Alert>}<Alert severity="info">{t("historyScope")}</Alert>
     {results.map(result => <Stack key={result.id} spacing={1} role="status">
       <Typography>{t(result.status)} · {result.snapshot.chain.name} / {result.snapshot.chain.evmChainId}</Typography>
       <Typography>{t("from")}: {result.snapshot.from}</Typography><Typography>{t("to")}: {result.snapshot.to}</Typography>
       <Typography>{result.snapshot.displayAmount} {result.snapshot.asset.symbol}{result.snapshot.asset.address ? ` · ${result.snapshot.asset.address}` : ""}</Typography>
+      {result.snapshot.contract && <><Typography>{result.snapshot.contract.signature}</Typography><Typography component="pre" sx={{ whiteSpace: "pre-wrap" }}>{result.snapshot.contract.arguments}</Typography></>}
       {result.hash && <Typography>{result.hash}</Typography>}
       {result.actualFee !== undefined && <Typography>{t("actualFee")}: {formatUnits(result.actualFee, result.snapshot.chain.evm!.nativeCurrency.decimals)} {result.snapshot.chain.evm!.nativeCurrency.symbol}</Typography>}
       {result.error != null && <Alert severity="warning"><ServiceErrorText error={result.error} /></Alert>}

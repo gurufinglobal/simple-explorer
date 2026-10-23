@@ -116,13 +116,13 @@ BEX·Oracle·FeePolicy는 체인의 `features.bex/oracle/feepolicy: true`가 있
 
 BEX fee/limit, FeePolicy discount_type/amount, Oracle nonce·결과 시각·report는 원문을 보존합니다. 미확정 비율·단위·우선순위·nonce=0의 최신 의미·서명 검증 여부를 추정하지 않습니다. `percent`와 합성 fixture의 `percentage`는 별개 원문입니다. 각 성공한 클라이언트 조회는 endpoint·관찰시각·응답 헤더 높이를 보관하며 높이가 노출되지 않으면 미확인입니다. 서로 다른 요청을 동일 snapshot으로 해석하지 마세요.
 
-상단 검색은 양의 정수 블록 높이, Cosmos tx hash, 설정 prefix/checksum에 맞는 계정 주소를 지원합니다. 64자리 숫자는 높이/hash 후보 선택을 요구합니다. EVM hash 대응, 블록 hash, validator/token 검색은 미지원이며 입력 오류 안내 후 HTTP를 보내지 않습니다. 중복 GlobalSearchBar와 미사용 검색 store는 제거했습니다.
+상단 검색은 양의 정수 블록 높이, Cosmos tx hash, 설정 prefix/checksum에 맞는 계정 주소를 지원합니다. 64자리 숫자는 높이/hash 후보 선택을 요구합니다. 이 상단 검색에서 EVM hash·블록 hash·validator/token 검색은 미지원이며 입력 오류 안내 후 HTTP를 보내지 않습니다. 중복 GlobalSearchBar와 미사용 검색 store는 제거했습니다.
 
 ## 구현 경계
 
 `src/server/handlers`는 내부 함수입니다. Next route handler 등록 없이 공개 HTTP API라고 해석하지 않습니다. Faucet 지급·WebSocket 연결·재위임 제출·서버 지갑 세션의 미사용 모의 성공 경로는 제거했습니다. 실제 조회 갱신은 HTTP polling, 지갑 상태는 클라이언트 wallet lifecycle/store, 구현된 staking 행위는 실제 signer guard를 사용합니다. Faucet·WS·재위임을 향후 제품에 연결하려면 별도 범위와 수용 기준이 필요합니다.
 
-개별 token metadata는 bank metadata/IBC trace 응답만 사용합니다. 응답 없는 symbol·name·decimals는 추정하지 않으며 EVM token metadata는 미지원입니다. IBC trace의 base denom만으로 원체인 symbol·name을 확정하지 않습니다.
+개별 token metadata는 bank metadata/IBC trace 응답만 사용합니다. 응답 없는 symbol·name·decimals는 추정하지 않으며 이 Cosmos token 조회에서는 EVM token metadata를 제공하지 않습니다. EVM ERC20 metadata는 별도 Send 화면에서 조회합니다. IBC trace의 base denom만으로 원체인 symbol·name을 확정하지 않습니다.
 
 ## EVM 조회·전송 설정과 경계
 
@@ -151,3 +151,17 @@ EVM 전송은 헤더에서 탐색된 **MetaMask provider를 직접 선택**하�
 - 앱 제출 결과 최근 20건을 `explorer:evm-results:v1`에 공개 요청·결과 metadata만 저장합니다. 지갑 provider·WC topic·서명 데이터는 저장하지 않습니다. 새로고침 중 응답 대기 요청은 unknown으로 복원하며 저장한 요청은 재서명할 수 없습니다. 브라우저 저장소 실패는 화면에 표시합니다. 전체 주소 거래/내부 trace 이력은 제공하지 않습니다.
 
 현재 실기기·실지갑·실거래 검증과 운영 EVM 설정 변경은 미실행입니다. 실제 테스트는 체인·공개 계정·자산·금액/수수료 상한·기간·허용 작업 승인 후 수행합니다. 구현 회귀 테스트는 `tests/integration/evm-transfer.integration.test.tsx`, `metamask-provider.integration.test.tsx`, `walletconnect-evm-transfer.integration.test.tsx`에서 실제 서비스·UI를 실행하고 지갑/JSON-RPC 경계만 mock합니다.
+
+
+## EVM 컨트랙트 및 hash 조회
+
+대시보드 **EVM 컨트랙트 및 hash 조회** 영역에서 사용합니다. 기존 검증된 EVM 설정이 필요하며 운영 체인 설정을 자동으로 추가하지 않습니다.
+
+- 컨트랙트 주소와 JSON ABI 배열(최대 64 KiB, 256개 항목)을 입력하고 전체 signature로 함수를 선택합니다. overload는 별개 항목이며 중복 signature는 차단합니다. 함수 ABI에는 inputs/outputs/stateMutability가 필요합니다.
+- 인자는 순서대로 JSON 배열(최대 32 KiB)로 입력합니다. 큰 정수의 반올림을 막기 위해 모든 정수는 문자열로 입력합니다: `["42", true]`. tuple과 배열은 중첩 배열을 사용하며 타입·길이·범위를 검사합니다. 배열당 최대 1,024개 원소, tuple ABI 깊이 12, 인자 중첩 깊이 24, 인코딩한 calldata 최대 64 KiB입니다.
+- `view`/`pure`는 공개 RPC의 `eth_call`로 조회하고 서명하지 않습니다. 선택 체인에 연결된 EVM 주소가 있으면 caller로 사용하며, 없으면 RPC 기본 caller를 사용합니다. `nonpayable`/`payable`은 code 확인 → simulation(`eth_call`) → estimate → 앱 확인 → 지갑 요청 → receipt 흐름입니다. `payable`만 네이티브 value를 허용합니다. 배포·fallback/receive·raw calldata 전용 UI는 제공하지 않습니다.
+- 확인창은 체인·전체 주소·signature·디코딩된 인자·value·nonce·gas·최대 수수료를 표시합니다. 서명 직전 계정·체인·generation·nonce·잔액·code·simulation을 다시 확인합니다. 자동 재서명/재전송은 없으며 timeout/늦은 hash는 원래 요청으로 보존합니다. simulation 성공은 실제 실행 성공을 보장하지 않습니다.
+- EVM hash는 `0x`가 포함된 32바이트를 입력합니다. 선택 체인에서 거래와 영수증을 조회하고 legacy/EIP-2930/EIP-1559 등 RPC 거래 타입, pending/unknown/success/revert를 구분합니다. Cosmos hash는 상단의 별도 Cosmos 검색을 사용합니다. 확인한 영수증은 동일 체인·hash·from/to의 앱 제출 결과에도 반영합니다.
+- 최근 20건 앱 제출 기록만 이 브라우저에 보관합니다. 전체 주소 과거 이력·내부 trace·재조직/최종성 감시는 제공하지 않습니다. hash 조회 오류가 이미 확인된 결과를 실패로 덮어쓰지 않습니다.
+
+`tests/integration/evm-contract.integration.test.tsx`는 실제 서비스·상태·UI를 실행하고 RPC/지갑 경계만 mock합니다. 합성 contract의 read/write receipt는 배포 TGXN·실지갑·실거래 지원 증명이 아닙니다. 실제 거래 검증은 허용된 체인·계정·contract/함수·금액/수수료 상한·기간 확정 후 별도로 수행합니다.
