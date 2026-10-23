@@ -1,4 +1,8 @@
 "use client";
+import { ServiceErrorText } from "@/components/query/service-error-text";
+
+import { useTranslations } from "next-intl";
+
 
 import {
   Button,
@@ -28,6 +32,7 @@ export function WalletConnectQrDialog({
   error,
   onClose,
 }: WalletConnectQrDialogProps) {
+  const t = useTranslations("wallet");
   const universalLink = uri
     ? `https://walletconnect.com/wc?uri=${encodeURIComponent(uri)}`
     : null;
@@ -47,27 +52,24 @@ export function WalletConnectQrDialog({
       <DialogContent>
         <Stack spacing={2} alignItems="center">
           <Typography variant="body2" color="text.secondary" textAlign="center">
-            Scan with a WalletConnect-compatible wallet, or open the link on mobile.
-          </Typography>
+             {t("scan_with_a_walletconnect_compatible_wallet_or_open_the")} </Typography>
           {uri ? (
             <QRCodeSVG value={uri} size={220} level="M" includeMargin />
           ) : (
-            <Typography variant="body2">Preparing pairing…</Typography>
+            <Typography variant="body2">{t("preparing_pairing")}</Typography>
           )}
           {error ? (
             <Typography variant="body2" color="error" textAlign="center">
-              {error}
+              {<ServiceErrorText error={error} />}
             </Typography>
           ) : null}
           <Stack direction="row" spacing={1} flexWrap="wrap" justifyContent="center">
-            <Button onClick={onClose}>Cancel connection</Button>
+            <Button onClick={onClose}>{t("cancel_connection")}</Button>
             <Button variant="outlined" onClick={() => void copyUri()} disabled={!uri}>
-              Copy URI
-            </Button>
+               {t("copy_uri")} </Button>
             {universalLink ? (
               <Button component="a" href={universalLink} target="_blank" rel="noreferrer" variant="contained">
-                Open wallet
-              </Button>
+                 {t("open_wallet")} </Button>
             ) : null}
           </Stack>
         </Stack>

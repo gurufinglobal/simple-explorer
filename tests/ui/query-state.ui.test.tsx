@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '../helpers/render';
 import { DashboardView } from "@/components/network/dashboard-view";
 import { NetworkSummaryPanel } from '@/components/network/network-summary-panel';
 import { BlocksLiveList } from '@/components/explorer/blocks-live-list';
@@ -47,7 +47,7 @@ describe('real service and query DOM', () => {
     });
     render(<DashboardView />);
     expect(await screen.findByText('9,007,199,254,740,993')).toBeTruthy();
-    expect(screen.getByText('Validators').parentElement?.textContent).toContain('0');
+    expect(screen.getByText("검증자").parentElement?.textContent).toContain('0');
     expect(await screen.findByText('조회 실패')).toBeTruthy();
   });
   it('preserves successful metrics/time after refresh failure and marks stale', async () => {

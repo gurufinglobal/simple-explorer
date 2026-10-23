@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '../helpers/render';
 import userEvent from '@testing-library/user-event';
 import { PathParamsContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import { AppRouterContext } from 'next/dist/shared/lib/app-router-context.shared-runtime';
@@ -67,7 +67,7 @@ it('R3 validator original toggles by pointer/keyboard without navigation; detail
   await userEvent.keyboard(' ');
   expect(raw.parentElement!.hidden).toBe(true);
   expect(push).not.toHaveBeenCalled();
-  const link = screen.getByRole('link', { name: 'Validator' });
+  const link = screen.getByRole('link', { name: "Validator" });
   expect(link.getAttribute('href')).toBe('/staking/v?chain=fixture');
   // Actual native link navigation is exercised by mobile-accessibility.browser.mjs.
   link.focus(); expect(document.activeElement).toBe(link);

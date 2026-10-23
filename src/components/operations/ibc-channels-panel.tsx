@@ -1,3 +1,5 @@
+
+import { useTranslations } from "next-intl";
 import {
   Box,
   Chip,
@@ -34,28 +36,28 @@ type Props = {
 };
 
 export function IbcChannelsPanel({ channels }: Props) {
+  const t = useTranslations("modules");
   if (channels.length === 0) {
     return (
       <Typography variant="body2" color="text.secondary">
-        조회한 범위에 등록된 채널이 없습니다. (
-        <code>/ibc/core/channel/v1/channels</code>)
+         {t("no_registered_channels_in_the_queried_range")} <code>/ibc/core/channel/v1/channels</code>)
       </Typography>
     );
   }
 
   return (
-    <TableContainer component={Paper} variant="outlined" role="region" aria-label="IBC 채널 목록 가로 스크롤" tabIndex={0}>
+    <TableContainer component={Paper} variant="outlined" role="region" aria-label={t("scroll_ibc_channels_horizontally")} tabIndex={0}>
       <Table size="small" sx={{ minWidth: 720 }}>
         <TableHead>
           <TableRow>
-            <TableCell>로컬 포트</TableCell>
-            <TableCell>로컬 채널 ID</TableCell>
-            <TableCell>상태</TableCell>
-            <TableCell>순서</TableCell>
-            <TableCell>버전</TableCell>
-            <TableCell>연결 홉</TableCell>
-            <TableCell>상대 포트</TableCell>
-            <TableCell>상대 채널 ID</TableCell>
+            <TableCell>{t("local_port")}</TableCell>
+            <TableCell>{t("local_channel_id")}</TableCell>
+            <TableCell>{t("status_2")}</TableCell>
+            <TableCell>{t("ordering")}</TableCell>
+            <TableCell>{t("version")}</TableCell>
+            <TableCell>{t("connection_hops")}</TableCell>
+            <TableCell>{t("counterparty_port")}</TableCell>
+            <TableCell>{t("counterparty_channel_id")}</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '../helpers/render';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PathParamsContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import BexPage from '@/app/(explorer)/bex/page';
@@ -105,7 +105,7 @@ it('Oracle nonce zero and huge time stay raw; report presence does not imply ver
   render(route(OracleDetail));
   await screen.findByText(/999999999999999999999 \(원문/);
   expect(screen.getByText(/최신 의미 미확인/)).toBeTruthy();
-  fireEvent.click(screen.getByRole('tab', { name: /Reports/ }));
+  fireEvent.click(screen.getByRole('tab', { name: /보고서/ }));
   await screen.findByText('unverified-signature');
   expect(screen.getByText(/서명·집계 검증을 수행하지 않았습니다/)).toBeTruthy();
   expect(screen.queryByText('검증됨')).toBeNull();

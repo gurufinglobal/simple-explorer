@@ -1,3 +1,5 @@
+
+import { serviceText } from '@/i18n/service-message';
 import { PartialQueryError, combinedError, schemaError } from "@/lib/query-result";
 import { formatCoin } from "@/lib/cosmos-amount";
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
@@ -101,7 +103,7 @@ async function fetchAverageBlockTimeRecent(latestHeight: number, sampleBlocks = 
     .filter((ms) => Number.isFinite(ms));
 
   if (timesMs.length < 2) {
-    schemaError("블록 간격 표본이 올바르지 않습니다.");
+    schemaError(serviceText("invalid_block_interval_sample"));
   }
 
   let sumDiffMs = 0;
@@ -114,7 +116,7 @@ async function fetchAverageBlockTimeRecent(latestHeight: number, sampleBlocks = 
     }
   }
   if (count === 0) {
-    schemaError("블록 간격 표본이 올바르지 않습니다.");
+    schemaError(serviceText("invalid_block_interval_sample"));
   }
   return Number(((sumDiffMs / count) / 1000).toFixed(2));
 }
@@ -134,7 +136,7 @@ export async function getNetworkSummary(apiClients: QueryClient = defaultClients
         summary.averageBlockTimeSec = await fetchAverageBlockTimeRecent(height, 10, apiClients);
       }),
       (async () => {
-        if (!baseDenom) schemaError("native denom 미확인");
+        if (!baseDenom) schemaError(serviceText("native_denom_unknown"));
         const res = await apiClients.lcdGet<SupplyResponse>(`/cosmos/bank/v1beta1/supply/by_denom?denom=${encodeURIComponent(baseDenom)}`);
         if (!res.amount?.amount || !/^\d+$/.test(res.amount.amount) || res.amount.denom !== baseDenom) schemaError();
         summary.supply = formatCoin({ amount: res.amount.amount, denom: baseDenom }, metadata.find(m => m.baseDenom === baseDenom));
@@ -187,7 +189,7 @@ export async function getAccountsTotal(apiClients: QueryClient = defaultClients)
   );
   const raw = response.pagination?.total?.trim() ?? "";
   if (!/^[0-9]+$/.test(raw)) {
-    schemaError("계정 총계 응답이 올바르지 않습니다.");
+    schemaError(serviceText("invalid_total_account_count_response"));
   }
   return raw;
 }

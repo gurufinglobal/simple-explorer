@@ -1,4 +1,6 @@
 "use client";
+import { useTranslations } from "next-intl";
+
 import { ModuleTable, moduleTextCellSx } from "@/components/query/module-table";
 
 import Link from "@/components/layout/chain-link";
@@ -38,9 +40,7 @@ function formatEnumLabel(value: string): string {
   return value.replace(/^CATEGORY_/, "").replace(/^STATUS_/, "").toLowerCase().replaceAll("_", " ");
 }
 
-function formatResultTime(value: string): string {
-  return `${value} (원문 · 시간 단위 미확인)`;
-}
+
 
 function sortByNonceDesc<T extends { nonce: string }>(rows: T[]): T[] {
   return [...rows].sort((a, b) => {
@@ -68,6 +68,11 @@ function formatNumericShort(value: number): string {
 }
 
 export function OracleDetailView() {
+  const t = useTranslations("modules");
+function formatResultTime(value: string): string {
+  return t("raw_time_unit_unverified", { value0: value });
+}
+
   const params = useParams<{ requestId: string }>();
   const requestId = params.requestId ?? "";
   const [reportNonce, setReportNonce] = useState("");
@@ -136,62 +141,55 @@ export function OracleDetailView() {
     };
   }, [resultsSorted]);
 
-  if (!request) return <QueryInfo queries={[{ ...query, label: "Oracle 요청" }, { ...latestQuery, label: "최근 결과" }, { ...reportQuery, label: "보고서" }, { ...resultsQuery, label: "결과 이력" }]} />;
+  if (!request) return <QueryInfo queries={[{ ...query, label: t("oracle_request") }, { ...latestQuery, label: t("recent_result") }, { ...reportQuery, label: t("reports") }, { ...resultsQuery, label: t("result_history") }]} />;
 
   return (
     <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Typography variant="h5" fontWeight={700}>
-          Oracle Request #{request.id}
+           {t("oracle_request_2")}{request.id}
         </Typography>
         <Button component={Link} href="/oracle" variant="outlined" size="small">
-          목록
-        </Button>
+           {t("list")} </Button>
       </Stack>
-      <Typography variant="body2">nonce=0 조회의 최신 의미와 결과 시각 단위는 미확인입니다. Report·signature는 LCD 원문이며 서명·집계 검증을 수행하지 않았습니다.</Typography>
-      <QueryInfo queries={[{ ...query, label: "Oracle 요청" }, { ...latestQuery, label: "최근 결과" }, { ...reportQuery, label: "보고서" }, { ...resultsQuery, label: "결과 이력" }]} />
+      <Typography variant="body2">{t("the_meaning_of_latest_for_nonce_0_and_the")}</Typography>
+      <QueryInfo queries={[{ ...query, label: t("oracle_request") }, { ...latestQuery, label: t("recent_result") }, { ...reportQuery, label: t("reports") }, { ...resultsQuery, label: t("result_history") }]} />
 
       <Card variant="outlined">
         <CardContent>
           <Grid container spacing={2}>
             <Grid size={{ xs: 12, md: 3 }}>
               <Typography variant="caption" color="text.secondary">
-                Symbol
-              </Typography>
+                 {t("symbol")} </Typography>
               <Typography>{request.symbol}</Typography>
             </Grid>
             <Grid size={{ xs: 12, md: 3 }}>
               <Typography variant="caption" color="text.secondary">
-                Category
-              </Typography>
+                 {t("category")} </Typography>
               <Typography>{formatEnumLabel(request.category)}</Typography>
             </Grid>
             <Grid size={{ xs: 12, md: 2 }}>
               <Typography variant="caption" color="text.secondary">
-                Status
-              </Typography>
+                 {t("status")} </Typography>
               <Typography>{formatEnumLabel(request.status)}</Typography>
             </Grid>
             <Grid size={{ xs: 12, md: 2 }}>
               <Typography variant="caption" color="text.secondary">
-                Nonce
-              </Typography>
+                 {t("nonce")} </Typography>
               <Typography>{request.nonce}</Typography>
             </Grid>
             <Grid size={{ xs: 12, md: 2 }}>
               <Typography variant="caption" color="text.secondary">
-                Period
-              </Typography>
+                 {t("period")} </Typography>
               <Typography>{request.period}</Typography>
             </Grid>
             <Grid size={{ xs: 12 }}>
               <Typography variant="caption" color="text.secondary">
-                Result (query nonce=0 · 최신 의미 미확인)
-              </Typography>
+                 {t("result_query_nonce_0_latest_semantics_unverified")} </Typography>
               <Typography>
                 {latestResult
-                  ? `${latestResult.aggregatedData} (nonce ${latestResult.nonce}, height ${latestResult.aggregatedHeight}, ${formatResultTime(latestResult.aggregatedTime)})`
-                  : latestQuery.result.status === "not-found" ? "확인된 결과 없음" : "결과 미확인"}
+                  ? t("resultSummary", { data: latestResult.aggregatedData, nonce: latestResult.nonce, height: latestResult.aggregatedHeight, time: formatResultTime(latestResult.aggregatedTime) })
+                  : latestQuery.result.status === "not-found" ? t("no_confirmed_result") : t("result_unknown")}
               </Typography>
             </Grid>
           </Grid>
@@ -201,33 +199,30 @@ export function OracleDetailView() {
       <Card variant="outlined">
         <CardContent>
           <Tabs value={tab} onChange={(_, value) => setTab(value)}>
-            <Tab label="Overview" />
-            <Tab label="Reports" />
-            <Tab label="History" />
+            <Tab label={t("overview")} />
+            <Tab label={t("reports_2")} />
+            <Tab label={t("history")} />
           </Tabs>
           <Box sx={{ mt: 2 }}>
             {tab === 0 ? (
               <Stack spacing={1.5}>
-                <Typography variant="body2">Reports: {reportQuery.result.data ? reports.length : "-"}</Typography>
-                <Typography variant="body2">Results History: {resultsQuery.result.data ? results.length : "-"}</Typography>
+                <Typography variant="body2">{t("reports_3")} {reportQuery.result.data ? reports.length : "-"}</Typography>
+                <Typography variant="body2">{t("results_history")} {resultsQuery.result.data ? results.length : "-"}</Typography>
                 {resultsTruncated ? (
                   <Alert severity="info">
-                    Oracle Results API는 서버 페이징을 지원하지 않아 최근 {MAX_ORACLE_ROWS}건 기준으로 변화를 표시합니다.
-                  </Alert>
+                     {t("the_oracle_results_api_does_not_support_server_pagination")} {MAX_ORACLE_ROWS}{t("records")} </Alert>
                 ) : null}
                 <Card variant="outlined">
                   <CardContent>
                     <Typography variant="subtitle2" fontWeight={700}>
-                      Aggregated Data Trend (근삿값 · 표시된 {MAX_ORACLE_ROWS}건 이내)
-                    </Typography>
+                       {t("aggregated_data_trend_approximate_within")} {MAX_ORACLE_ROWS}{t("displayed_records")} </Typography>
                     {trendData === null || trendData.points.length < 2 ? (
                       <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                        라인 그래프를 그릴 수 있는 숫자형 aggregated data가 충분하지 않습니다.
-                      </Typography>
+                         {t("not_enough_numeric_aggregated_data_to_draw_a_line")} </Typography>
                     ) : (
                       <Stack spacing={1} sx={{ mt: 1 }}>
                         <Typography variant="caption" color="text.secondary">
-                          Nonce {trendData.firstNonce} → {trendData.lastNonce} | Min {formatNumericShort(trendData.min)} / Max{" "}
+                           {t("nonce")} {trendData.firstNonce} → {trendData.lastNonce}  {t("message")} {formatNumericShort(trendData.min)}  {t("max")}{" "}
                           {formatNumericShort(trendData.max)}
                         </Typography>
                         <Box sx={{ width: "100%", overflowX: "auto" }}>
@@ -235,7 +230,7 @@ export function OracleDetailView() {
                             width="100%"
                             viewBox={`0 0 ${trendData.width} ${trendData.height}`}
                             role="img"
-                            aria-label="Aggregated data trend line chart"
+                            aria-label={t("aggregated_data_trend_line_chart")}
                           >
                             <line
                               x1={42}
@@ -268,26 +263,24 @@ export function OracleDetailView() {
               <Stack spacing={1.5}>
                 {reportsTruncated ? (
                   <Alert severity="info">
-                    현재 응답에서 nonce 내림차순 {MAX_ORACLE_ROWS}건만 표시합니다. 전체 이력 여부는 미확인입니다.
-                  </Alert>
+                     {t("displaying_only_the_latest")} {MAX_ORACLE_ROWS}{t("records_in_descending_nonce_order_full_history_availability_is")} </Alert>
                 ) : null}
                 <Stack direction={{ xs: "column", md: "row" }} spacing={1}>
                   <TextField
                     size="small"
-                    label="Nonce"
+                    label={t("nonce")}
                     value={reportNonce}
                     onChange={(event) => setReportNonce(event.target.value)}
                   />
                   <TextField
                     size="small"
-                    label="Provider"
+                    label={t("provider")}
                     value={reportProvider}
                     onChange={(event) => setReportProvider(event.target.value)}
                     fullWidth
                   />
                   <Button variant="outlined" onClick={() => void reloadReports()} disabled={reportsLoading}>
-                    Apply
-                  </Button>
+                     {t("apply")} </Button>
                 </Stack>
                 {reportsLoading ? (
                   <ModuleTable>
@@ -303,15 +296,15 @@ export function OracleDetailView() {
                     </TableBody>
                   </ModuleTable>
                 ) : reports.length === 0 ? (
-                  <Typography variant="body2">{reportQuery.result.status === "empty" ? "표시할 report가 없습니다." : "Report 조회 결과 미확인"}</Typography>
+                  <Typography variant="body2">{reportQuery.result.status === "empty" ? t("no_reports_to_display") : t("report_query_result_unknown")}</Typography>
                 ) : (
                   <ModuleTable>
                     <TableHead>
                       <TableRow>
-                        <TableCell>Provider</TableCell>
-                        <TableCell align="right">Nonce</TableCell>
-                        <TableCell align="right">Raw Data</TableCell>
-                        <TableCell>Signature</TableCell>
+                        <TableCell>{t("provider")}</TableCell>
+                        <TableCell align="right">{t("nonce")}</TableCell>
+                        <TableCell align="right">{t("raw_data")}</TableCell>
+                        <TableCell>{t("signature")}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -335,19 +328,18 @@ export function OracleDetailView() {
               <Stack spacing={1}>
                 {resultsTruncated ? (
                   <Alert severity="info">
-                    현재 응답에서 nonce 내림차순 {MAX_ORACLE_ROWS}건만 표시합니다. 전체 이력 여부는 미확인입니다.
-                  </Alert>
+                     {t("displaying_only_the_latest")} {MAX_ORACLE_ROWS}{t("records_in_descending_nonce_order_full_history_availability_is")} </Alert>
                 ) : null}
                 {resultsSorted.length === 0 ? (
-                  <Typography variant="body2">{resultsQuery.result.status === "empty" ? "표시할 결과 이력이 없습니다." : "결과 이력 미확인"}</Typography>
+                  <Typography variant="body2">{resultsQuery.result.status === "empty" ? t("no_result_history_to_display") : t("result_history_unknown")}</Typography>
                 ) : (
                   <ModuleTable>
                     <TableHead>
                       <TableRow>
-                        <TableCell align="right">Nonce</TableCell>
-                        <TableCell align="right">Aggregated Data</TableCell>
-                        <TableCell align="right">Height</TableCell>
-                        <TableCell>Time (원문)</TableCell>
+                        <TableCell align="right">{t("nonce")}</TableCell>
+                        <TableCell align="right">{t("aggregated_data")}</TableCell>
+                        <TableCell align="right">{t("height")}</TableCell>
+                        <TableCell>{t("time_raw")}</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>

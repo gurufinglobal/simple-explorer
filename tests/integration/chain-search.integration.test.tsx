@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "../helpers/render";
 import { bech32 } from "bech32";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import { PathParamsContext } from "next/dist/shared/lib/hooks-client-context.shared-runtime";
@@ -73,8 +73,8 @@ describe("W08 chain-aware search and actual service reads", () => {
       if (!cookie) document.cookie = "gf_chain=; path=/; max-age=0";
       window.history.replaceState(null, "", "/?chain=" + chain);
       render(route({}, <><Home /><ChainLink href="/tx/history?chain=b">Saved transaction</ChainLink></>));
-      expect(screen.getByRole("link", { name: "Open Dashboard" }).getAttribute("href")).toBe("/dashboard?chain=" + chain);
-      expect(screen.getByRole("link", { name: "Start Block Exploration" }).getAttribute("href")).toBe("/blocks?chain=" + chain);
+      expect(screen.getByRole("link", { name: "대시보드 열기" }).getAttribute("href")).toBe("/dashboard?chain=" + chain);
+      expect(screen.getByRole("link", { name: "블록 탐색 시작" }).getAttribute("href")).toBe("/blocks?chain=" + chain);
       expect(screen.getByRole("link", { name: "Saved transaction" }).getAttribute("href")).toBe("/tx/history?chain=b");
       expect(http).not.toHaveBeenCalled();
     },
@@ -110,7 +110,7 @@ describe("W08 chain-aware search and actual service reads", () => {
   it.each([TopNavSearch])("AC05-3 rendered search exposes both choices before navigation", Component => {
     render(route({}, <Component />));
     fireEvent.change(screen.getByRole("textbox"), { target: { value: "1".repeat(64) } });
-    fireEvent.click(screen.getByRole("button", { name: "search" }));
+    fireEvent.click(screen.getByRole("button", { name: "검색" }));
     expect(push).not.toHaveBeenCalled(); expect(http).not.toHaveBeenCalled();
     fireEvent.click(screen.getByRole("button", { name: "블록 높이 (정수)" }));
     expect(push).toHaveBeenCalledWith("/blocks/" + "1".repeat(64) + "?chain=a");
@@ -132,7 +132,7 @@ describe("W08 chain-aware search and actual service reads", () => {
     expect(getEffectiveCosmosAddress({ bech32Address: raw, evmAddress: null }, chains[0])).toBe(canonical);
     useWalletSessionStore.setState({ status: "connected", bech32Address: raw, evmAddress: null, chainKey: "a" });
     render(route({ address: raw }, <><AddressPage /><WalletPortfolioHydrator /></>));
-    await screen.findByText("Address (canonical Bech32): " + canonical);
+    await screen.findByText("주소 (canonical Bech32): " + canonical);
     await waitFor(() => expect(http.mock.calls.filter(([url]) => String(url).includes("/balances/")).length).toBeGreaterThanOrEqual(2));
     expect(http.mock.calls.filter(([url]) => String(url).includes("/balances/")).every(([url]) => String(url).endsWith("/" + canonical))).toBe(true);
   });
@@ -180,9 +180,9 @@ describe("W08 chain-aware search and actual service reads", () => {
     await screen.findByText("MsgEthereumTx");
     expect(screen.getByText(/158612886367191703 agxn/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "19611783" }).getAttribute("href")).toBe("/blocks/19611783?chain=a");
-    expect(screen.getByText("Success")).toBeTruthy();
+    expect(screen.getByText("성공")).toBeTruthy();
     expect(screen.getByText(/EVM transaction hash 대응, receipt\/log/)).toBeTruthy();
     expect(screen.getByText("주소 정보를 추출하지 못했습니다.")).toBeTruthy();
-    expect(screen.getByText("Cosmos tx hash (hex):")).toBeTruthy();
+    expect(screen.getByText("Cosmos 거래 해시 (hex):")).toBeTruthy();
   });
 });

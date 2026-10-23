@@ -1,4 +1,6 @@
 "use client";
+import { useTranslations } from "next-intl";
+
 
 import { useQuery } from "@/hooks/use-query";
 import { ModuleQueryStatus as QueryStatus } from "@/components/query/module-query-status";
@@ -18,6 +20,7 @@ import {
 import { getDenomsMetadata } from "@/services/guru/token-metadata.service";
 
 export function TokensMetadataList() {
+  const t = useTranslations("modules");
   const query = useQuery("tokens", client => getDenomsMetadata(client));
   const items = query.result.data ?? [];
   const loading = query.busy && !query.result.data;
@@ -25,13 +28,11 @@ export function TokensMetadataList() {
   return (
     <Stack spacing={2}>
       <Typography variant="h5" fontWeight={700}>
-        Tokens
-      </Typography>
+         {t("tokens")} </Typography>
       <Typography variant="body2" color="text.secondary">
-        `/cosmos/bank/v1beta1/denoms_metadata` 결과를 기준으로 표시합니다.
-      </Typography>
+         {t("based_on_the_cosmos_bank_v1beta1_denoms_metadata_response")} </Typography>
 
-      <QueryStatus {...query} label="토큰 메타데이터" />
+      <QueryStatus {...query} label={t("token_metadata")} />
 
       {loading ? (
         <Card variant="outlined">
@@ -39,12 +40,12 @@ export function TokensMetadataList() {
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Symbol</TableCell>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Display</TableCell>
-                  <TableCell>Base Denom</TableCell>
-                  <TableCell align="right">Decimals</TableCell>
-                  <TableCell>Description</TableCell>
+                  <TableCell>{t("symbol")}</TableCell>
+                  <TableCell>{t("name")}</TableCell>
+                  <TableCell>{t("display")}</TableCell>
+                  <TableCell>{t("base_denom")}</TableCell>
+                  <TableCell align="right">{t("decimals")}</TableCell>
+                  <TableCell>{t("description")}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -63,19 +64,19 @@ export function TokensMetadataList() {
           </CardContent>
         </Card>
       ) : items.length === 0 ? (
-        query.result.status === "empty" ? <Typography variant="body2">표시할 토큰 메타데이터가 없습니다.</Typography> : null
+        query.result.status === "empty" ? <Typography variant="body2">{t("no_token_metadata_to_display")}</Typography> : null
       ) : (
         <Card variant="outlined">
           <CardContent>
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TableCell>Symbol</TableCell>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Display</TableCell>
-                  <TableCell>Base Denom</TableCell>
-                  <TableCell align="right">Decimals</TableCell>
-                  <TableCell>Description</TableCell>
+                  <TableCell>{t("symbol")}</TableCell>
+                  <TableCell>{t("name")}</TableCell>
+                  <TableCell>{t("display")}</TableCell>
+                  <TableCell>{t("base_denom")}</TableCell>
+                  <TableCell align="right">{t("decimals")}</TableCell>
+                  <TableCell>{t("description")}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -85,7 +86,7 @@ export function TokensMetadataList() {
                     <TableCell>{item.name}</TableCell>
                     <TableCell>{item.displayDenom}</TableCell>
                     <TableCell>{item.baseDenom}</TableCell>
-                    <TableCell align="right">{item.decimals ?? "정밀도 미확인"}</TableCell>
+                    <TableCell align="right">{item.decimals ?? t("precision_unknown")}</TableCell>
                     <TableCell>{item.description}</TableCell>
                   </TableRow>
                 ))}

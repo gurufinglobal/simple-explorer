@@ -1,3 +1,5 @@
+
+import { serviceText } from '@/i18n/service-message';
 import { cursorParam, pageRows, queryPage, type LcdPagination } from '@/lib/query-page';
 import { PartialQueryError, schemaError } from '@/lib/query-result';
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
@@ -90,7 +92,7 @@ export async function getIbcChannelsPage(apiClients: QueryClient = defaultClient
     `/ibc/core/channel/v1/channels?pagination.limit=100${cursorParam(cursor)}`,
   );
   const raw = response.channels;
-  if (!Array.isArray(raw)) schemaError("채널 목록이 올바르지 않습니다.");
+  if (!Array.isArray(raw)) schemaError(serviceText("invalid_channel_list"));
   const mapped: IbcChannel[] = [];
   for (const item of raw) {
     if (!item || typeof item !== "object") {
@@ -103,7 +105,7 @@ export async function getIbcChannelsPage(apiClients: QueryClient = defaultClient
   }
   const page = queryPage(mapped, response.pagination, 100);
   if (mapped.length !== raw.length) {
-    const message = '일부 채널의 식별자가 올바르지 않습니다. 현재 결과는 일부입니다.';
+    const message = serviceText("some_channel_identifiers_are_invalid_results_are_partial");
     if (!mapped.length) schemaError(message);
     throw new PartialQueryError(page, { kind: 'schema', message });
   }

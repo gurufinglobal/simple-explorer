@@ -1,4 +1,6 @@
 "use client";
+import { serviceText } from '@/i18n/service-message';
+
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getActiveChainConfig } from '@/lib/chain-selection';
 import type { ChainConfig } from '@/lib/env';
@@ -48,8 +50,8 @@ export function usePagedQuery<T>(target: string, load: (client: QueryClient, cur
       const seen = [...previous.seen, previous.nextCursor ?? ''];
       const pages = previous.pages + 1;
       const stopReason = page.stopReason ?? (page.nextCursor && seen.includes(page.nextCursor)
-        ? 'cursor 반복·순환을 감지하여 중단했습니다. 현재 결과는 일부입니다.'
-        : page.nextCursor && pages >= MAX_QUERY_PAGES ? `조회 한도(${MAX_QUERY_PAGES}페이지)에 도달했습니다. 현재 결과는 일부입니다.` : undefined);
+        ? serviceText("stopped_after_detecting_a_repeated_or_cyclic_cursor_results_are")
+        : page.nextCursor && pages >= MAX_QUERY_PAGES ? serviceText("reached_the_query_limit_pages_results_are_partial", { value0: String(MAX_QUERY_PAGES) }) : undefined);
       // Successful retry clears a transport error; a prior partial page warning persists.
       const partial = page.warning ?? previous.warning;
       const next: State<T> = { key, seen, pages, nextCursor: page.nextCursor, stopReason, warning: partial, result: {

@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "../helpers/render";
 import { ChainSelector } from "@/components/layout/chain-selector";
 import { getActiveChainConfig } from "@/lib/chain-selection";
 import { getConfiguredChains } from "@/lib/env";

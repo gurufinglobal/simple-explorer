@@ -22,6 +22,8 @@ export type GovCoin = {
 export type NormalizedProposal = {
   id: string;
   title: string;
+  /** Distinguish an app fallback from a real on-chain title with identical text. */
+  titleMissing?: boolean;
   summary: string;
   status: GovProposalStatus;
   statusRaw: string;

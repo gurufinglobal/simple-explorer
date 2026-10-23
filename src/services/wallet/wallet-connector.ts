@@ -1,3 +1,5 @@
+
+import { ServiceError } from '@/i18n/service-message';
 import type { SessionTypes } from "@walletconnect/types";
 import type { ChainConfig } from "@/lib/env";
 import { getActiveChainConfig } from "@/lib/chain-selection";
@@ -13,7 +15,7 @@ export function walletConnectSessionToResult(session: SessionTypes.Struct, chain
   return { walletType: "walletconnect", ...normalizeWalletConnectSession(session, chain) };
 }
 export async function connectWallet(walletType: "keplr" | "metamask", chain: ChainConfig = getActiveChainConfig(), assertCurrent: () => void = () => {}): Promise<WalletConnectResult> {
-  if (typeof window === "undefined") throw new Error("브라우저에서 지갑을 연결하세요.");
+  if (typeof window === "undefined") throw new ServiceError("connect_your_wallet_in_the_browser");
   const chainId = await verifyLcdChain(chain);
   assertCurrent();
   if (walletType === "keplr") {
@@ -24,8 +26,8 @@ export async function connectWallet(walletType: "keplr" | "metamask", chain: Cha
       chainKey: chain.key, chainId, pubkey: accounts[0].pubkey,
       connectedChains: [`cosmos:${chainId}`] };
   }
-  if (!window.ethereum?.request) throw new Error("MetaMask 지갑을 찾을 수 없습니다.");
+  if (!window.ethereum?.request) throw new ServiceError("metamask_wallet_not_found");
   const accounts = await window.ethereum.request({ method: "eth_requestAccounts" });
-  if (!Array.isArray(accounts) || typeof accounts[0] !== "string" || !/^0x[0-9a-f]{40}$/i.test(accounts[0])) throw new Error("MetaMask 계정을 찾을 수 없습니다.");
+  if (!Array.isArray(accounts) || typeof accounts[0] !== "string" || !/^0x[0-9a-f]{40}$/i.test(accounts[0])) throw new ServiceError("metamask_account_not_found");
   return { walletType, bech32Address: null, evmAddress: accounts[0], chainKey: chain.key, chainId };
 }

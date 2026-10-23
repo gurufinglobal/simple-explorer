@@ -1,3 +1,6 @@
+import { ServiceError } from "@/i18n/service-message";
+
+import { serviceMessage, serviceText } from '@/i18n/service-message';
 import { requireModule } from "@/lib/module-capability";
 import type { QueryObservation } from "@/lib/query-result";
 import { validateLcdJson } from "@/services/lcd-schema";
@@ -35,12 +38,12 @@ export async function requestJson<T>(url: string, init: RequestInit = {}, option
       if (response.status === 404 && /\/cosmos\/auth\/v1beta1\/accounts\//.test(url)) {
         const body = await response.clone().json().catch(() => null) as { code?: number; message?: string } | null;
         if (body?.code === 5 && /account.*not found|unknown address/i.test(body.message ?? "")) {
-          throw new QueryError({ kind: "not-found", status: 404, message: "계정이 아직 생성되지 않았습니다. Bank 잔액은 별도로 조회합니다." });
+          throw new QueryError({ kind: "not-found", status: 404, ...serviceMessage("account_has_not_been_created_yet_bank_balances_are_queried") });
         }
       }
       const retry = response.headers.get("Retry-After");
       const retryAt = retry ? (/^\d+(?:\.\d+)?$/.test(retry) ? Date.now() + Number(retry) * 1000 : Date.parse(retry)) : NaN;
-      throw new QueryError({ kind: "http", status: response.status, message: `HTTP ${response.status}: 조회에 실패했습니다.`, ...(Number.isFinite(retryAt) ? { retryAt } : {}) });
+      throw new QueryError({ kind: "http", status: response.status, ...serviceMessage("http_query_failed", { value0: String(response.status) }), ...(Number.isFinite(retryAt) ? { retryAt } : {}) });
     }
     options.onResponse?.(response);
     try {
@@ -48,23 +51,23 @@ export async function requestJson<T>(url: string, init: RequestInit = {}, option
       if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
       return body;
     }
-    catch (error) { if (controller.signal.aborted) throw error; throw new QueryError({ kind: "parse", message: "JSON 응답을 읽을 수 없습니다." }); }
+    catch (error) { if (controller.signal.aborted) throw error; throw new QueryError({ kind: "parse", ...serviceMessage("could_not_read_the_json_response") }); }
   } catch (error) {
-    if (controller.signal.aborted) throw new QueryError({ kind: timedOut ? "timeout" : "cancelled", message: timedOut ? "조회 제한 시간(10초)을 초과했습니다." : "조회가 취소되었습니다." });
+    if (controller.signal.aborted) throw new QueryError({ kind: timedOut ? "timeout" : "cancelled", message: timedOut ? serviceText("query_exceeded_the_10_second_timeout") : serviceText("query_cancelled") });
     throw error instanceof QueryError ? error : new QueryError(queryError(error));
   } finally { clearTimeout(timer); options.signal?.removeEventListener("abort", cancel); }
 }
 
 function resolveRpcBaseUrl(chain: ChainConfig): string {
   if (!chain.rpcUrl) {
-    throw new Error("Selected chain does not provide rpcUrl.");
+    throw new ServiceError("selected_chain_does_not_provide_rpcurl");
   }
   return chain.rpcUrl;
 }
 
 function resolveEvmRpcBaseUrl(chain: ChainConfig): string {
   if (!chain.evmRpcUrl) {
-    throw new Error("Selected chain does not provide evmRpcUrl.");
+    throw new ServiceError("selected_chain_does_not_provide_evmrpcurl");
   }
   return chain.evmRpcUrl;
 }

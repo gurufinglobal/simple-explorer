@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "../helpers/render";
 import { NetworkSummaryPanel } from "@/components/network/network-summary-panel";
 import { mockNetworkSummaryHttp, restoreHttpBoundary } from "../helpers/network-summary";
 

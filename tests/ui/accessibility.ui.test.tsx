@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen } from "@testing-library/react";
+import { act, cleanup, render, screen } from "../helpers/render";
 import userEvent from "@testing-library/user-event";
 import { AppRouterContext } from "next/dist/shared/lib/app-router-context.shared-runtime";
 import type { AppRouterInstance } from "next/dist/shared/lib/app-router-context.shared-runtime";
@@ -52,7 +52,7 @@ it("loading and error have explicit accessible names", () => {
 });
 it("home explains wallet-free exploration and configured chains with no import example", () => {
   render(<AppRouterContext.Provider value={router}><Home /></AppRouterContext.Provider>);
-  expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Gurufin Explorer");
+  expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Gurufin 탐색기");
   expect(screen.getByText("공개 정보 조회에는 지갑 연결이 필요하지 않습니다.")).toBeTruthy();
   expect(screen.getByText("현재 설정된 체인: Chain A")).toBeTruthy();
   expect(document.querySelector("pre")).toBeNull();
@@ -64,7 +64,7 @@ it("IBC route announces pending HTTP then failure without a wallet or an executi
   vi.stubGlobal("fetch", http);
   render(<OperationsPage />);
   expect(screen.getByRole("status", { name: "조회 상태" }).textContent).toBe("불러오는 중");
-  expect(screen.getByText("IBC Channels")).toBeTruthy();
+  expect(screen.getByRole("heading", { name: "IBC 채널", level: 5 })).toBeTruthy();
   expect(screen.queryByRole("button", { name: /최종 확인/ })).toBeNull();
   expect(http).toHaveBeenCalledOnce();
   await act(async () => finish(new Response("", { status: 503 })));

@@ -1,3 +1,5 @@
+
+import { ServiceError } from '@/i18n/service-message';
 import { makeSignDoc as makeAminoSignDoc, serializeSignDoc, type StdFee, type StdSignature } from "@cosmjs/amino";
 import { keccak256, Secp256k1, Secp256k1Signature } from "@cosmjs/crypto";
 import { isOfflineDirectSigner, type EncodeObject, type OfflineSigner } from "@cosmjs/proto-signing";
@@ -13,9 +15,9 @@ import { assertCosmosWalletKey, GURU_RELEASE_PUBKEY, isGuruReleaseProfile, signi
 const equal = (a: Uint8Array, b: Uint8Array) => a.length === b.length && a.every((v, i) => v === b[i]);
 const decode64 = (s: string) => Uint8Array.from(atob(s), c => c.charCodeAt(0));
 const uint64 = (n: string | number | bigint) => {
-  if ((typeof n === "number" && !Number.isSafeInteger(n)) || !/^\d+$/.test(String(n))) throw new Error("잘못된 uint64 값입니다.");
+  if ((typeof n === "number" && !Number.isSafeInteger(n)) || !/^\d+$/.test(String(n))) throw new ServiceError("invalid_uint64_value");
   const value = BigInt(n);
-  if (value > BigInt("18446744073709551615")) throw new Error("uint64 범위를 초과했습니다.");
+  if (value > BigInt("18446744073709551615")) throw new ServiceError("exceeds_the_uint64_range");
   return value;
 };
 
@@ -29,13 +31,13 @@ export class GuruSigningClient extends SigningStargateClient {
 
   constructor(comet: CometClient | undefined, private readonly guruSigner: OfflineSigner,
     private readonly chain: ChainConfig, options: SigningStargateClientOptions = {}) {
-    if (!isGuruReleaseProfile(chain)) throw new Error("검증된 Guru 릴리스 프로필이 아닙니다.");
+    if (!isGuruReleaseProfile(chain)) throw new ServiceError("not_a_verified_guru_release_profile");
     super(comet, guruSigner, { ...options, accountParser: options.accountParser ?? signingAccountParser(chain) });
   }
 
   private async walletKey(address: string) {
     const account = (await this.guruSigner.getAccounts()).find(a => a.address === address);
-    if (!account) throw new Error("실제 signer 계정이 없습니다.");
+    if (!account) throw new ServiceError("actual_signer_account_missing");
     // Keplr reports the curve as secp256k1 for this API. The profile, address and
     // verified Keccak signature determine its semantics; never cast an algo.
     assertCosmosWalletKey(this.chain, address, account.pubkey, account.algo);
@@ -44,9 +46,9 @@ export class GuruSigningClient extends SigningStargateClient {
 
   private body(address: string, messages: readonly EncodeObject[], memo: string, timeoutHeight?: bigint) {
     if (messages.length !== 1 || messages[0].typeUrl !== "/cosmos.bank.v1beta1.MsgSend") {
-      throw new Error("Guru 릴리스 어댑터는 단일 MsgSend만 지원합니다.");
+      throw new ServiceError("the_guru_release_adapter_supports_only_a_single_msgsend");
     }
-    if (messages[0].value.fromAddress !== address) throw new Error("MsgSend 송신 계정이 signer와 다릅니다.");
+    if (messages[0].value.fromAddress !== address) throw new ServiceError("msgsend_sender_differs_from_the_signer");
     return this.registry.encode({ typeUrl: "/cosmos.tx.v1beta1.TxBody", value: { messages, memo, timeoutHeight } });
   }
 
@@ -62,16 +64,16 @@ export class GuruSigningClient extends SigningStargateClient {
     // Keplr's response envelope is tendermint/PubKeySecp256k1 even for eth signing.
     // The on-chain Any is constructed independently from the pinned proto above.
     if (response.pub_key.type !== "tendermint/PubKeySecp256k1" || !equal(decode64(response.pub_key.value), key)) {
-      throw new Error("지갑 서명 공개키가 확인한 키와 다릅니다.");
+      throw new ServiceError("wallet_signature_public_key_differs_from_the_verified_key");
     }
     const signature = decode64(response.signature);
-    if (signature.length !== 64 && signature.length !== 65) throw new Error("잘못된 Guru 서명 길이입니다.");
+    if (signature.length !== 64 && signature.length !== 65) throw new ServiceError("invalid_guru_signature_length");
     const compact = signature.slice(0, 64);
     // go-ethereum verification rejects high S. Preserve that rule explicitly.
     const s = BigInt(`0x${Array.from(compact.slice(32), b => b.toString(16).padStart(2, "0")).join("")}`);
     if (s > BigInt("0x7fffffffffffffffffffffffffffffff5d576e7357a4501ddfe92f46681b20a0") ||
       !await Secp256k1.verifySignature(Secp256k1Signature.fromFixedLength(compact), keccak256(bytes), key)) {
-      throw new Error("Guru Keccak 서명 검증에 실패했습니다. 방송하지 않습니다.");
+      throw new ServiceError("guru_keccak_signature_verification_failed_broadcast_is_blocked");
     }
     return signature;
   }
@@ -84,7 +86,7 @@ export class GuruSigningClient extends SigningStargateClient {
       authInfoBytes: this.auth(key, sequence, { amount: [], gas: "0" }, 1), signatures: [new Uint8Array(64)] }).finish();
     const result = await new ServiceClientImpl(createProtobufRpcClient(this.forceGetQueryClient())).Simulate({ txBytes });
     const gas = result.gasInfo?.gasUsed;
-    if (gas === undefined || gas <= BigInt(0) || gas > BigInt(Number.MAX_SAFE_INTEGER)) throw new Error("유효한 simulate gas를 받지 못했습니다.");
+    if (gas === undefined || gas <= BigInt(0) || gas > BigInt(Number.MAX_SAFE_INTEGER)) throw new ServiceError("no_valid_simulated_gas_result");
     return Number(gas);
   }
 
@@ -93,26 +95,26 @@ export class GuruSigningClient extends SigningStargateClient {
     const key = await this.walletKey(address);
     const bodyBytes = this.body(address, messages, memo, timeoutHeight);
     const data = explicitSignerData ?? { ...await this.getSequence(address), chainId: await this.getChainId() };
-    if (data.chainId !== this.chain.chainId) throw new Error("서명 체인이 릴리스 프로필과 다릅니다.");
+    if (data.chainId !== this.chain.chainId) throw new ServiceError("signing_chain_differs_from_the_release_profile");
     if (isOfflineDirectSigner(this.guruSigner)) {
-      if (!this.chain.signingProfile!.signModes.includes("direct")) throw new Error("Direct 서명이 허용되지 않았습니다.");
+      if (!this.chain.signingProfile!.signModes.includes("direct")) throw new ServiceError("direct_signing_is_not_allowed");
       const doc = SignDoc.fromPartial({ bodyBytes, authInfoBytes: this.auth(key, data.sequence, fee, 1),
         chainId: data.chainId, accountNumber: uint64(data.accountNumber) });
       const bytes = SignDoc.encode(doc).finish();
       const response = await this.guruSigner.signDirect(address, doc);
-      if (!equal(SignDoc.encode(response.signed).finish(), bytes)) throw new Error("지갑이 확인한 SignDoc을 변경했습니다. 다시 확인하세요.");
+      if (!equal(SignDoc.encode(response.signed).finish(), bytes)) throw new ServiceError("wallet_changed_the_reviewed_signdoc_review_again");
       const signature = await this.checkedSignature(response.signature, bytes, key);
       // Decode the saved bytes so mutations to the wallet request cannot leak into TxRaw.
       const signed = SignDoc.decode(bytes);
       return { bodyBytes: signed.bodyBytes, authInfoBytes: signed.authInfoBytes, signatures: [signature] };
     }
-    if (!this.chain.signingProfile!.signModes.includes("amino")) throw new Error("Amino 서명이 허용되지 않았습니다.");
+    if (!this.chain.signingProfile!.signModes.includes("amino")) throw new ServiceError("amino_signing_is_not_allowed");
     const doc = makeAminoSignDoc(messages.map(m => this.guruAmino.toAmino(m)), fee,
       data.chainId, memo, data.accountNumber, data.sequence, timeoutHeight);
     const bytes = serializeSignDoc(doc);
     const authInfoBytes = this.auth(key, data.sequence, fee, 127);
     const response = await this.guruSigner.signAmino(address, doc);
-    if (!equal(serializeSignDoc(response.signed), bytes)) throw new Error("지갑이 확인한 Amino SignDoc을 변경했습니다. 다시 확인하세요.");
+    if (!equal(serializeSignDoc(response.signed), bytes)) throw new ServiceError("wallet_changed_the_reviewed_amino_signdoc_review_again");
     return { bodyBytes, authInfoBytes, signatures: [await this.checkedSignature(response.signature, bytes, key)] };
   }
 }

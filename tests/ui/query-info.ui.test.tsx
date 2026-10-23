@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import '@testing-library/jest-dom/vitest';
 import { afterEach, expect, it } from 'vitest';
-import { cleanup, render, screen, within, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, within, waitFor } from '../helpers/render';
 import userEvent from '@testing-library/user-event';
 import { PathParamsContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import GovernanceProposalPage from '@/app/(explorer)/governance/[proposalId]/page';
@@ -37,13 +37,13 @@ it('proposal route collapses all sources, exposes observations with keyboard and
   expect(toggle).toHaveAttribute('aria-expanded', 'false');
   expect(toggle).toHaveFocus();
   await userEvent.tab(); expect(screen.getByRole('button', { name: '제안 다시 조회' })).toHaveFocus();
-  await userEvent.click(screen.getByRole('tab', { name: 'Raw JSON' }));
+  await userEvent.click(screen.getByRole('tab', { name: "원본 JSON" }));
   http.mockClear();
   await userEvent.click(screen.getByRole('button', { name: '집계 다시 조회' }));
   await screen.findByText('4/6개 조회 완료');
   expect(http).toHaveBeenCalledTimes(1);
   expect(String(http.mock.calls[0][0])).toContain('/tally');
-  expect(screen.getByRole('tab', { name: 'Raw JSON' })).toHaveAttribute('aria-selected', 'true');
+  expect(screen.getByRole('tab', { name: "원본 JSON" })).toHaveAttribute('aria-selected', 'true');
   await userEvent.click(screen.getByRole('tab', { name: '투표 내역' }));
   expect(screen.getByText('투표: 현재 조회 0건 · 전체 개수 미확인')).toBeVisible();
 });
@@ -53,17 +53,17 @@ it('Params keeps HTTP501 and failed module visible, reveals every source and pre
   render(<ParamsView />);
   await screen.findByText('일부 조회 실패');
   const info = screen.getByRole('region', { name: 'Params 조회 정보' });
-  expect(within(info).getByText('Crisis Constant Fee: HTTP 501')).toBeVisible();
+  expect(within(info).getByText('Crisis 고정 수수료: HTTP 501')).toBeVisible();
   expect(within(info).getByRole('alert')).toHaveTextContent('HTTP 501');
   expect(within(info).queryByText(/출처:/)).toBeNull();
-  const card = screen.getByText('Auth Params');
+  const card = screen.getByText('인증 파라미터');
   const toggle = within(info).getByRole('button', { name: '조회 정보' });
   await userEvent.click(toggle);
   expect(within(info).getAllByText(/출처:.*응답 높이: 123/)).toHaveLength(14);
   expect(within(info).getByText(/실패 출처:.*constant_fee/)).toBeVisible();
   await userEvent.click(toggle);
   failAll = true;
-  await userEvent.click(screen.getByRole('button', { name: 'Params 다시 조회' }));
+  await userEvent.click(screen.getByRole('button', { name: '파라미터 다시 조회' }));
   await waitFor(() => expect(within(info).getByText('갱신 실패: 마지막 조회 데이터')).toBeVisible());
   expect(card).toBeVisible();
   expect(toggle).toHaveAttribute('aria-expanded', 'false');

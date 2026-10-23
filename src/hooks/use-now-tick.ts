@@ -1,13 +1,7 @@
-"use client";
+'use client';
+import { useNow } from 'next-intl';
 
-import { useEffect, useState } from "react";
-
-/** Current time in ms, updated every `intervalMs` (default 1000). */
+/** Request clock is shared by SSR and hydration, then advances on the client. */
 export function useNowTick(intervalMs = 1000): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), intervalMs);
-    return () => window.clearInterval(id);
-  }, [intervalMs]);
-  return now;
+  return useNow({ updateInterval: intervalMs }).getTime();
 }

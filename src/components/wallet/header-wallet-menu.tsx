@@ -1,4 +1,9 @@
 "use client";
+import { ServiceErrorText } from "@/components/query/service-error-text";
+
+import { useServiceText } from "@/i18n/use-service-text";
+import { useTranslations } from "next-intl";
+
 import AccountBalanceWalletOutlinedIcon from "@mui/icons-material/AccountBalanceWalletOutlined";
 import { Alert, Chip, Divider, IconButton, ListItemText, Menu, MenuItem, Stack, Typography } from "@mui/material";
 import { useEffect, useState } from "react";
@@ -8,6 +13,8 @@ import { getActiveChainConfig } from "@/lib/chain-selection";
 import { WalletConnectQrDialog } from "./walletconnect-qr-dialog";
 
 export function HeaderWalletMenu() {
+  const t = useTranslations("wallet");
+  const st = useServiceText();
   const state = useWalletSessionStore();
   const [anchor, setAnchor] = useState<HTMLElement | null>(null);
   const [qr, setQr] = useState(false);
@@ -16,11 +23,11 @@ export function HeaderWalletMenu() {
   useEffect(() => {
     if (state.status === "disconnected") { setQr(false); setUri(null); }
   }, [state.status]);
-  let selectedChain = "체인 설정 오류";
+  let selectedChain = t("chain_configuration_error");
   try { const chain = getActiveChainConfig(); selectedChain = chain.chainId ?? chain.name; } catch {}
   const address = state.bech32Address ?? state.evmAddress;
   const label = state.status === "connected" && address ? `${address.slice(0, 6)}…${address.slice(-4)}`
-    : state.status === "connecting" ? "Connecting" : state.status === "error" ? "Error" : "Disconnected";
+    : state.status === "connecting" ? t("connecting") : state.status === "error" ? t("error") : t("disconnected");
   const extension = (wallet: "keplr" | "metamask") => { setAnchor(null); void connectExtension(wallet); };
   const startQr = async () => {
     if (useWalletSessionStore.getState().status === "connecting") return;
@@ -32,18 +39,18 @@ export function HeaderWalletMenu() {
     <Stack spacing={0.5}>
       <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
         <Chip size="small" label={label} color={state.status === "connected" ? "success" : "default"} />
-        <Typography variant="caption">{selectedChain} · {state.writeStatus === "ready" ? "쓰기 가능" : state.writeStatus === "checking" ? "확인 중" : "조회 전용"}</Typography>
-        <IconButton color="inherit" aria-label="wallet menu" aria-haspopup="menu" aria-expanded={Boolean(anchor)} onClick={event => setAnchor(event.currentTarget)}><AccountBalanceWalletOutlinedIcon /></IconButton>
+        <Typography variant="caption">{selectedChain} · {state.writeStatus === "ready" ? t("transactions_enabled") : state.writeStatus === "checking" ? t("checking") : t("read_only")}</Typography>
+        <IconButton color="inherit" aria-label={t("wallet_menu")} aria-haspopup="menu" aria-expanded={Boolean(anchor)} onClick={event => setAnchor(event.currentTarget)}><AccountBalanceWalletOutlinedIcon /></IconButton>
       </Stack>
-      {state.writeReason && <Typography variant="caption" role="status">{state.writeReason}</Typography>}
+      {state.writeReason && <Typography variant="caption" role="status">{st(state.writeReason)}</Typography>}
     </Stack>
     <Menu slotProps={{ paper: { sx: { overflowWrap: "anywhere" } } }} anchorEl={anchor} open={Boolean(anchor)} onClose={() => setAnchor(null)}>
-      <MenuItem disabled={state.status === "connecting"} onClick={() => void startQr()}><ListItemText primary="WalletConnect" secondary="QR / mobile wallet" /></MenuItem>
+      <MenuItem disabled={state.status === "connecting"} onClick={() => void startQr()}><ListItemText primary="WalletConnect" secondary={t("mobileWallet")} /></MenuItem>
       <MenuItem disabled={state.status === "connecting"} onClick={() => extension("keplr")}><ListItemText primary="Keplr" /></MenuItem>
       <MenuItem disabled={state.status === "connecting"} onClick={() => extension("metamask")}><ListItemText primary="MetaMask" /></MenuItem>
       <Divider />
-      <MenuItem disabled={state.status === "disconnected"} onClick={() => { setAnchor(null); setQr(false); void disconnectWallet(); }}><ListItemText primary={state.status === "connecting" ? "Cancel connection" : "Disconnect"} /></MenuItem>
-      {state.lastError && <Alert severity="error">{state.lastError}</Alert>}
+      <MenuItem disabled={state.status === "disconnected"} onClick={() => { setAnchor(null); setQr(false); void disconnectWallet(); }}><ListItemText primary={state.status === "connecting" ? t("cancel_connection") : t("disconnect")} /></MenuItem>
+      {state.lastError && <Alert severity="error">{<ServiceErrorText error={state.lastError} />}</Alert>}
     </Menu>
     <WalletConnectQrDialog open={qr} uri={uri} error={state.lastError} onClose={() => { setQr(false); setUri(null); void disconnectWallet(); }} />
   </>;

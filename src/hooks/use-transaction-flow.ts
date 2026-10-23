@@ -1,4 +1,6 @@
 "use client";
+import { ServiceError, serviceText } from '@/i18n/service-message';
+
 import { useEffect, useRef, useState } from "react";
 import { useWalletSessionStore } from "@/stores/wallet-session.store";
 import { errorMessage, type PreparedTransaction, type TransactionPhase, type TransactionReceipt } from "@/services/transactions/transaction";
@@ -57,7 +59,7 @@ export function useTransactionFlow(contextKey: string, validationKey = "") {
     const request = ++version.current;
     const key = contextKey;
     const isCurrent = () => request === version.current && currentKey.current === key && currentValidation.current === validationKey;
-    const assertCurrent = () => { if (!isCurrent()) throw new Error("입력이 변경되었습니다. 거래를 다시 확인하세요."); };
+    const assertCurrent = () => { if (!isCurrent()) throw new ServiceError("input_changed_review_the_transaction_again"); };
     setError(null); setReceipt(null); setPrepared(null); setPhase("validating");
     try {
       const result = await prepare(assertCurrent);
@@ -70,7 +72,7 @@ export function useTransactionFlow(contextKey: string, validationKey = "") {
   const cancel = () => {
     version.current += 1; active.current?.cancel(); active.current = null;
     busy.current = false; setPrepared(null); setPhase("input");
-    setError("앱 확인을 취소했습니다. 전송하지 않았습니다.");
+    setError(serviceText("app_confirmation_cancelled_nothing_was_sent"));
   };
   const confirm = async () => {
     if (busy.current || !active.current) return;

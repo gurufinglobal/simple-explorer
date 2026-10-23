@@ -1,4 +1,6 @@
 "use client";
+import { useTranslations } from "next-intl";
+
 import { ModuleTable } from "@/components/query/module-table";
 import { withChain } from "@/lib/chain-selection";
 
@@ -37,6 +39,7 @@ function formatEnumLabel(value: string): string {
 }
 
 export function OracleList() {
+  const t = useTranslations("modules");
   const [page, setPage] = useState(1);
   const [categoryFilter, setCategoryFilter] = useState("ALL");
   const [statusFilter, setStatusFilter] = useState("ALL");
@@ -66,13 +69,11 @@ export function OracleList() {
   return (
     <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
       <Typography variant="h5" fontWeight={700}>
-        Oracle Requests
-      </Typography>
+         {t("oracle_requests")} </Typography>
       <Typography variant="body2" color="text.secondary">
-        Oracle 필드는 원문입니다. period·quorum 단위와 nonce 최신 규칙은 미확인입니다.
-      </Typography>
+         {t("oracle_fields_are_raw_values_period_and_quorum_units")} </Typography>
 
-      <QueryInfo queries={[{ ...query, label: "요청 목록" }, { ...paramsQuery, label: "Oracle 파라미터" }, { ...moderator, label: "관리자" }, { ...categoriesQuery, label: "카테고리" }, { ...whitelist, label: "허용 목록" }]} />
+      <QueryInfo queries={[{ ...query, label: t("requests") }, { ...paramsQuery, label: t("oracle_parameters") }, { ...moderator, label: t("administrator") }, { ...categoriesQuery, label: t("categories") }, { ...whitelist, label: t("allowlist") }]} />
 
       {!loading && supported ? (
         <Grid container spacing={2}>
@@ -80,9 +81,8 @@ export function OracleList() {
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="caption" color="text.secondary">
-                  Enabled
-                </Typography>
-                <Typography variant="body1">{params ? params.enable === null ? "미확인" : String(params.enable) : "-"}</Typography>
+                   {t("enabled")} </Typography>
+                <Typography variant="body1">{params ? params.enable === null ? t("unknown") : String(params.enable) : "-"}</Typography>
               </CardContent>
             </Card>
           </Grid>
@@ -90,8 +90,7 @@ export function OracleList() {
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="caption" color="text.secondary">
-                  Quorum Ratio
-                </Typography>
+                   {t("quorum_ratio")} </Typography>
                 <Typography variant="body1">{params?.quorumRatio ?? "-"}</Typography>
               </CardContent>
             </Card>
@@ -100,8 +99,7 @@ export function OracleList() {
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="caption" color="text.secondary">
-                  Retention Blocks
-                </Typography>
+                   {t("retention_blocks")} </Typography>
                 <Typography variant="body1">{params?.reportRetentionBlocks ?? "-"}</Typography>
               </CardContent>
             </Card>
@@ -110,8 +108,7 @@ export function OracleList() {
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="caption" color="text.secondary">
-                  Whitelist Count
-                </Typography>
+                   {t("allowlist_count")} </Typography>
                 <Typography variant="body1">{whitelistCount}</Typography>
               </CardContent>
             </Card>
@@ -120,13 +117,12 @@ export function OracleList() {
             <Card variant="outlined">
               <CardContent>
                 <Typography variant="caption" color="text.secondary">
-                  Moderator Address
-                </Typography>
+                   {t("moderator_address")} </Typography>
                 <Typography sx={{ mt: 0.5, wordBreak: "break-all", fontFamily: "monospace" }}>
                   {moderatorAddress ?? "-"}
                 </Typography>
                 <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 1 }}>
-                  Categories: {categories.length > 0 ? categories.map(formatEnumLabel).join(", ") : "-"}
+                   {t("categories_2")} {categories.length > 0 ? categories.map(formatEnumLabel).join(", ") : "-"}
                 </Typography>
               </CardContent>
             </Card>
@@ -160,13 +156,13 @@ export function OracleList() {
         <TextField
           select
           size="small"
-          label="Category"
+          label={t("category")}
           value={categoryFilter}
           onChange={(event) => setCategoryFilter(event.target.value)}
           sx={{ minWidth: 220 }}
           disabled={loading || !supported}
         >
-          <MenuItem value="ALL">All</MenuItem>
+          <MenuItem value="ALL">{t("all")}</MenuItem>
           {categories.map((category) => (
             <MenuItem key={category} value={category}>
               {formatEnumLabel(category)}
@@ -176,15 +172,15 @@ export function OracleList() {
         <TextField
           select
           size="small"
-          label="Status"
+          label={t("status")}
           value={statusFilter}
           onChange={(event) => setStatusFilter(event.target.value)}
           sx={{ minWidth: 220 }}
           disabled={loading || !supported}
         >
-          <MenuItem value="ALL">All</MenuItem>
-          <MenuItem value="STATUS_ACTIVE">active</MenuItem>
-          <MenuItem value="STATUS_INACTIVE">inactive</MenuItem>
+          <MenuItem value="ALL">{t("all")}</MenuItem>
+          <MenuItem value="STATUS_ACTIVE">{t("active")}</MenuItem>
+          <MenuItem value="STATUS_INACTIVE">{t("inactive")}</MenuItem>
         </TextField>
       </Stack>
 
@@ -194,12 +190,12 @@ export function OracleList() {
             <ModuleTable>
               <TableHead>
                 <TableRow>
-                  <TableCell>ID</TableCell>
-                  <TableCell>Symbol</TableCell>
-                  <TableCell>Category</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell align="right">Nonce</TableCell>
-                  <TableCell align="right">Period</TableCell>
+                  <TableCell>{t("id")}</TableCell>
+                  <TableCell>{t("symbol")}</TableCell>
+                  <TableCell>{t("category")}</TableCell>
+                  <TableCell>{t("status")}</TableCell>
+                  <TableCell align="right">{t("nonce")}</TableCell>
+                  <TableCell align="right">{t("period")}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -218,19 +214,19 @@ export function OracleList() {
           </CardContent>
         </Card>
       ) : !supported ? null : requests.length === 0 ? (
-        <Typography variant="body2">표시할 Oracle request가 없습니다.</Typography>
+        <Typography variant="body2">{t("no_oracle_requests_to_display")}</Typography>
       ) : (
         <Card variant="outlined">
           <CardContent>
             <ModuleTable>
               <TableHead>
                 <TableRow>
-                  <TableCell>ID</TableCell>
-                  <TableCell>Symbol</TableCell>
-                  <TableCell>Category</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell align="right">Nonce</TableCell>
-                  <TableCell align="right">Period</TableCell>
+                  <TableCell>{t("id")}</TableCell>
+                  <TableCell>{t("symbol")}</TableCell>
+                  <TableCell>{t("category")}</TableCell>
+                  <TableCell>{t("status")}</TableCell>
+                  <TableCell align="right">{t("nonce")}</TableCell>
+                  <TableCell align="right">{t("period")}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>

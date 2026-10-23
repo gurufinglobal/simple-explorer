@@ -1,3 +1,5 @@
+
+import { serviceText, serviceMessage } from '@/i18n/service-message';
 import { cursorParam, pageRows, queryPage, type LcdPagination } from '@/lib/query-page';
 import { PartialQueryError, QueryError, readFields, schemaError } from "@/lib/query-result";
 import { normalizeGovV1Beta1Proposal, normalizeGovV1Proposal } from "@/lib/gov-mapper";
@@ -82,7 +84,7 @@ function normalizeDepositEntry(raw: unknown): GovernanceDepositRow | null {
     amountDisplay = coins
       .map((c) => {
         const o = c as { denom?: string; amount?: string };
-        if (!o.denom || !o.amount || !/^\d+$/.test(o.amount)) return "금액 미확인";
+        if (!o.denom || !o.amount || !/^\d+$/.test(o.amount)) return serviceText("amount_unknown");
         return `${o.amount} ${o.denom}`;
       })
       .filter(Boolean)
@@ -129,7 +131,7 @@ export async function listProposals(limit = 100, apiClients: QueryClient = defau
 }
 export async function listProposalsPage(limit = 100, apiClients: QueryClient = defaultClients, cursor?: string | null) {
   const { data, legacy } = await lcdGetWithVersion<ProposalsV1Response>(`/cosmos/gov/v1/proposals?pagination.limit=${limit}&pagination.reverse=true${cursorParam(cursor)}`, apiClients);
-  if (!Array.isArray(data.proposals)) schemaError("제안 목록이 올바르지 않습니다.");
+  if (!Array.isArray(data.proposals)) schemaError(serviceText("invalid_proposal_list"));
   return queryPage(data.proposals.map(legacy ? normalizeGovV1Beta1Proposal : normalizeGovV1Proposal), data.pagination, limit);
 }
 
@@ -139,7 +141,7 @@ export async function getProposalRaw(proposalId: string, apiClients: QueryClient
 
 export async function getProposal(proposalId: string, apiClients: QueryClient = defaultClients): Promise<NormalizedProposal | null> {
   const { data, legacy } = await lcdGetWithVersion<ProposalOneV1>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}`, apiClients);
-  if (!data.proposal) schemaError("제안 응답이 올바르지 않습니다.");
+  if (!data.proposal) schemaError(serviceText("invalid_proposal_response"));
   return (legacy ? normalizeGovV1Beta1Proposal : normalizeGovV1Proposal)(data.proposal);
 }
 
@@ -166,17 +168,17 @@ export async function getGovParams(apiClients: QueryClient = defaultClients): Pr
   return readFields<GovParamsBundle>({ voting: null, tallying: null, deposit: null }, {
     voting: safeLcdGet<ParamsVoting>("/cosmos/gov/v1/params/voting", apiClients).then(response => {
       const value = response?.params ?? response?.voting_params;
-      if (!value?.voting_period) schemaError("Voting params 응답이 올바르지 않습니다.");
+      if (!value?.voting_period) schemaError(serviceText("invalid_voting_parameters_response"));
       return { votingPeriod: value.voting_period };
     }),
     tallying: safeLcdGet<ParamsTally>("/cosmos/gov/v1/params/tallying", apiClients).then(response => {
       const value = response?.params ?? response?.tally_params;
-      if (!value?.quorum || !value.threshold || !value.veto_threshold) schemaError("Tally params 응답이 올바르지 않습니다.");
+      if (!value?.quorum || !value.threshold || !value.veto_threshold) schemaError(serviceText("invalid_tally_parameters_response"));
       return { quorum: value.quorum, threshold: value.threshold, vetoThreshold: value.veto_threshold };
     }),
     deposit: safeLcdGet<ParamsDeposit>("/cosmos/gov/v1/params/deposit", apiClients).then(response => {
       const value = response?.params ?? response?.deposit_params;
-      if (!value || !Array.isArray(value.min_deposit)) schemaError("Deposit params 응답이 올바르지 않습니다.");
+      if (!value || !Array.isArray(value.min_deposit)) schemaError(serviceText("invalid_deposit_parameters_response"));
       return { minDeposit: value.min_deposit, maxDepositPeriod: value.max_deposit_period ?? "" };
     }),
   });
@@ -184,7 +186,7 @@ export async function getGovParams(apiClients: QueryClient = defaultClients): Pr
 
 /** Validate each row here so a malformed sibling cannot erase valid rows. */
 function mapGovernanceRows<T>(raw: unknown, normalize: (item: unknown) => T | null, label: string): T[] {
-  if (!Array.isArray(raw)) schemaError(`${label} 목록이 올바르지 않습니다.`);
+  if (!Array.isArray(raw)) schemaError(serviceText("invalid_list", { value0: String(label) }));
   const rows: T[] = [];
   let invalid = 0;
   for (const item of raw) {
@@ -193,7 +195,7 @@ function mapGovernanceRows<T>(raw: unknown, normalize: (item: unknown) => T | nu
     else invalid++;
   }
   if (invalid) {
-    const info = { kind: "schema" as const, message: `${label} ${raw.length}건 중 ${invalid}건의 식별자가 올바르지 않습니다.` };
+    const info = { kind: "schema" as const, ...serviceMessage("invalid_identifiers_in_of_records", { value0: String(label), value1: String(raw.length), value2: String(invalid) }) };
     if (rows.length) throw new PartialQueryError(rows, info);
     throw new QueryError(info);
   }
@@ -205,7 +207,7 @@ export async function listVotes(proposalId: string, apiClients: QueryClient = de
 }
 export async function listVotesPage(proposalId: string, apiClients: QueryClient = defaultClients, cursor?: string | null) {
   const response = await safeLcdGet<VotesResponse>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/votes?pagination.limit=200${cursorParam(cursor)}`, apiClients);
-  try { return queryPage(mapGovernanceRows(response.votes, normalizeVoteEntry, "투표 내역"), response.pagination, 200); }
+  try { return queryPage(mapGovernanceRows(response.votes, normalizeVoteEntry, serviceText("vote_records")), response.pagination, 200); }
   catch (error) {
     if (error instanceof PartialQueryError) throw new PartialQueryError(queryPage(error.data as GovernanceVoteRow[], response.pagination, 200), error.info);
     throw error;
@@ -214,7 +216,7 @@ export async function listVotesPage(proposalId: string, apiClients: QueryClient 
 
 export async function listDeposits(proposalId: string, apiClients: QueryClient = defaultClients): Promise<GovernanceDepositRow[]> {
   const response = await safeLcdGet<DepositsResponse>(`/cosmos/gov/v1/proposals/${encodeURIComponent(proposalId)}/deposits`, apiClients);
-  return mapGovernanceRows(response.deposits, normalizeDepositEntry, "예치 내역");
+  return mapGovernanceRows(response.deposits, normalizeDepositEntry, serviceText("deposit_records"));
 }
 
 /** Map LCD vote option string to app vote option. */

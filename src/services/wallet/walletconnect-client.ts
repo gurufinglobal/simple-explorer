@@ -1,3 +1,4 @@
+import { ServiceError } from "@/i18n/service-message";
 import type { ProposalTypes } from "@walletconnect/types";
 import type { SessionTypes } from "@walletconnect/types";
 import type SignClient from "@walletconnect/sign-client";
@@ -19,7 +20,7 @@ export function getWalletConnectProjectId(): string | undefined {
 
 function assertBrowser(): void {
   if (typeof window === "undefined") {
-    throw new Error("WalletConnect is only available in the browser.");
+    throw new ServiceError("walletconnect_is_only_available_in_the_browser");
   }
 }
 
@@ -27,7 +28,7 @@ export async function getOrCreateSignClient(): Promise<SignClient> {
   assertBrowser();
   const projectId = getWalletConnectProjectId();
   if (!projectId) {
-    throw new Error("NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID is not configured.");
+    throw new ServiceError("next_public_walletconnect_project_id_is_not_configured");
   }
 
   if (!clientPromise) {

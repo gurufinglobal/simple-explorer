@@ -1,3 +1,5 @@
+
+import { serviceText } from '@/i18n/service-message';
 import type {
   GovCoin,
   GovProposalStatus,
@@ -41,7 +43,7 @@ function mapCoins(raw: unknown): GovCoin[] {
   }
   return raw.map((c) => {
     const o = c as { denom?: string; amount?: string } | null;
-    return { denom: o?.denom ?? "denom 미확인", amount: o?.amount ?? "미확인" };
+    return { denom: o?.denom ?? serviceText("denom_unknown"), amount: o?.amount ?? serviceText("unknown") };
   });
 }
 
@@ -67,6 +69,7 @@ export function normalizeGovV1Proposal(p: Record<string, unknown>): NormalizedPr
   return {
     id,
     title: title || `Proposal ${id}`,
+    titleMissing: !title,
     summary: summary || "—",
     status: mapStatus(statusRaw),
     statusRaw,
@@ -84,16 +87,15 @@ export function normalizeGovV1Beta1Proposal(p: Record<string, unknown>): Normali
   const id = String(p.proposal_id ?? p.id ?? "");
   const statusRaw = String(p.status ?? "");
   const content = p.content as Record<string, unknown> | undefined;
-  const title =
-    String(p.title ?? "") ||
-    (content?.title ? String(content.title) : "") ||
-    `Proposal ${id}`;
+  const sourceTitle = String(p.title ?? "") || (content?.title ? String(content.title) : "");
+  const title = sourceTitle || `Proposal ${id}`;
   const summary =
     String(p.description ?? "") || (content?.description ? String(content.description) : "") || "—";
 
   return {
     id,
     title,
+    titleMissing: !sourceTitle,
     summary,
     status: mapStatus(statusRaw),
     statusRaw,

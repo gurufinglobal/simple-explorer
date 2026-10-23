@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import { cosmosAddress, cosmosPubkey, cosmosSigningProfile } from "../helpers/cosmos-signing";
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '../helpers/render';
 import userEvent from '@testing-library/user-event';
 import { bech32 } from 'bech32';
 import { sha256 } from '@cosmjs/crypto';
@@ -144,7 +144,7 @@ async function open(action: GovernanceAction) {
     fireEvent.change(screen.getByLabelText(action === 'deposit' ? '수량 (표시 단위)' : '초기 예치 (표시 단위)'), { target: { value: '1.234567' } });
     await screen.findByText('표시 수량 1.234567 GXN → 전송 원본 1234567 agxn'); fireEvent.click(screen.getByRole('checkbox'));
   }
-  const trigger = screen.getByRole('button', { name: action === 'vote' ? 'Yes' : action === 'deposit' ? '예치 전송' : '제안 전송' }); trigger.focus(); fireEvent.click(trigger);
+  const trigger = screen.getByRole('button', { name: action === 'vote' ? "찬성" : action === 'deposit' ? '예치 전송' : '제안 전송' }); trigger.focus(); fireEvent.click(trigger);
   return screen.findByRole('dialog');
 }
 async function approve() { fireEvent.click(await screen.findByRole('button', { name: '확인하고 지갑 서명' })); }
@@ -171,14 +171,14 @@ describe.each(actions)('W07 %s real UI/service/signer guards/HTTP refresh', acti
       await waitFor(() => expect(http.mock.calls.some(([u]) => String(u).includes(`/proposals/${newId}`))).toBe(true));
     } else {
       await screen.findByText('Updated proposal');
-      if (action === 'vote') { await screen.findByText('내 투표: yes'); expect(screen.getByText(/실시간 집계:.*Yes: 900/)).toBeTruthy(); expect(await screen.findByText('VOTE_OPTION_YES')).toBeTruthy(); }
+      if (action === 'vote') { await screen.findByText('내 투표: yes'); expect(screen.getByText(/실시간 집계:.*찬성: 900/)).toBeTruthy(); expect(await screen.findByText('VOTE_OPTION_YES')).toBeTruthy(); }
       else { fireEvent.click(await screen.findByRole('tab', { name: '예치 내역' })); await screen.findByText(sender); }
     }
   });
   it.each(['button', 'escape'] as const)('cancel by %s restores focus and broadcasts zero times', async method => {
     const dialog = await open(action); if (method === 'button') fireEvent.click(within(dialog).getByRole('button', { name: '취소' })); else await userEvent.setup().keyboard('{Escape}');
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
-    expect(document.activeElement?.textContent).toContain(action === 'vote' ? 'Yes' : action === 'deposit' ? '예치 전송' : '제안 전송');
+    expect(document.activeElement?.textContent).toContain(action === 'vote' ? "찬성" : action === 'deposit' ? '예치 전송' : '제안 전송');
     expect(boundary.wallet).not.toHaveBeenCalled(); expect(boundary.broadcast).not.toHaveBeenCalled();
   });
   it('wallet rejection is cancellation with zero broadcasts', async () => {
@@ -187,7 +187,7 @@ describe.each(actions)('W07 %s real UI/service/signer guards/HTTP refresh', acti
   });
   it('nonzero chain code never shows success', async () => {
     txStatus = 12; boundary.broadcast.mockResolvedValue({ code: 12, transactionHash: hash, rawLog: 'chain failure' });
-    await open(action); await approve(); await screen.findByText('chain failure · code 12'); expect(screen.queryByText(/체인 포함 성공/)).toBeNull();
+    await open(action); await approve(); expect((await screen.findByText('원문 상세: chain failure')).parentElement?.textContent).toContain('code 12'); expect(screen.queryByText(/체인 포함 성공/)).toBeNull();
   });
   it('timeout is persisted and queried after remount without retransmission', async () => {
     boundary.broadcast.mockRejectedValue(new Error('Timeout')); await open(action); await approve();
@@ -310,7 +310,7 @@ describe('W07 events, refresh boundaries and concurrency', () => {
   });
   it('new detail link pins chain and cannot sign against a different active chain', async () => {
     boundary.id = newId; boundary.chain = 'a'; setActiveChainKeyCookie('b'); render(<GovernanceProposalPage />);
-    await screen.findByText(`제안 #${newId}`); expect(screen.getByText(/제안 링크 체인: a/)).toBeTruthy(); expect((screen.getByRole('button', { name: 'Yes' }) as HTMLButtonElement).disabled).toBe(true);
+    await screen.findByText(`제안 #${newId}`); expect(screen.getByText(/제안 링크 체인: a/)).toBeTruthy(); expect((screen.getByRole('button', { name: "찬성" }) as HTMLButtonElement).disabled).toBe(true);
     const urls = http.mock.calls.map(([u]) => String(u)); expect(urls.some(u => u.startsWith('https://a.test') && u.endsWith(`/proposals/${newId}`))).toBe(true); expect(boundary.broadcast).not.toHaveBeenCalled();
   });
   it('proposal list refresh updates the mounted list after inclusion', async () => {
@@ -341,7 +341,7 @@ describe('W07 events, refresh boundaries and concurrency', () => {
     const dialog = await open(change === 'input amount' ? 'proposal' : 'vote'); expect(dialog).toBeTruthy();
     if (change === 'input amount') fireEvent.change(screen.getByLabelText('초기 예치 (표시 단위)'), { target: { value: '2' } });
     else if (change === 'proposal target') { boundary.id = '12'; mounted.rerender(<GovernanceProposalPage />); }
-    else if (change === 'choice') { fireEvent.click(within(dialog).getByRole('button', { name: '취소' })); await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull()); fireEvent.click(screen.getByRole('button', { name: /^No$/ })); const next = await screen.findByRole('dialog'); expect(next.textContent).toContain('투표 선택: no'); }
+    else if (change === 'choice') { fireEvent.click(within(dialog).getByRole('button', { name: '취소' })); await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull()); fireEvent.click(screen.getByRole('button', { name: /^반대$/ })); const next = await screen.findByRole('dialog'); expect(next.textContent).toContain('투표 선택: no'); }
     else act(() => store.getState().disconnect());
     if (change !== 'choice') await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull()); expect(boundary.broadcast).not.toHaveBeenCalled();
   });

@@ -12,23 +12,12 @@ export function formatGovRatioPercent(raw: string): string {
 /**
  * Best-effort label for x/gov voting_period / max_deposit_period (e.g. "120h", "432000s").
  */
-export function formatGovDurationLabel(raw: string): string {
-  const s = raw.trim();
-  const secMatch = /^(\d+)s$/.exec(s);
-  if (secMatch) {
-    const sec = Number(secMatch[1]);
-    if (!Number.isNaN(sec)) {
-      if (sec >= 86400) {
-        return `${(sec / 86400).toFixed(1)}일 (${raw})`;
-      }
-      if (sec >= 3600) {
-        return `${(sec / 3600).toFixed(1)}시간 (${raw})`;
-      }
-      if (sec >= 60) {
-        return `${(sec / 60).toFixed(0)}분 (${raw})`;
-      }
-      return `${sec}초 (${raw})`;
-    }
-  }
-  return raw;
+export function formatGovDurationLabel(raw: string, locale = "ko"): string {
+  const match = /^(\d+)s$/.exec(raw.trim());
+  if (!match) return raw;
+  const seconds = Number(match[1]);
+  if (!Number.isFinite(seconds)) return raw;
+  const [unit, divisor, digits]: [string, number, number] = seconds >= 86400 ? ['day', 86400, 1]
+    : seconds >= 3600 ? ['hour', 3600, 1] : seconds >= 60 ? ['minute', 60, 0] : ['second', 1, 0];
+  return `${new Intl.NumberFormat(locale, { style: 'unit', unit, unitDisplay: 'long', minimumFractionDigits: digits, maximumFractionDigits: digits }).format(seconds / divisor)} (${raw})`;
 }

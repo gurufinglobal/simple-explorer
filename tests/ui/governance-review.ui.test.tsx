@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 import React from 'react';
 import { afterEach, expect, it } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '../helpers/render';
 import { PathParamsContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import GovernancePage from '@/app/(explorer)/governance/page';
 import GovernanceProposalPage from '@/app/(explorer)/governance/[proposalId]/page';
@@ -84,5 +84,5 @@ it.each(['success', 'failure'] as const)('keeps Dashboard proposals unqueried du
   expect(screen.getByText(message)).toBeTruthy();
   expect(screen.queryByText('No active proposals — open Governance for the full list.')).toBeNull();
   expect(http.mock.calls.some(([url]) => String(url).includes('/proposals'))).toBe(false);
-  expect(screen.getByRole('link', { name: 'Governance' }).getAttribute('href')).toBe('/governance?chain=fixture');
+  expect(screen.getByRole('link', { name: "거버넌스" }).getAttribute('href')).toBe('/governance?chain=fixture');
 });

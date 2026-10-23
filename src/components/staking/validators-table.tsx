@@ -1,4 +1,6 @@
 "use client";
+import { useTranslations } from "next-intl";
+
 import Link from "@/components/layout/chain-link";
 
 import { CoinAmount } from "@/components/amount/coin-amount";
@@ -55,8 +57,9 @@ function formatVotingPowerShare(votingPower: string, totalVotingPower: bigint): 
 }
 
 export function ValidatorsTable({ validators }: ValidatorsTableProps) {
+  const t = useTranslations("staking");
   if (validators.length === 0) {
-    return <Typography variant="body2">조회한 범위에 검증자가 없습니다.</Typography>;
+    return <Typography variant="body2">{t("no_validators_in_the_queried_range")}</Typography>;
   }
 
   const comparable = validators.every(v => parseUnsignedBigInt(v.votingPower) !== null && v.bondDenom && v.bondDenom === validators[0].bondDenom);
@@ -71,16 +74,16 @@ export function ValidatorsTable({ validators }: ValidatorsTableProps) {
   return (
     <Card variant="outlined">
       <CardContent>
-        <Typography variant="body2">비율은 현재 조회 목록 내 비중입니다. 체인 전체 비중이 아니며 이어보기 시 분모가 늘어납니다.</Typography>
-        <TableContainer role="region" aria-label="검증자 목록 가로 스크롤" tabIndex={0}>
+        <Typography variant="body2">{t("ratios_are_shares_within_the_current_list_not_the")}</Typography>
+        <TableContainer role="region" aria-label={t("scroll_validators_horizontally")} tabIndex={0}>
           <Table size="small" sx={{ minWidth: 720 }}>
             <TableHead>
               <TableRow>
-                <TableCell>Moniker</TableCell>
-                <TableCell>Operator</TableCell>
-                <TableCell align="right">Voting Power</TableCell>
-                <TableCell align="right">Commission</TableCell>
-                <TableCell align="center">Status</TableCell>
+                <TableCell>{t("moniker_2")}</TableCell>
+                <TableCell>{t("operator")}</TableCell>
+                <TableCell align="right">{t("voting_power_2")}</TableCell>
+                <TableCell align="right">{t("commission")}</TableCell>
+                <TableCell align="center">{t("status_2")}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -93,14 +96,14 @@ export function ValidatorsTable({ validators }: ValidatorsTableProps) {
                   </TableCell>
                   <TableCell>{validator.operatorAddress}</TableCell>
                   <TableCell align="right">
-                    <CoinAmount coin={{ amount: validator.votingPower, denom: validator.bondDenom ?? "bond denom 미확인" }} metadata={validator.metadata} /> (
-                    {comparable && totalVotingPower > BigInt(0) ? formatVotingPowerShare(validator.votingPower, totalVotingPower) : "비중 미확인"})
+                    <CoinAmount coin={{ amount: validator.votingPower, denom: validator.bondDenom ?? t("bond_denom_unknown") }} metadata={validator.metadata} /> (
+                    {comparable && totalVotingPower > BigInt(0) ? formatVotingPowerShare(validator.votingPower, totalVotingPower) : t("share_unknown")})
                   </TableCell>
                   <TableCell align="right">{formatCommissionPercent(validator.commission)}</TableCell>
                   <TableCell align="center">
                     <Chip
                       size="small"
-                      label={validator.jailed ? "Jailed" : "Active"}
+                      label={validator.jailed ? t("jailed") : t("active")}
                       color={validator.jailed ? "warning" : "success"}
                     />
                   </TableCell>

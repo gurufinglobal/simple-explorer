@@ -1,4 +1,6 @@
 "use client";
+import { ServiceError } from '@/i18n/service-message';
+
 import { type GasPrice } from "@cosmjs/stargate";
 import { connectSigningClient } from "./connect-signing-client";
 import type { StdFee } from "@cosmjs/amino";
@@ -31,15 +33,15 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
     const now = store.getState();
     if (now.generation !== state.generation || now.status !== "connected" || getActiveChainConfig().key !== chain.key ||
       now.bech32Address !== params.bech32Address || now.walletType !== params.walletType || now.sessionTopic !== params.sessionTopic) {
-      throw new Error("체인·지갑·계정이 변경되었습니다. 다시 연결하고 거래를 확인하세요.");
+      throw new ServiceError("chain_wallet_or_account_changed_reconnect_and_review_the_transaction");
     }
   };
   assertCurrent();
   const reason = writeBlockReason(chain, state);
   if (reason) throw new Error(reason);
-  if (gasPrice.denom !== chain.feeDenom) throw new Error("수수료 denom이 검증된 체인 설정과 다릅니다.");
+  if (gasPrice.denom !== chain.feeDenom) throw new ServiceError("fee_denom_differs_from_the_verified_chain_configuration");
   const address = state.bech32Address!;
-  if (bech32.decode(address).prefix !== chain.bech32Prefix) throw new Error("계정 prefix가 선택 체인과 다릅니다.");
+  if (bech32.decode(address).prefix !== chain.bech32Prefix) throw new ServiceError("account_prefix_differs_from_the_selected_chain");
   await verifyChainEndpoints(chain);
   assertCurrent();
   let signer: OfflineSigner;
@@ -48,7 +50,7 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
   } else {
     const session = await getActiveWalletConnectSession(state.sessionTopic!);
     assertCurrent();
-    if (!session) throw new Error("WalletConnect 세션이 없습니다. 다시 연결하세요.");
+    if (!session) throw new ServiceError("walletconnect_session_missing_reconnect");
     assertWalletConnectApproval(session, chain, address);
     signer = createWalletConnectOfflineSigner({ topic: state.sessionTopic!, chainId: chain.chainId!, signerAddress: address, pubkey: state.pubkey!, assertCurrent });
   }
@@ -58,23 +60,23 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
     assertCurrent();
     const account = accounts.find(a => a.address === address);
     if (!account || !account.pubkey?.length || !state.pubkey || account.pubkey.length !== state.pubkey.length || account.pubkey.some((v, i) => v !== state.pubkey![i])) {
-      throw new Error("실제 signer 계정·공개키가 연결 계정과 다릅니다. 다시 연결하세요.");
+      throw new ServiceError("actual_signer_account_or_public_key_differs_from_the_connected");
     }
     assertCosmosWalletKey(chain, account.address, account.pubkey, account.algo);
     return accounts;
   };
   await getAccounts();
   const signingMethod = isOfflineDirectSigner(signer) ? "direct" : "amino";
-  if (!chain.signingProfile!.signModes.includes(signingMethod)) throw new Error("체인 프로필이 실제 signer 방식을 허용하지 않습니다.");
-  if (!chain.signing?.some(s => s.wallet === state.walletType && s.method === signingMethod)) throw new Error("실제 signer 방식이 검증된 서명 방식과 다릅니다.");
-  if (guard?.allowedSigning && !guard.allowedSigning.some(s => s.wallet === state.walletType && s.method === signingMethod)) throw new Error("이 메시지의 실제 지갑 서명 방식은 검증되지 않았습니다.");
+  if (!chain.signingProfile!.signModes.includes(signingMethod)) throw new ServiceError("the_chain_profile_does_not_permit_the_actual_signing_method");
+  if (!chain.signing?.some(s => s.wallet === state.walletType && s.method === signingMethod)) throw new ServiceError("actual_signing_method_differs_from_the_verified_method");
+  if (guard?.allowedSigning && !guard.allowedSigning.some(s => s.wallet === state.walletType && s.method === signingMethod)) throw new ServiceError("actual_wallet_signing_method_for_this_message_is_unverified");
   const guarded: OfflineSigner = isOfflineDirectSigner(signer) ? {
     getAccounts,
     signDirect: async (who, doc) => {
       await getAccounts();
       await guard?.beforeSign?.();
       assertCurrent();
-      if (who !== address || doc.chainId !== chain.chainId) throw new Error("서명 대상 체인·계정 불일치");
+      if (who !== address || doc.chainId !== chain.chainId) throw new ServiceError("signing_chain_or_account_mismatch");
       const bodyBeforeSigning = doc.bodyBytes.slice();
       const accountBeforeSigning = doc.accountNumber;
       const signerInfoBytes = (bytes: Uint8Array) => AuthInfo.encode(AuthInfo.fromPartial({ signerInfos: AuthInfo.decode(bytes).signerInfos })).finish();
@@ -83,12 +85,12 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
       assertCurrent();
       if (signersBeforeSigning) {
         const signersAfterSigning = signerInfoBytes(response.signed.authInfoBytes);
-        if (signersBeforeSigning.length !== signersAfterSigning.length || signersBeforeSigning.some((b, i) => b !== signersAfterSigning[i])) throw new Error("지갑이 확인한 signer·sequence를 변경했습니다.");
+        if (signersBeforeSigning.length !== signersAfterSigning.length || signersBeforeSigning.some((b, i) => b !== signersAfterSigning[i])) throw new ServiceError("wallet_changed_the_reviewed_signer_or_sequence");
       }
-      if (guard && response.signed.accountNumber !== accountBeforeSigning) throw new Error("지갑이 확인한 서명 계정 번호를 변경했습니다.");
-      if (response.signed.chainId !== chain.chainId) throw new Error("반환된 서명의 체인이 다릅니다.");
+      if (guard && response.signed.accountNumber !== accountBeforeSigning) throw new ServiceError("wallet_changed_the_reviewed_signing_account_number");
+      if (response.signed.chainId !== chain.chainId) throw new ServiceError("returned_signature_chain_differs");
       if (guard && (response.signed.bodyBytes.length !== bodyBeforeSigning.length || response.signed.bodyBytes.some((byte, i) => byte !== bodyBeforeSigning[i]))) {
-        throw new Error("지갑이 확인한 거래 본문을 변경했습니다. 다시 확인하세요.");
+        throw new ServiceError("wallet_changed_the_reviewed_transaction_body_review_again");
       }
       return response;
     },
@@ -98,17 +100,17 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
       await getAccounts();
       await guard?.beforeSign?.();
       assertCurrent();
-      if (who !== address || doc.chain_id !== chain.chainId) throw new Error("서명 대상 체인·계정 불일치");
+      if (who !== address || doc.chain_id !== chain.chainId) throw new ServiceError("signing_chain_or_account_mismatch");
       const messagesBeforeSigning = JSON.stringify(doc.msgs);
       const memoBeforeSigning = doc.memo;
       const accountBeforeSigning = doc.account_number;
       const sequenceBeforeSigning = doc.sequence;
       const response = await signer.signAmino(who, doc);
       assertCurrent();
-      if (guard && (response.signed.account_number !== accountBeforeSigning || response.signed.sequence !== sequenceBeforeSigning)) throw new Error("지갑이 확인한 서명 계정 번호·sequence를 변경했습니다.");
-      if (response.signed.chain_id !== chain.chainId) throw new Error("반환된 서명의 체인이 다릅니다.");
+      if (guard && (response.signed.account_number !== accountBeforeSigning || response.signed.sequence !== sequenceBeforeSigning)) throw new ServiceError("wallet_changed_the_reviewed_signing_account_number_or_sequence");
+      if (response.signed.chain_id !== chain.chainId) throw new ServiceError("returned_signature_chain_differs");
       if (guard && (JSON.stringify(response.signed.msgs) !== messagesBeforeSigning || response.signed.memo !== memoBeforeSigning)) {
-        throw new Error("지갑이 확인한 거래 본문을 변경했습니다. 다시 확인하세요.");
+        throw new ServiceError("wallet_changed_the_reviewed_transaction_body_review_again");
       }
       return response;
     },
@@ -123,7 +125,7 @@ export async function createBoundSigningClient(params: SigningInput, gasPrice: G
         });
         try {
           assertCurrent();
-          if (who !== address) throw new Error("거래 계정 불일치");
+          if (who !== address) throw new ServiceError("transaction_account_mismatch");
           // Separate signing from broadcast to invalidate a pending wallet prompt on account/chain change.
           const signed = await client.sign(who, messages, fee, "");
           assertCurrent();

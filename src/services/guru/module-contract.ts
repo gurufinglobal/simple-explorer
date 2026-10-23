@@ -1,6 +1,9 @@
+
+import { serviceText } from '@/i18n/service-message';
 import { PartialQueryError, QueryError, schemaError } from '@/lib/query-result';
 
-export const UNKNOWN_FIELD = '미확인';
+/** A locale-neutral missing-value marker; actual response strings remain untouched. */
+export const UNKNOWN_FIELD = "—";
 export function record(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value);
 }
@@ -8,23 +11,23 @@ export function rawText(value: unknown): string {
   if (value === undefined || value === null) return UNKNOWN_FIELD;
   if (typeof value === 'string') return value;
   if (typeof value === 'number' && Number.isSafeInteger(value)) return String(value);
-  return schemaError('필드 원문을 안전하게 표시할 수 없습니다.');
+  return schemaError(serviceText("cannot_safely_display_the_raw_field"));
 }
 export function requiredText(value: unknown): string {
   const text = rawText(value);
-  if (text === UNKNOWN_FIELD || !text.trim()) schemaError('필수 식별자/필드가 없습니다.');
+  if (text === UNKNOWN_FIELD || !text.trim()) schemaError(serviceText("required_identifier_or_field_missing"));
   return text;
 }
 /** Retain valid rows, never disguise a malformed response as a successful empty list. */
 export function moduleRows<T, R>(value: T[] | undefined, map: (row: T) => R): R[] {
-  if (!Array.isArray(value)) schemaError('모듈 목록 응답이 올바르지 않습니다.');
+  if (!Array.isArray(value)) schemaError(serviceText("invalid_module_list_response"));
   const rows: R[] = [];
   let invalid = 0;
   for (const row of value) {
     try { if (!record(row)) schemaError(); rows.push(map(row)); } catch { invalid++; }
   }
   if (invalid) {
-    const message = `모듈 응답 ${invalid}개 항목의 형식이 올바르지 않습니다. 현재 결과는 일부입니다.`;
+    const message = serviceText("invalid_format_in_module_response_entries_results_are_partial", { value0: String(invalid) });
     if (!rows.length) schemaError(message);
     throw new PartialQueryError(rows, { kind: 'schema', message });
   }

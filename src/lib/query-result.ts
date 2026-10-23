@@ -1,9 +1,15 @@
+import { describeServiceMessage, type ServiceCode, type MessageParams } from "@/i18n/service-message";
+
+import { serviceMessage, serviceText } from '@/i18n/service-message';
 /** Serializable read contract shared by services and client views. */
 export type QueryContext = { chain: string; target: string };
 export type QueryStatus = 'idle' | 'loading' | 'success' | 'empty' | 'not-found' | 'partial' | 'stale' | 'error' | 'unsupported' | 'cancelled';
 export type QueryErrorInfo = {
+  messageCode?: ServiceCode;
+  messageParams?: MessageParams;
   kind: 'http' | 'timeout' | 'network' | 'parse' | 'schema' | 'unsupported' | 'cancelled' | 'not-found' | 'incomplete';
   message: string;
+  detail?: string;
   status?: number;
   retryAt?: number;
   endpoint?: string;
@@ -20,7 +26,7 @@ export type QueryResult<T> = {
   blockHeight?: string;
 };
 export class QueryError extends Error {
-  constructor(public readonly info: QueryErrorInfo) { super(info.message); this.name = 'QueryError'; }
+  constructor(public readonly info: QueryErrorInfo) { super(info.message); this.info = { ...info, ...(describeServiceMessage(info) ?? describeServiceMessage(info.message) ?? {}) }; this.name = 'QueryError'; }
 }
 /** A service may preserve successful fields/pages while reporting failed siblings. */
 export class PartialQueryError<T> extends QueryError {
@@ -28,13 +34,15 @@ export class PartialQueryError<T> extends QueryError {
 }
 export function queryError(error: unknown): QueryErrorInfo {
   if (error instanceof QueryError) return error.info;
+  const known = describeServiceMessage(error);
+  if (known) return { kind: "network", ...known };
   const name = error && typeof error === 'object' && 'name' in error ? error.name : undefined;
-  if (name === 'AbortError') return { kind: 'cancelled', message: '조회가 취소되었습니다.' };
-  if (name === 'TimeoutError') return { kind: 'timeout', message: '조회 제한 시간(10초)을 초과했습니다.' };
-  if (name === 'SyntaxError') return { kind: 'parse', message: 'JSON 응답을 읽을 수 없습니다.' };
-  return { kind: 'network', message: '네트워크 조회에 실패했습니다.' };
+  if (name === 'AbortError') return { kind: 'cancelled', ...serviceMessage("query_cancelled") };
+  if (name === 'TimeoutError') return { kind: 'timeout', ...serviceMessage("query_exceeded_the_10_second_timeout") };
+  if (name === 'SyntaxError') return { kind: 'parse', ...serviceMessage("could_not_read_the_json_response") };
+  return { kind: 'network', ...serviceMessage("network_query_failed"), ...(error instanceof Error ? { detail: error.message } : {}) };
 }
-export function schemaError(message = '응답 형식이 올바르지 않습니다.'): never {
+export function schemaError(message = serviceText("invalid_response_format")): never {
   throw new QueryError({ kind: 'schema', message });
 }
 export function initialResult<T>(context: QueryContext): QueryResult<T> {

@@ -1,4 +1,6 @@
 "use client";
+import { useTranslations } from "next-intl";
+
 import { ModuleTable, moduleTextCellSx } from "@/components/query/module-table";
 import { withChain } from "@/lib/chain-selection";
 
@@ -33,6 +35,7 @@ function countDiscountItems(item: FeePolicyAccountDiscount): number {
 }
 
 export function FeePolicyList() {
+  const t = useTranslations("modules");
   const query = useQuery("feepolicy-discounts", client => listFeePolicyDiscounts(client));
   const moderator = useQuery("feepolicy-moderator", client => getFeePolicyModeratorAddress(client));
   const items = useMemo(() => query.result.data ?? [], [query.result.data]);
@@ -50,21 +53,18 @@ export function FeePolicyList() {
   return (
     <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
       <Typography variant="h5" fontWeight={700}>
-        FeePolicy Discounts
-      </Typography>
+         {t("feepolicy_discounts")} </Typography>
       <Typography variant="body2" color="text.secondary">
-        할인 유형·amount는 원문입니다. percent와 percentage를 같은 단위로 환산하지 않습니다. 적용 범위·단위·우선순위는 미확인입니다.
-      </Typography>
+         {t("discount_types_and_amounts_are_raw_values_percent_and")} </Typography>
 
-      <Typography variant="body2">할인 유형·amount는 원문입니다. 적용 범위·단위·우선순위는 미확인입니다. ALL은 빈 address 원문의 표시명이며 전체 계정 적용을 확정하지 않습니다.</Typography>
-      <QueryInfo queries={[{ ...query, label: "할인 정책" }, { ...moderator, label: "관리자" }]} />
+      <Typography variant="body2">{t("discount_types_and_amounts_are_raw_values_scope_units")}</Typography>
+      <QueryInfo queries={[{ ...query, label: t("discount_policy") }, { ...moderator, label: t("administrator") }]} />
 
       {!loading && supported ? (
         <Card variant="outlined">
           <CardContent>
             <Typography variant="subtitle2" color="text.secondary">
-              Moderator Address
-            </Typography>
+               {t("moderator_address")} </Typography>
             <Typography sx={{ mt: 0.5, fontFamily: "monospace", wordBreak: "break-all" }}>
               {moderatorAddress ?? "-"}
             </Typography>
@@ -85,9 +85,9 @@ export function FeePolicyList() {
             <ModuleTable>
               <TableHead>
                 <TableRow>
-                  <TableCell>Address</TableCell>
-                  <TableCell align="right">Modules</TableCell>
-                  <TableCell align="right">Discount Items</TableCell>
+                  <TableCell>{t("address")}</TableCell>
+                  <TableCell align="right">{t("modules")}</TableCell>
+                  <TableCell align="right">{t("discount_items")}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -103,16 +103,16 @@ export function FeePolicyList() {
           </CardContent>
         </Card>
       ) : !supported ? null : items.length === 0 ? (
-        <Typography variant="body2">표시할 FeePolicy discount가 없습니다.</Typography>
+        <Typography variant="body2">{t("no_feepolicy_discounts_to_display")}</Typography>
       ) : (
         <Card variant="outlined">
           <CardContent>
             <ModuleTable>
               <TableHead>
                 <TableRow>
-                  <TableCell>Address</TableCell>
-                  <TableCell align="right">Modules</TableCell>
-                  <TableCell align="right">Discount Items</TableCell>
+                  <TableCell>{t("address")}</TableCell>
+                  <TableCell align="right">{t("modules")}</TableCell>
+                  <TableCell align="right">{t("discount_items")}</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>

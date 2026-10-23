@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { TestIntlProvider, act, cleanup, fireEvent, render, screen } from '../helpers/render';
 import { useQuery } from '@/hooks/use-query';
 import { QueryStatus } from '@/components/query/query-status';
 import { BlocksLiveList } from '@/components/explorer/blocks-live-list';
@@ -218,7 +218,7 @@ it('non-poll queries retain the last result when disabled/re-enabled and still r
 it('server-rendered polling markup does not claim success before effects run', async () => {
   mockQueryHttp(() => block('1'));
   const { renderToString } = await import('react-dom/server');
-  const markup = renderToString(<BlocksLiveList />);
+  const markup = renderToString(<TestIntlProvider><BlocksLiveList /></TestIntlProvider>);
   expect(markup).toContain('불러오는 중');
   expect(markup).not.toContain('조회 완료');
 });

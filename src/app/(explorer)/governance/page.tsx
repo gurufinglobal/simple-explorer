@@ -1,4 +1,6 @@
 "use client";
+import { useTranslations } from "next-intl";
+
 
 import { useState } from "react";
 import type { NormalizedProposal } from "@/lib/gov-types";
@@ -13,6 +15,7 @@ import { listProposalsPage } from "@/services/guru/governance-query.service";
 
 const EMPTY: NormalizedProposal[] = [];
 export default function GovernancePage() {
+  const t = useTranslations("governance");
   const [criteria, setCriteria] = useState<{ filter: FilterKey; sort: SortKey }>({ filter: "all", sort: "newest" });
   const query = usePagedQuery("governance", (client, cursor) => listProposalsPage(100, client, cursor), row => row.id, undefined, `${criteria.filter}:${criteria.sort}`);
 
@@ -20,11 +23,9 @@ export default function GovernancePage() {
     <Stack spacing={2}>
       <Stack direction="row" justifyContent="space-between" alignItems="center" flexWrap="wrap" gap={1}>
         <Typography variant="h5" fontWeight={700}>
-          Governance
-        </Typography>
+           {t("governance")} </Typography>
         <Button component={Link} href="/governance/new" variant="contained" size="small">
-          새 제안
-        </Button>
+           {t("new_proposal")} </Button>
       </Stack>
 
       <QueryStatus {...query} />

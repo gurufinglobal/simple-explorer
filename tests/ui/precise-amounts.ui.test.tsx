@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '../helpers/render';
 import { PathParamsContext } from 'next/dist/shared/lib/hooks-client-context.shared-runtime';
 import AddressDetailPage from '@/app/(explorer)/address/[address]/page';
 import { TokensMetadataList } from '@/components/tokens/tokens-metadata-list';
@@ -29,8 +29,8 @@ describe('AC02 amount details through the real service and DOM', () => {
     expect(await screen.findByText('9007199254740993 unknown (정밀도 미확인)')).toBeTruthy();
     await screen.findByText(/합계 조회 기준 높이: 42/);
     expect(screen.getByText(/현재 unbonding 기간: 86400s/)).toBeTruthy();
-    expect(screen.getByText(/2020-01-01T00:00:00Z/)).toBeTruthy();
-    expect(screen.getByText(/2030-01-01T00:00:00Z/)).toBeTruthy();
+    expect(screen.getByTitle("2020-01-01T00:00:00Z")).toBeTruthy();
+    expect(screen.getByTitle("2030-01-01T00:00:00Z")).toBeTruthy();
     for (const button of screen.getAllByRole('button', { name: '원본 금액' })) fireEvent.click(button);
     expect(screen.getByText('123.450000 agxn')).toBeTruthy();
     expect(screen.getByText(/소수 최소 단위 보상: 전송 정수와 다릅니다/)).toBeTruthy();

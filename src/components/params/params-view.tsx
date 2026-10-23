@@ -1,4 +1,8 @@
 "use client";
+import { ServiceErrorText } from "@/components/query/service-error-text";
+
+import { useTranslations } from "next-intl";
+
 
 import { useQuery } from "@/hooks/use-query";
 import { QueryInfo } from "@/components/query/query-info";
@@ -17,6 +21,8 @@ import {
 import { getChainParamsSections } from "@/services/cosmos/params.service";
 
 export function ParamsView() {
+  const t = useTranslations("modules");
+  const titles: Record<string, string> = { "auth": t("parameterSections.auth"), "bank": t("parameterSections.bank"), "staking": t("parameterSections.staking"), "slashing": t("parameterSections.slashing"), "distribution": t("parameterSections.distribution"), "mint": t("parameterSections.mint"), "gov-voting": t("parameterSections.gov-voting"), "gov-tallying": t("parameterSections.gov-tallying"), "gov-deposit": t("parameterSections.gov-deposit"), "crisis": t("parameterSections.crisis"), "ibc-transfer": t("parameterSections.ibc-transfer"), "oracle": t("parameterSections.oracle"), "feepolicy": t("parameterSections.feepolicy"), "bex": t("parameterSections.bex"), "feemarket": t("parameterSections.feemarket") };
   const query = useQuery("params", client => getChainParamsSections(client));
   const rows = query.result.data ?? [];
   const loading = query.busy && !query.result.data;
@@ -25,17 +31,15 @@ export function ParamsView() {
     <Stack spacing={2}>
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Typography variant="h5" fontWeight={700}>
-          Params
-        </Typography>
+           {t("parameters")} </Typography>
 
       </Stack>
 
       <Typography variant="body2" color="text.secondary">
-        현재 선택한 체인의 주요 모듈 파라미터를 LCD에서 조회합니다.
-      </Typography>
+         {t("query_the_selected_chain_s_main_module_parameters_from")} </Typography>
 
-      <QueryInfo label="Params 조회 정보" queries={[{ ...query, label: "Params" }]}
-        notices={rows.filter(row => row.error).map(row => `${row.title}: ${row.error?.status ? `HTTP ${row.error.status}` : row.error?.kind}`)} />
+      <QueryInfo label={t("parameter_query_information")} queries={[{ ...query, label: t("parameters") }]}
+        notices={rows.filter(row => row.error).map(row => `${titles[row.key] ?? row.title}: ${row.error?.status ? `HTTP ${row.error.status}` : row.error?.kind}`)} />
 
       {loading ? (
         <Grid container spacing={2}>
@@ -59,21 +63,21 @@ export function ParamsView() {
                   <Stack spacing={1}>
                     <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1} flexWrap="wrap">
                       <Typography variant="subtitle1" fontWeight={700}>
-                        {row.title}
+                        {titles[row.key] ?? row.title}
                       </Typography>
                       <Chip
-                        label={row.status === "ok" ? "OK" : "Unavailable"}
+                        label={row.status === "ok" ? t("ok") : t("unavailable")}
                         color={row.status === "ok" ? "success" : "warning"}
                         size="small"
                       />
                     </Stack>
                     {row.sourcePath ? (
                       <Typography variant="caption" color="text.secondary">
-                        Source: {row.sourcePath}
+                         {t("source")} {row.sourcePath}
                       </Typography>
                     ) : null}
                     {row.error ? (
-                      <Alert severity="warning">{row.error.message} ({row.error.kind})</Alert>
+                      <Alert severity="warning">{<ServiceErrorText error={row.error} />} ({row.error.kind})</Alert>
                     ) : (
                       <Box
                         component="pre"

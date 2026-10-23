@@ -1,3 +1,4 @@
+import { ServiceError } from "@/i18n/service-message";
 import { moduleDetail, moduleRows, rawText, requiredText, record } from "./module-contract";
 import { PartialQueryError, QueryError, combinedError } from "@/lib/query-result";
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
@@ -66,7 +67,7 @@ type BexCoinsResponse = {
 };
 
 function normalizeExchange(raw: BexExchangeRaw): BexExchange {
-  if (!record(raw)) throw new Error("Invalid exchange");
+  if (!record(raw)) throw new ServiceError("invalid_exchange");
   return {
     id: requiredText(raw.id),
     adminAddress: rawText(raw.admin_address),

@@ -1,3 +1,5 @@
+
+import { serviceText, ServiceError } from '@/i18n/service-message';
 import { keccak256, ripemd160, Secp256k1, sha256 } from "@cosmjs/crypto";
 import { accountFromAny, type AccountParser } from "@cosmjs/stargate";
 import { BaseAccount } from "cosmjs-types/cosmos/auth/v1beta1/auth";
@@ -23,14 +25,14 @@ export function isGuruReleaseProfile(chain: ChainConfig): boolean {
 /** An observed EVM key is never relabelled as Cosmos secp256k1. */
 export function signingProfileBlockReason(chain: ChainConfig): string | null {
   const profile = chain.signingProfile;
-  if (!profile) return "체인의 계정·공개키·서명 프로필이 확인되지 않았습니다. 조회만 가능합니다.";
+  if (!profile) return serviceText("chain_account_public_key_or_signing_profile_is_unverified_read");
   if (isGuruReleaseProfile(chain)) return null;
   // W01 observed a custom Guru key on this chain, irrespective of a user-supplied label.
   if (chain.chainId === "guru_631-1" || profile.family !== "cosmos") {
-    return "이 EVM 체인의 공개키 codec·서명 호환성이 검증되지 않았습니다. 조회만 가능합니다.";
+    return serviceText("public_key_codec_and_signing_compatibility_for_this_evm_chain");
   }
   if (profile.accountTypeUrl !== COSMOS_ACCOUNT || profile.pubkeyTypeUrl !== COSMOS_PUBKEY || profile.addressAlgorithm !== "cosmos") {
-    return "이 계정·공개키 codec은 지원하지 않습니다. 조회만 가능합니다.";
+    return serviceText("this_account_or_public_key_codec_is_unsupported_read_only");
   }
   return null;
 }
@@ -43,40 +45,40 @@ export function assertSigningProfile(chain: ChainConfig): void {
 export function assertCosmosWalletKey(chain: ChainConfig, address: string, pubkey: Uint8Array, algo: string): void {
   assertSigningProfile(chain);
   if (algo !== "secp256k1" || pubkey.length !== 33 || (pubkey[0] !== 2 && pubkey[0] !== 3)) {
-    throw new Error("지갑 공개키 알고리즘·길이가 체인 서명 프로필과 다릅니다.");
+    throw new ServiceError("wallet_public_key_algorithm_or_length_differs_from_the_chain");
   }
   // Validate the curve point as well as its encoding before address derivation.
   Secp256k1.uncompressPubkey(pubkey);
   const bytes = isGuruReleaseProfile(chain) ? keccak256(Secp256k1.uncompressPubkey(pubkey).slice(1)).slice(-20) : ripemd160(sha256(pubkey));
   const derived = bech32.encode(chain.bech32Prefix!, bech32.toWords(bytes));
-  if (derived !== address) throw new Error("지갑 공개키에서 도출한 주소가 연결 계정과 다릅니다.");
+  if (derived !== address) throw new ServiceError("address_derived_from_the_wallet_public_key_differs_from_the");
 }
 
 /** Keeps CosmJS's uint64 bounds and rejects unapproved account/key wrappers. Null keys are valid. */
 export function signingAccountParser(chain: ChainConfig, expected?: { address: string; pubkey: Uint8Array }): AccountParser {
   assertSigningProfile(chain);
   return account => {
-    if (account.typeUrl !== chain.signingProfile!.accountTypeUrl) throw new Error("체인 계정 타입이 서명 프로필과 다릅니다.");
+    if (account.typeUrl !== chain.signingProfile!.accountTypeUrl) throw new ServiceError("chain_account_type_differs_from_the_signing_profile");
     if (isGuruReleaseProfile(chain)) {
       const base = BaseAccount.decode(account.value);
-      if (base.pubKey && base.pubKey.typeUrl !== GURU_RELEASE_PUBKEY) throw new Error("체인 공개키 타입이 릴리스 서명 프로필과 다릅니다.");
+      if (base.pubKey && base.pubKey.typeUrl !== GURU_RELEASE_PUBKEY) throw new ServiceError("chain_public_key_type_differs_from_the_release_signing_profile");
       const key = base.pubKey ? PubKey.decode(base.pubKey.value).key : null;
       if (key) assertCosmosWalletKey(chain, base.address, key, "secp256k1");
       if (expected && (base.address !== expected.address || (key &&
         (key.length !== expected.pubkey.length || key.some((b, i) => b !== expected.pubkey[i]))))) {
-        throw new Error("체인 계정·공개키가 지갑 계정과 다릅니다.");
+        throw new ServiceError("chain_account_or_public_key_differs_from_the_wallet_account");
       }
       if (base.accountNumber > BigInt(Number.MAX_SAFE_INTEGER) || base.sequence > BigInt(Number.MAX_SAFE_INTEGER)) {
-        throw new Error("계정 번호·sequence가 안전 정수 범위를 초과했습니다.");
+        throw new ServiceError("account_number_or_sequence_exceeds_the_safe_integer_range");
       }
       return { address: base.address, accountNumber: Number(base.accountNumber), sequence: Number(base.sequence),
         pubkey: key ? { type: "os/PubKeyEthSecp256k1", value: btoa(String.fromCharCode(...key)) } : null };
     }
     const parsed = accountFromAny(account);
-    if (parsed.pubkey && parsed.pubkey.type !== "tendermint/PubKeySecp256k1") throw new Error("체인 공개키 타입이 서명 프로필과 다릅니다.");
+    if (parsed.pubkey && parsed.pubkey.type !== "tendermint/PubKeySecp256k1") throw new ServiceError("chain_public_key_type_differs_from_the_signing_profile");
     if (expected && (parsed.address !== expected.address || (parsed.pubkey &&
       parsed.pubkey.value !== btoa(String.fromCharCode(...expected.pubkey))))) {
-      throw new Error("체인 계정·공개키가 지갑 계정과 다릅니다.");
+      throw new ServiceError("chain_account_or_public_key_differs_from_the_wallet_account");
     }
     return parsed;
   };
