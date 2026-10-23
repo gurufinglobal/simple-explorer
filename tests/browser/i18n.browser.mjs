@@ -53,6 +53,14 @@ async function measure(page, name, width, locale) {
   cases.push({ name, width, locale, ...dimensions, url: page.url() });
 }
 async function language(page, locale) {
+  const menuButton = page.getByRole('button', { name: /^(Language|언어)$/ });
+  if (await menuButton.count()) {
+    await menuButton.click();
+    await page.getByRole('menuitemradio', { name: locale === 'en' ? 'English' : '한국어' }).click();
+    await page.waitForFunction(locale => document.documentElement.lang === locale, locale);
+    await page.waitForLoadState('networkidle');
+    return;
+  }
   const selector = page.getByRole('combobox', { name: /^(Language|언어)$/ });
   await selector.focus(); await page.keyboard.press('ArrowDown');
   await page.getByRole('listbox').waitFor();
