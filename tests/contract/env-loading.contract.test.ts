@@ -5,6 +5,10 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { getConfiguredChains, getDefaultChainKey, readPublicEnv } from "@/lib/env";
 import { apiClients, createQueryClient } from "@/services/clients";
+import { requireModule } from "@/lib/module-capability";
+import { listBexExchanges } from "@/services/guru/bex.service";
+import { listFeePolicyDiscounts } from "@/services/guru/feepolicy.service";
+import { listOracleRequests } from "@/services/guru/oracle.service";
 
 const root = resolve(import.meta.dirname, "../..");
 const publicKeys = Object.keys(readPublicEnv());
@@ -61,7 +65,8 @@ it.each(["development", "production", "test"])("matches Next variable precedence
 it("loads only test defaults and never auto-loads env.example", () => {
   const directory = fixture({ ".env.test": readFileSync(join(root, ".env.test"), "utf8"), "env.example": readFileSync(join(root, "env.example"), "utf8") });
   apply(load(directory));
-  expect(getConfiguredChains()[0]).toMatchObject({ key: "default", lcdUrl: "https://trpc.gurufin.io:1317", rpcUrl: "https://trpc.gurufin.io:26657", evmRpcUrl: "https://trpc.gurufin.io:8545", wsUrl: "wss://trpc.gurufin.io:26657/websocket" });
+  expect(getConfiguredChains()).toEqual([{ key: "default", name: "Default", lcdUrl: "https://trpc.gurufin.io:1317", rpcUrl: "https://trpc.gurufin.io:26657", evmRpcUrl: "https://trpc.gurufin.io:8545", wsUrl: "wss://trpc.gurufin.io:26657/websocket", features: { bex: true, feepolicy: true, oracle: true } }]);
+  expect(getDefaultChainKey()).toBe("default");
   for (const mode of ["development", "production"]) {
     apply(load(directory, mode));
     expect(() => getConfiguredChains()).toThrow("NEXT_PUBLIC_CHAINS");
@@ -69,6 +74,30 @@ it("loads only test defaults and never auto-loads env.example", () => {
   const exampleOnly = fixture({ "env.example": readFileSync(join(root, "env.example"), "utf8") });
   apply(load(exampleOnly));
   expect(() => getConfiguredChains()).toThrow("NEXT_PUBLIC_CHAINS");
+});
+
+it("enables real module services from the tracked test configuration without changing other query defaults", async () => {
+  apply(load(fixture({ ".env.test": readFileSync(join(root, ".env.test"), "utf8") })));
+  const chain = getConfiguredChains()[0];
+  for (const feature of ["bank", "staking", "governance", "distribution"] as const) {
+    expect(() => requireModule(chain, `/cosmos/${feature}/v1beta1/params`)).not.toThrow();
+    expect(chain.features?.[feature]).toBeUndefined();
+  }
+  const http = vi.fn<typeof fetch>(async input => {
+    const url = new URL(String(input));
+    expect(url.origin).toBe("https://trpc.gurufin.io:1317");
+    switch (url.pathname) {
+      case "/guru/bex/v1/exchanges": return Response.json({ exchanges: [] });
+      case "/guru/feepolicy/v1/discounts": return Response.json({ discounts: [] });
+      case "/guru/oracle/v2/requests": return Response.json({ requests: [] });
+      default: throw new Error(`Unexpected request: ${url.pathname}`);
+    }
+  });
+  vi.stubGlobal("fetch", http);
+  await expect(listBexExchanges()).resolves.toEqual([]);
+  await expect(listFeePolicyDiscounts()).resolves.toEqual([]);
+  await expect(listOracleRequests()).resolves.toEqual([]);
+  expect(http).toHaveBeenCalledTimes(3);
 });
 
 it("accepts process-only LCD without a test file and blocks missing endpoints before HTTP", async () => {
@@ -90,9 +119,9 @@ it("accepts process-only LCD without a test file and blocks missing endpoints be
 });
 
 it("uses JSON for helpers and pinned clients even when lower single-chain endpoints remain", () => {
-  const directory = fixture({ ".env.test": readFileSync(join(root, ".env.test"), "utf8"), ".env.test.local": "NEXT_PUBLIC_LCD_URL=https://other.example\n" });
+  const directory = fixture({ ".env.test": "NEXT_PUBLIC_LCD_URL=https://single.example\nNEXT_PUBLIC_RPC_URL=https://single-rpc.example\n", ".env.test.local": "NEXT_PUBLIC_LCD_URL=https://other.example\n" });
   apply(load(directory));
-  expect(getConfiguredChains()[0]).toMatchObject({ lcdUrl: "https://other.example", rpcUrl: "https://trpc.gurufin.io:26657" });
+  expect(getConfiguredChains()[0]).toMatchObject({ lcdUrl: "https://other.example", rpcUrl: "https://single-rpc.example" });
   const chains = [{ key: "json", name: "JSON", lcdUrl: "https://json.example", rpcUrl: "https://json-rpc.example" }];
   vi.stubEnv("NEXT_PUBLIC_CHAINS", JSON.stringify(chains));
   expect(getConfiguredChains()).toEqual(chains);
@@ -124,12 +153,14 @@ it("preserves TGXN W01 enrichment and explicit RPC while rejecting unknown defau
 });
 
 it.each(["defaults", "file", "process"])("initializes the actual Vitest worker with %s precedence and restores stubs", mode => {
+  const fileChains = [{ key: "file", name: "File", lcdUrl: "https://file.example", rpcUrl: "https://file-rpc.example", features: { bex: false, feepolicy: true, oracle: false } }];
+  const processChains = [{ key: "process", name: "Process", lcdUrl: "https://process.example", features: { bex: true, feepolicy: false, oracle: true } }];
   const directory = fixture({
     "package.json": '{"type":"module"}',
     "vitest.config.ts": readFileSync(join(root, "vitest.config.ts"), "utf8"),
     ".env.test": readFileSync(join(root, ".env.test"), "utf8"),
     ".env.local": "NEXT_PUBLIC_LCD_URL=https://must-not-load.example\nNEXT_PUBLIC_CHAINS=invalid\n",
-    ...(mode !== "defaults" ? { ".env.test.local": "NEXT_PUBLIC_LCD_URL=https://file.example\nNEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=synthetic\n" } : {}),
+    ...(mode !== "defaults" ? { ".env.test.local": `NEXT_PUBLIC_CHAINS='${JSON.stringify(fileChains)}'\nNEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=synthetic\n` } : {}),
   });
   symlinkSync(join(root, "node_modules"), join(directory, "node_modules"), "dir");
   symlinkSync(join(root, "src"), join(directory, "src"), "dir");
@@ -142,13 +173,17 @@ it.each(["defaults", "file", "process"])("initializes the actual Vitest worker w
     it('loads before imports and restores overrides', async () => {
       expect(process.env.NODE_ENV).toBe('test');
       expect(getConfiguredChains()[0].lcdUrl).toBe(${JSON.stringify(expected)});
-      expect(getConfiguredChains()[0].rpcUrl).toBe('https://trpc.gurufin.io:26657');
+      expect(getConfiguredChains()[0].features).toEqual(${JSON.stringify(mode === "process" ? processChains[0].features : mode === "file" ? fileChains[0].features : { bex: true, feepolicy: true, oracle: true })});
+      expect(getConfiguredChains()[0].key).toBe(${JSON.stringify(mode === "defaults" ? "default" : mode)});
+      expect(getConfiguredChains()[0].rpcUrl).toBe(${mode === "process" ? "undefined" : JSON.stringify(mode === "file" ? "https://file-rpc.example" : "https://trpc.gurufin.io:26657")});
       const http = vi.fn(async () => Response.json({ ok: true }));
       vi.stubGlobal('fetch', http);
       try {
         await apiClients.lcdGet('/probe');
         expect(http.mock.calls[0][0]).toBe(${JSON.stringify(expected + "/probe")});
         vi.stubEnv('NEXT_PUBLIC_LCD_URL', 'https://temporary.example');
+        expect(getConfiguredChains()[0].lcdUrl).toBe(${JSON.stringify(expected)});
+        vi.stubEnv('NEXT_PUBLIC_CHAINS', JSON.stringify([{ key: 'temporary', name: 'Temporary', lcdUrl: 'https://temporary.example' }]));
         expect(getConfiguredChains()[0].lcdUrl).toBe('https://temporary.example');
       } finally { vi.unstubAllEnvs(); vi.unstubAllGlobals(); }
       expect(getConfiguredChains()[0].lcdUrl).toBe(${JSON.stringify(expected)});
@@ -158,7 +193,7 @@ it.each(["defaults", "file", "process"])("initializes the actual Vitest worker w
     });
   `);
   const output = execFileSync(process.execPath, [join(root, "node_modules/vitest/vitest.mjs"), "run", "--maxWorkers=1"], {
-    cwd: directory, env: { ...cleanEnv(), ...(mode === "process" ? { NEXT_PUBLIC_LCD_URL: expected } : {}) }, encoding: "utf8", timeout: 30000,
+    cwd: directory, env: { ...cleanEnv(), ...(mode === "process" ? { NEXT_PUBLIC_CHAINS: JSON.stringify(processChains) } : {}) }, encoding: "utf8", timeout: 30000,
   });
   expect(output).toContain("2 passed");
 }, 40000);
