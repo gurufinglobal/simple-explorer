@@ -218,6 +218,24 @@ describe('W05 saved receipt updates and lookup races (F1)', () => {
   });
 });
 afterEach(() => { window.history.replaceState(null, '', '/'); cleanup(); store.getState().disconnect(); delete window.keplr; delete window.getOfflineSigner; vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
+it.each(['en', 'ko'] as const)('metadata refresh inside a native form only reads its query (%s)', async locale => {
+  const submit = vi.fn(event => event.preventDefault());
+  render(<form onSubmit={submit}><SendForm /></form>, { locale });
+  const retryName = locale === 'en' ? 'Retry query' : '다시 조회';
+  const button = await screen.findByRole('button', { name: retryName });
+  await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
+  http.mockClear();
+  button.focus();
+  await userEvent.keyboard('{Enter}');
+  await waitFor(() => expect((button as HTMLButtonElement).disabled).toBe(false));
+  expect(http).toHaveBeenCalledTimes(1);
+  expect(String(http.mock.calls[0][0])).toContain('/denoms_metadata');
+  expect(submit).not.toHaveBeenCalled();
+  expect(boundary.connect).not.toHaveBeenCalled();
+  expect(boundary.wallet).not.toHaveBeenCalled();
+  expect(boundary.broadcast).not.toHaveBeenCalled();
+  expect(screen.queryByRole('dialog')).toBeNull();
+});
 async function fill() {
   render(<SendForm />);
   fireEvent.change(screen.getByLabelText('수신 주소'), { target: { value: recipient } });

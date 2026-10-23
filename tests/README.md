@@ -30,3 +30,9 @@
 - Faucet/WS/재위임/서버 세션의 미사용 모의 성공 코드와 대응 가상 성공 검사는 제거했다. 실제 polling·wallet lifecycle·staking/거버넌스·F1 보관 결과 검사는 유지한다.
 
 모듈 browser runner는 긴 숫자·소수·헤더의 실제 텍스트 줄 수(1줄), 긴 설명 셀의 최소 240px 폭, 360px의 내부 overflow, Tab 진입·ArrowRight 이동·마지막 열 노출을 검사한다. BEX 3종 수수료 표, Oracle Reports/History, FeePolicy 목록/상세를 포함하며 3개 목록의 링크 Enter 후 chain 유지도 확인한다. 문서 가로 넘침만으로 표 가독성 통과를 판정하지 않는다.
+
+## 조회 버튼 공통 레이아웃 회귀 (GURA-66)
+
+- `integration/send-transaction.integration.test.tsx`: 실제 SendForm을 native form에 넣고 영한 키보드 재조회가 metadata HTTP만 실행하며 submit·서명·broadcast를 유발하지 않는지 확인한다.
+- `browser/query-refresh.browser.mjs`: 실제 production Chrome의 360/768/1440px × en/ko에서 단일 조회·다중 조회·폼 내부 조회·`/wallet`의 버튼 폭, 44px 터치 높이, 줄바꿈, 상단 배치, 키보드 포커스 및 error/Retry-After/busy/success/stale/partial을 검증하고 PNG와 측정 JSON을 저장한다. HTTP와 주입 지갑만 합성 경계이며 실제 서명/거래·물리 모바일 검증이 아니다.
+- 실행: `node tests/browser/wallet-page-server.mjs --production`으로 합성 체인 production 서버를 시작한 후 `PLAYWRIGHT_MODULE=<playwright index.mjs 경로> node tests/browser/query-refresh.browser.mjs`. 선택 환경 변수는 `BROWSER_ORIGIN`(기본 3265 포트), `BROWSER_OUTPUT`, `SOURCE_SHA`다. 빌드와 전체 테스트는 동시에 실행하지 않는다.
