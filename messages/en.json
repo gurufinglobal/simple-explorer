@@ -17,7 +17,7 @@
       "invalid_account_address_byte_length": "Invalid account address byte length.",
       "could_not_read_the_saved_chain_key_select_a_chain": "Could not read the saved chain key. Select a chain again.",
       "unregistered_chain": "Unregistered chain.",
-      "configuration_for_selected_chain_is_missing_select_a_chain_again": "Configuration for selected chain '{value0}' is missing. Select a chain again.",
+      "configuration_for_selected_chain_is_missing_select_a_chain_again": "Configuration for selected chain ''{value0}'' is missing. Select a chain again.",
       "invalid_raw_amount": "Invalid raw amount.",
       "invalid_raw_amount_or_denom": "Invalid raw amount or denom.",
       "amount_must_be_a_positive_integer_in_base_units": "Amount must be a positive integer in base units.",
