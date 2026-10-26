@@ -15,7 +15,7 @@ afterEach(() => { vi.unstubAllEnvs(); vi.unstubAllGlobals(); });
 
 describe("server development configuration", () => {
   it("uses explicit TGXN through the real selection and HTTP clients without browser globals", async () => {
-    vi.stubEnv("NEXT_PUBLIC_CHAINS", '[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317"}]');
+    vi.stubEnv("NEXT_PUBLIC_CHAINS", '[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317","rpcUrl":"https://tgxn.gurufin.io:26657","chainId":"guru_631-1","denom":"agxn","nativeDenom":"agxn","bondDenom":"agxn","evidence":["W01 2026-10-20T04:43:48Z: LCD/RPC guru_631-1; native/bond agxn. Terminal observation only; browser CORS and signing unverified."]}]');
     expect(typeof document).toBe("undefined");
     expect(getDefaultChainKey()).toBe("tgxn");
     expect(getActiveChainConfig()).toMatchObject({ key: "tgxn", name: "TGXN", chainId: "guru_631-1", nativeDenom: "agxn", bondDenom: "agxn" });
@@ -30,6 +30,16 @@ describe("server development configuration", () => {
     expect(apiClients.rpcUrl("/status")).toBe("https://tgxn.gurufin.io:26657/status");
     await expect(apiClients.evmRpcGet("/")).rejects.toThrow("evmRpcUrl");
     expect(http).toHaveBeenCalledTimes(2);
+  });
+
+  it("keeps minimal TGXN on the server and blocks missing RPC before HTTP", async () => {
+    const chain = { key: "tgxn", name: "TGXN", lcdUrl: "https://tgxn.gurufin.io:1317" };
+    vi.stubEnv("NEXT_PUBLIC_CHAINS", JSON.stringify([chain]));
+    expect(getActiveChainConfig()).toEqual(chain);
+    const http = vi.fn<typeof fetch>(); vi.stubGlobal("fetch", http);
+    await expect(apiClients.rpcGet("/status")).rejects.toThrow("rpcUrl");
+    await expect(apiClients.rpcJson("status")).rejects.toThrow("rpcUrl");
+    expect(http).not.toHaveBeenCalled();
   });
 
   it.each(["development", "production", "test"])("requires explicit configuration in %s", mode => {

@@ -15,7 +15,7 @@ const customChains = JSON.stringify([
 beforeEach(() => {
   for (const key of Object.keys(process.env).filter(key => key.startsWith("NEXT_PUBLIC_"))) vi.stubEnv(key, undefined);
   vi.stubEnv("NODE_ENV", "development");
-  vi.stubEnv("NEXT_PUBLIC_CHAINS", '[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317","rpcUrl":"https://tgxn.gurufin.io:26657"}]');
+  vi.stubEnv("NEXT_PUBLIC_CHAINS", '[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317","rpcUrl":"https://tgxn.gurufin.io:26657","chainId":"guru_631-1","denom":"agxn","nativeDenom":"agxn","bondDenom":"agxn","evidence":["W01 2026-10-20T04:43:48Z: LCD/RPC guru_631-1; native/bond agxn. Terminal observation only; browser CORS and signing unverified."]}]');
   window.history.replaceState(null, "", "/");
   document.cookie = "gf_chain=; max-age=0; path=/";
 });
@@ -37,6 +37,17 @@ it("renders TGXN and sends client LCD/RPC requests to the same explicit configur
   expect(http.mock.calls.map(([url]) => url)).toEqual([
     "https://tgxn.gurufin.io:1317/cosmos/base/tendermint/v1beta1/node_info", "https://tgxn.gurufin.io:26657/status",
   ]);
+});
+
+it("renders minimal TGXN without injecting metadata and blocks missing RPC before HTTP", async () => {
+  const chain = { key: "tgxn", name: "TGXN", lcdUrl: "https://tgxn.gurufin.io:1317" };
+  vi.stubEnv("NEXT_PUBLIC_CHAINS", JSON.stringify([chain]));
+  render(<ChainSelector id="minimal-chain" />);
+  expect(screen.getByRole("combobox").textContent).toBe("TGXN");
+  expect(getActiveChainConfig()).toEqual(chain);
+  const http = vi.fn<typeof fetch>(); vi.stubGlobal("fetch", http);
+  await expect(apiClients.rpcGet("/status")).rejects.toThrow("rpcUrl");
+  expect(http).not.toHaveBeenCalled();
 });
 
 it("honors JSON and default key overrides, then preserves a valid saved cookie", async () => {

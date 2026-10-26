@@ -160,13 +160,7 @@ export function parseChainConfigs(raw: string | undefined): ChainConfig[] {
       if (url && !/^https?:\/\//.test(url)) throw new ServiceError("chain_endpoints_must_be_http_s_urls");
     }
   }
-  return parsed.data.map(chain => {
-    // W01 public observations; no prefix, fee, decimals or wallet support inferred.
-    if (chain.key !== "tgxn" || chain.lcdUrl.replace(/\/$/, "") !== "https://tgxn.gurufin.io:1317") return chain;
-    return { ...chain, chainId: "guru_631-1", rpcUrl: chain.rpcUrl ?? "https://tgxn.gurufin.io:26657",
-      denom: "agxn", nativeDenom: "agxn", bondDenom: "agxn",
-      evidence: [...(chain.evidence ?? []), "W01 2026-10-20T04:43:48Z: LCD/RPC guru_631-1; native/bond agxn. Terminal observation only; browser CORS and signing unverified."] };
-  });
+  return parsed.data;
 }
 
 export function readPublicEnv(): AppEnv {

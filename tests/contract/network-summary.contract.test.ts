@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getNetworkSummaryPayload } from '@/server/handlers/network-summary.handler';
 import { getAccountsTotal, getApplicationVersions, getNetworkSummary } from '@/services/guru/network-summary.service';
 import { readQuery } from '@/lib/query-result';
@@ -16,6 +16,14 @@ describe('network summary HTTP boundary', () => {
       }
     });
     expect(http).toHaveBeenCalledTimes(9);
+  });
+  it('keeps minimal TGXN supply unknown with a partial result and no supply HTTP', async () => {
+    vi.stubEnv('NEXT_PUBLIC_CHAINS', JSON.stringify([{ key: 'tgxn', name: 'TGXN', lcdUrl: 'https://tgxn.gurufin.io:1317' }]));
+    vi.stubEnv('NEXT_PUBLIC_DEFAULT_CHAIN_KEY', 'tgxn');
+    const result = await readQuery({ ...context, chain: 'tgxn' }, () => getNetworkSummary());
+    expect(result).toMatchObject({ status: 'partial', data: { chainId: 'fixture-chain-1', supply: '-' }, error: { kind: 'schema' } });
+    expect(result.data?.supplyRaw).toBeUndefined();
+    expect(http.mock.calls.some(([url]) => String(url).includes('/supply/'))).toBe(false);
   });
   it('preserves successful zero', async () => {
     const respond = http.getMockImplementation()!;

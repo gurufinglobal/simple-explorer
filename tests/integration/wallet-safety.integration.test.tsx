@@ -118,14 +118,28 @@ describe("W03 chain configuration and signing boundaries", () => {
     expect(String(http.mock.calls[0][0])).toContain("https://a.test:1317/");
     expect(store.getState().chainId).toBe("a-1");
   });
-  it("updates observed tgxn metadata without inventing fee/prefix/wallet support", () => {
-    const [chain] = parseChainConfigs(JSON.stringify([{ key: "tgxn", name: "tgxn", lcdUrl: "https://tgxn.gurufin.io:1317", denom: "atgxn" }]));
-    expect(chain).toMatchObject({ chainId: "guru_631-1", rpcUrl: "https://tgxn.gurufin.io:26657", denom: "agxn", nativeDenom: "agxn", bondDenom: "agxn" });
-    expect(chain.feeDenom).toBeUndefined(); expect(chain.bech32Prefix).toBeUndefined(); expect(chain.signing).toBeUndefined();
+  it.each([false, true])("TGXN missing write evidence blocks signer and broadcast (metadata=%s)", async explicit => {
+    const minimal = { key: "tgxn", name: "TGXN", lcdUrl: "https://tgxn.gurufin.io:1317" };
+    const input = explicit ? { ...minimal, chainId: "guru_631-1", rpcUrl: "https://tgxn.gurufin.io:26657", denom: "agxn", nativeDenom: "agxn", bondDenom: "agxn" } : minimal;
+    configure([input]); vi.stubEnv("NEXT_PUBLIC_DEFAULT_CHAIN_KEY", "tgxn");
+    expect(getConfiguredChains()).toEqual([input]);
+    store.getState().connect("keplr", address, null, { chainKey: "tgxn", chainId: "guru_631-1", pubkey });
+    render(<GovernanceNewProposalForm defaultDenom="agxn" />);
+    expect((screen.getByRole("button", { name: "제안 전송" }) as HTMLButtonElement).disabled).toBe(true);
+    await expect(send()).rejects.toThrow();
+    expect(sign).not.toHaveBeenCalled(); expect(boundary.request).not.toHaveBeenCalled();
+    expect(boundary.connectSigner).not.toHaveBeenCalled(); expect(boundary.broadcast).not.toHaveBeenCalled();
   });
   it.each(["get", "post"])("LCD A / RPC B (%s) makes zero signer and broadcast calls", async method => {
     connected();
     http.mockImplementation(async (input, init) => Response.json(String(input).includes(":26657") && ((method === "post") === (init?.method === "POST")) ? { result: { node_info: { network: "b-1" } } } : response(String(input))));
+    await expect(send()).rejects.toThrow("chain ID");
+    expect(sign).not.toHaveBeenCalled(); expect(boundary.connectSigner).not.toHaveBeenCalled(); expect(boundary.broadcast).not.toHaveBeenCalled();
+  });
+  it("preserves operator chain ID and blocks matching LCD/RPC responses for a different chain", async () => {
+    configure([{ ...a, chainId: "operator-9" }]);
+    expect(getActiveChainConfig().chainId).toBe("operator-9");
+    store.getState().connect("keplr", address, null, { chainKey: "a", chainId: "operator-9", pubkey });
     await expect(send()).rejects.toThrow("chain ID");
     expect(sign).not.toHaveBeenCalled(); expect(boundary.connectSigner).not.toHaveBeenCalled(); expect(boundary.broadcast).not.toHaveBeenCalled();
   });

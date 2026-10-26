@@ -59,6 +59,7 @@ function prepare(variant) {
     if (line === '# NEXT_PUBLIC_DEFAULT_CHAIN_KEY=tgxn') return line.slice(2);
     return line;
   }).join('\n');
+  if (variant === 'tgxn-minimal') config = `NEXT_PUBLIC_CHAINS='[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317"}]'\nNEXT_PUBLIC_DEFAULT_CHAIN_KEY=tgxn\n`;
   if (variant === 'lcd-only') config = 'NEXT_PUBLIC_LCD_URL=https://lcd-only.example.invalid\n';
   if (variant !== 'empty') {
     fs.writeFileSync(path.join(directory, '.env.development.local'), config);
@@ -119,7 +120,7 @@ async function observe(directory, variant, mode) {
       assert.equal(requests.length, 0);
       result.configurationError = true;
     } else {
-      const name = variant === 'tgxn' ? 'TGXN' : 'Default';
+      const name = variant.startsWith('tgxn') ? 'TGXN' : 'Default';
       assert(html.includes(name), 'server-rendered home names configured chain');
       await page.goto(origin + '/env-verification');
       await page.waitForFunction(() => document.getElementById('client')?.textContent);
@@ -127,13 +128,19 @@ async function observe(directory, variant, mode) {
       const client = JSON.parse(await page.locator('#client').textContent());
       assert.deepEqual(client, server, 'compiled server and browser configuration match');
       assert.equal(client.chain.name, name);
-      const lcd = variant === 'tgxn' ? 'https://tgxn.gurufin.io:1317' : variant === 'lcd-only' ? 'https://lcd-only.example.invalid' : 'https://trpc.gurufin.io:1317';
+      const lcd = variant.startsWith('tgxn') ? 'https://tgxn.gurufin.io:1317' : variant === 'lcd-only' ? 'https://lcd-only.example.invalid' : 'https://trpc.gurufin.io:1317';
       assert.equal(client.chain.lcdUrl, lcd);
+      if (variant.startsWith('tgxn')) {
+        const minimal = { key: 'tgxn', name: 'TGXN', lcdUrl: lcd };
+        const example = fs.readFileSync(path.join(root, 'env.example'), 'utf8').split('\n').find(line => line.startsWith('# NEXT_PUBLIC_CHAINS=') && line.includes('"key":"tgxn"'));
+        const explicit = JSON.parse(example.slice(example.indexOf("'") + 1, -1))[0];
+        assert.deepEqual(client.chain, variant === 'tgxn-minimal' ? minimal : explicit, 'metadata matches input exactly, including evidence');
+      }
       await page.locator('#probe').click();
       await page.waitForFunction(() => document.getElementById('calls')?.textContent);
       const calls = JSON.parse(await page.locator('#calls').textContent());
       assert.equal(calls[0], 'fulfilled');
-      assert.equal(calls[1], variant === 'lcd-only' ? 'Selected chain does not provide rpcUrl.' : 'fulfilled');
+      assert.equal(calls[1], (variant === 'lcd-only' || variant === 'tgxn-minimal') ? 'Selected chain does not provide rpcUrl.' : 'fulfilled');
       assert.equal(calls[2], variant === 'trpc' ? 'fulfilled' : 'Selected chain does not provide evmRpcUrl.');
       assert.deepEqual(requests, [client.lcd, ...(typeof client.rpc === 'string' ? [client.rpc] : []), ...(typeof client.evm === 'string' ? [client.evm] : [])]);
       result.server = server; result.client = client; result.calls = calls;
@@ -159,10 +166,10 @@ async function observe(directory, variant, mode) {
   }
 }
 try {
-  for (const variant of ['trpc', 'tgxn', 'lcd-only', 'empty']) {
+  for (const variant of ['trpc', 'tgxn', 'tgxn-minimal', 'lcd-only', 'empty']) {
     const directory = prepare(variant);
     await observe(directory, variant, 'development');
-    if (variant === 'trpc' || variant === 'tgxn') {
+    if (variant === 'trpc' || variant.startsWith('tgxn')) {
       console.log(`${variant}: npm run build (${directory})`);
       await command('npm', ['run', 'build'], directory, `${output}/${variant}-build.log`);
       await observe(directory, variant, 'production');

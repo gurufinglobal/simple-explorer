@@ -30,11 +30,13 @@ Next.js의 변수별 우선순위는 `process.env` → `.env.<mode>.local` → `
 표준 병합은 변수별이므로 LCD만 다른 체인으로 바꾸면 하위 파일의 RPC 등이 남을 수 있습니다. 체인 전환 시 endpoint를 함께 변경하거나 완전한 JSON을 사용하세요. TGXN을 사용하려면 복사한 파일에서 TRPC 활성 4줄을 제거/주석 처리한 뒤 아래 대안을 활성화합니다.
 
 ```dotenv
-NEXT_PUBLIC_CHAINS='[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317","rpcUrl":"https://tgxn.gurufin.io:26657"}]'
+NEXT_PUBLIC_CHAINS='[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317","rpcUrl":"https://tgxn.gurufin.io:26657","chainId":"guru_631-1","denom":"agxn","nativeDenom":"agxn","bondDenom":"agxn","evidence":["W01 2026-10-20T04:43:48Z: LCD/RPC guru_631-1; native/bond agxn. Terminal observation only; browser CORS and signing unverified."]}]'
 NEXT_PUBLIC_DEFAULT_CHAIN_KEY=tgxn
 ```
 
-기존 W01 관찰 규칙은 유지합니다. `tgxn` key와 위 LCD가 일치할 때 `chainId=guru_631-1`, `denom/nativeDenom/bondDenom=agxn`, 누락 RPC를 보강합니다. 미확인 prefix·decimals·수수료·서명·EVM/WS 지원은 추가하지 않습니다. 공개 URL과 터미널 관찰은 실제 브라우저 CORS·지갑 서명 성공의 증거가 아닙니다.
+체인 파서는 key·호스트에 따라 값을 보강하지 않습니다. 위 예시는 과거 W01 관찰 값을 명시한 것으로, 현재 체인 가용성·브라우저 CORS·지갑 서명 지원을 재검증한 결과가 아닙니다. 입력한 chain ID·denom·RPC·evidence를 그대로 사용하며 누락값과 근거를 생성하지 않습니다. JSON에 없는 값은 단일 체인 변수에서 병합하지 않습니다. 추가 metadata가 필요하면 JSON으로 설정하세요.
+
+**호환성 변경:** 기존 최소 TGXN JSON(`key`, `name`, `lcdUrl`)도 유효하지만 RPC 호출은 HTTP 요청 전 오류로 끝나고, `nativeDenom`이 없으면 공급량은 부분 오류/미확인으로 표시됩니다. 기존 조회 동작을 유지하려면 운영자가 해당 체인에서 확인한 `rpcUrl`, `chainId`, `denom`, `nativeDenom`, `bondDenom`, `evidence`를 JSON에 명시하고 개발 서버를 재시작하거나 production을 재빌드해야 합니다. 개인 env·운영 설정은 자동으로 이전하지 않습니다. 임의 체인에 TGXN 값을 복사하지 마세요. 명시 metadata만으로 쓰기가 허용되지는 않으며 node chain ID·signer·codec·RPC origin·수수료 검증은 계속 적용됩니다.
 
 설정 후 Select Chain 표시를 확인하고 `/dashboard`의 Network 요청 URL이 선택 체인의 LCD/RPC와 일치하는지 확인하세요. 모든 화면이 RPC를 요청하는 것은 아닙니다. HTTP/CORS/timeout 오류는 정상 잔액 0이나 성공으로 해석하지 않습니다. CP2 화면별 절차는 [CP2 확인 가이드](/GURA/issues/GURA-35#document-checkpoint-cp2)를 참고하세요.
 

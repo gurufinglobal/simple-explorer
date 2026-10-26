@@ -3,7 +3,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, mkdirSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
-import { getConfiguredChains, getDefaultChainKey, readPublicEnv } from "@/lib/env";
+import { getConfiguredChains, getDefaultChainKey, readPublicEnv, parseChainConfigs } from "@/lib/env";
 import { apiClients, createQueryClient } from "@/services/clients";
 import { requireModule } from "@/lib/module-capability";
 import { listBexExchanges } from "@/services/guru/bex.service";
@@ -143,13 +143,41 @@ it.each(["", "invalid", "[]", '[{"key":"x","name":"X","lcdUrl":"invalid"}]', '[{
   apply({ NEXT_PUBLIC_CHAINS: raw });
   expect(() => getConfiguredChains()).toThrow();
 });
-it("preserves TGXN W01 enrichment and explicit RPC while rejecting unknown default keys", () => {
-  apply({ NEXT_PUBLIC_CHAINS: '[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317"}]' });
-  expect(getConfiguredChains()[0]).toMatchObject({ chainId: "guru_631-1", nativeDenom: "agxn", rpcUrl: "https://tgxn.gurufin.io:26657" });
-  vi.stubEnv("NEXT_PUBLIC_CHAINS", '[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317","rpcUrl":"https://explicit.example"}]');
-  expect(getConfiguredChains()[0].rpcUrl).toBe("https://explicit.example");
+it("preserves every explicit known TGXN field and adds no evidence", () => {
+  const chain = { key: "tgxn", name: "TGXN", lcdUrl: "https://tgxn.gurufin.io:1317", chainId: "operator-9",
+    denom: "udisplay", nativeDenom: "unative", bondDenom: "ubond", rpcUrl: "https://operator.example/rpc", evidence: ["operator supplied"] };
+  const raw = JSON.stringify([chain]);
+  expect(parseChainConfigs(raw)).toEqual([chain]);
+  apply({ NEXT_PUBLIC_CHAINS: raw });
+  expect(getConfiguredChains()).toEqual([chain]);
   vi.stubEnv("NEXT_PUBLIC_DEFAULT_CHAIN_KEY", "missing");
   expect(() => getDefaultChainKey()).toThrow();
+});
+
+it.each([
+  ["tgxn", "https://tgxn.gurufin.io:1317"], ["tgxn", "https://tgxn.gurufin.io:1317/"],
+  ["other", "https://tgxn.gurufin.io:1317"], ["tgxn", "https://other.example"],
+])("keeps minimal %s at %s free of inferred metadata and single-chain merging", (key, lcdUrl) => {
+  const chain = { key, name: "Minimal", lcdUrl };
+  const raw = JSON.stringify([chain]);
+  expect(parseChainConfigs(raw)).toEqual([chain]);
+  apply({ NEXT_PUBLIC_CHAINS: raw, NEXT_PUBLIC_RPC_URL: "https://ignored.example", NEXT_PUBLIC_BECH32_PREFIX: "ignored" });
+  expect(getConfiguredChains()).toEqual([chain]);
+});
+
+it.each(["lcdUrl", "rpcUrl", "evmRpcUrl"])("rejects non-HTTP %s without fallback", field => {
+  expect(() => parseChainConfigs(JSON.stringify([{ key: "x", name: "X", lcdUrl: "https://x.example", [field]: "ftp://x.example" }]))).toThrow("HTTP");
+});
+
+it.each(["env.example", ".env.test"])("loads the explicit TGXN comment in %s with the documented metadata", file => {
+  const text = readFileSync(join(root, file), "utf8");
+  const lines = text.split("\n").filter(line => line.startsWith("# NEXT_PUBLIC_CHAINS=") && line.includes('"key":"tgxn"') || line === "# NEXT_PUBLIC_DEFAULT_CHAIN_KEY=tgxn");
+  apply(load(fixture({ ".env.test": lines.map(line => line.slice(2)).join("\n") })));
+  const [chain] = getConfiguredChains();
+  expect(chain).toEqual({ key: "tgxn", name: "TGXN", lcdUrl: "https://tgxn.gurufin.io:1317", rpcUrl: "https://tgxn.gurufin.io:26657",
+    chainId: "guru_631-1", denom: "agxn", nativeDenom: "agxn", bondDenom: "agxn",
+    evidence: ["W01 2026-10-20T04:43:48Z: LCD/RPC guru_631-1; native/bond agxn. Terminal observation only; browser CORS and signing unverified."], ...(file === ".env.test" ? { features: { bex: true, feepolicy: true, oracle: true } } : {}) });
+  expect(getDefaultChainKey()).toBe("tgxn");
 });
 
 it.each(["defaults", "file", "process"])("initializes the actual Vitest worker with %s precedence and restores stubs", mode => {

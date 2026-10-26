@@ -251,11 +251,12 @@ async function executeUi() { await fill(); const dialog = await confirmDialog();
 
 describe('GURA-57 recipient validation through actual form and preparation', () => {
   const reportedAddress = 'guru12yx8z0fzv27x3jx57yk0h8rlvwarp6y4zd00us';
-  it.each(['explicit-tgxn', 'missing-prefix'])('keeps a valid address neutral and blocks writes for %s', async mode => {
-    if (mode === 'explicit-tgxn') {
+  it.each(['explicit-tgxn', 'minimal-tgxn', 'missing-prefix'])('keeps a valid address neutral and blocks writes for %s', async mode => {
+    if (mode !== 'missing-prefix') {
       for (const key of Object.keys(process.env).filter(key => key.startsWith('NEXT_PUBLIC_'))) vi.stubEnv(key, undefined);
       vi.stubEnv('NODE_ENV', 'development');
-      vi.stubEnv('NEXT_PUBLIC_CHAINS', '[{"key":"tgxn","name":"TGXN","lcdUrl":"https://tgxn.gurufin.io:1317"}]');
+      vi.stubEnv('NEXT_PUBLIC_CHAINS', JSON.stringify([{ key: 'tgxn', name: 'TGXN', lcdUrl: 'https://tgxn.gurufin.io:1317',
+        ...(mode === 'explicit-tgxn' ? { chainId: 'guru_631-1', rpcUrl: 'https://tgxn.gurufin.io:26657', denom: 'agxn', nativeDenom: 'agxn', bondDenom: 'agxn' } : {}) }]));
       store.getState().connect('keplr', sender, null, { chainKey: 'tgxn', chainId: 'guru_631-1', pubkey });
       expect(getActiveChainConfig().key).toBe('tgxn');
     } else configure({ bech32Prefix: undefined });
@@ -264,9 +265,9 @@ describe('GURA-57 recipient validation through actual form and preparation', () 
     fireEvent.change(screen.getByLabelText('수신 주소'), { target: { value: reportedAddress } });
     expect(screen.getByLabelText('수신 주소').getAttribute('aria-invalid')).toBe('false');
     expect(screen.getByText(/선택 체인의 주소 prefix가 확인되지 않아/)).toBeTruthy();
-    expect(screen.getByText(/검증 정보가 부족하여 조회만 가능합니다/)).toBeTruthy();
+    expect(screen.getByText(mode === 'minimal-tgxn' ? /체인·지갑 연결이 일치하지 않습니다/ : /검증 정보가 부족하여 조회만 가능합니다/)).toBeTruthy();
     expect((screen.getByRole('button', { name: "송금 실행" }) as HTMLButtonElement).disabled).toBe(true);
-    await expect(prepareSendTx({ ...input, toAddress: reportedAddress })).rejects.toThrow('검증 정보가 부족');
+    await expect(prepareSendTx({ ...input, toAddress: reportedAddress })).rejects.toThrow(mode === 'minimal-tgxn' ? '체인·지갑 연결이 일치하지 않습니다' : '검증 정보가 부족');
     expect(window.getOfflineSigner).not.toHaveBeenCalled();
     expect(boundary.sign).not.toHaveBeenCalled();
     expect(boundary.wallet).not.toHaveBeenCalled();
