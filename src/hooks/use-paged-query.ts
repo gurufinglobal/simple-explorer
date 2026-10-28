@@ -1,10 +1,10 @@
 "use client";
-import { serviceText } from '@/i18n/service-message';
+import { serviceMessage, serviceText } from '@/i18n/service-message';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getActiveChainConfig } from '@/lib/chain-selection';
 import type { ChainConfig } from '@/lib/env';
-import { initialResult, PartialQueryError, queryError, type QueryResult, type QueryErrorInfo } from '@/lib/query-result';
+import { initialResult, PartialQueryError, QueryError, queryError, type QueryResult, type QueryErrorInfo } from '@/lib/query-result';
 import type { QueryPage } from '@/lib/query-page';
 import { invalidateQueryReads, queryIdentity, createQueryClient, type QueryClient } from '@/services/clients';
 
@@ -27,12 +27,15 @@ export function usePagedQuery<T>(target: string, load: (client: QueryClient, cur
   refs.current = { key, chain, load, identify };
   const active = useRef<AbortController | null>(null);
 
-  const fetchPage = useCallback(async (reset = false) => {
-    if (active.current) return;
+  // Return the read outcome without rejecting ordinary mount/button loads.
+  // Invalidation callers translate this outcome into their awaited refresh promise.
+  const fetchPage = useCallback(async (reset = false): Promise<QueryErrorInfo | null> => {
+    const cancelled = (): QueryErrorInfo => ({ kind: 'cancelled', ...serviceMessage('query_cancelled') });
+    if (active.current) return cancelled();
     const current = refs.current;
     const previous = !reset && stateRef.current.key === key ? stateRef.current : fresh();
-    if (previous.stopReason || (previous.pages > 0 && !previous.nextCursor)) return;
-    if ((previous.result.error?.retryAt ?? 0) > Date.now()) return;
+    if (previous.stopReason || (previous.pages > 0 && !previous.nextCursor)) return previous.result.error;
+    if ((previous.result.error?.retryAt ?? 0) > Date.now()) return previous.result.error;
     const controller = new AbortController();
     active.current = controller;
     setBusy(true);
@@ -45,7 +48,7 @@ export function usePagedQuery<T>(target: string, load: (client: QueryClient, cur
         if (!(error instanceof PartialQueryError)) throw error;
         page = { ...(error.data as QueryPage<T>), warning: error.info };
       }
-      if (controller.signal.aborted || refs.current.key !== key) return;
+      if (controller.signal.aborted || refs.current.key !== key) return cancelled();
       const rows = Array.from(new Map([...(previous.result.data ?? []), ...page.rows].map(row => [current.identify(row), row])).values());
       const seen = [...previous.seen, previous.nextCursor ?? ''];
       const pages = previous.pages + 1;
@@ -60,10 +63,12 @@ export function usePagedQuery<T>(target: string, load: (client: QueryClient, cur
         error: partial ?? null, status: partial || stopReason ? 'partial' : rows.length ? 'success' : 'empty',
       } };
       stateRef.current = next; setState(next);
+      return partial ?? (stopReason ? { kind: 'incomplete', message: stopReason } : null);
     } catch (error) {
-      if (controller.signal.aborted || refs.current.key !== key) return;
+      if (controller.signal.aborted || refs.current.key !== key) return cancelled();
       const next: State<T> = { ...previous, result: { ...previous.result, status: previous.pages ? 'stale' : 'error', error: queryError(error) } };
       stateRef.current = next; setState(next);
+      return next.result.error;
     } finally {
       if (active.current === controller) { active.current = null; setBusy(false); }
     }
@@ -87,7 +92,12 @@ export function usePagedQuery<T>(target: string, load: (client: QueryClient, cur
   useEffect(() => {
     const invalidate = (event: Event) => {
       const detail = (event as CustomEvent<{ chain: string; targets: string[]; claimed?: Set<string>; refreshes?: Promise<void>[] }>).detail;
-      if (detail.chain === refs.current.chain.key && detail.targets.includes(target)) { detail.claimed?.add(target); const pending = refresh(); detail.refreshes?.push(pending); }
+      if (detail.chain !== refs.current.chain.key || !detail.targets.includes(target)) return;
+      detail.claimed?.add(target);
+      const pending = refresh();
+      if (detail.refreshes) detail.refreshes.push(pending.then(error => {
+        if (error) throw new QueryError(error);
+      }));
     };
     window.addEventListener('explorer:queries-invalidated', invalidate);
     return () => window.removeEventListener('explorer:queries-invalidated', invalidate);

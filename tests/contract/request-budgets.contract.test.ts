@@ -9,6 +9,8 @@ import { getAccountsTotal, getApplicationVersions, getNetworkSummary } from '@/s
 import { getLiveBlocks, getLiveTransactions } from '@/services/guru/live-history.service';
 import { getBlockDetail } from '@/services/guru/block-details.service';
 import { getDenomsMetadata } from '@/services/guru/token-metadata.service';
+import { getGovParams } from '@/services/guru/governance-query.service';
+import { getOracleParams } from '@/services/guru/oracle.service';
 import { getStakingParams } from '@/services/guru/amount-context.service';
 import { readQuery } from '@/lib/query-result';
 import * as hashes from '@/lib/tx-hash';
@@ -189,5 +191,54 @@ it('caller cancellation stops mid-pagination with no additional requests or part
     return { balances: [{ denom: 'agxn', amount: '1' }], pagination: { next_key: String(pages) } };
   });
   await expect(getSpendableBalances('a', createQueryClient(getActiveChainConfig(), controller.signal))).rejects.toMatchObject({ info: { kind: 'cancelled' } });
+  expect(http).toHaveBeenCalledTimes(2);
+});
+
+it.each(['voting', 'tallying', 'deposit'] as const)('invalid governance %s params recover inside the same TTL without dropping valid siblings', async failed => {
+  const params = {
+    voting: { voting_params: { voting_period: '100s' } },
+    tallying: { tally_params: { quorum: '0.3', threshold: '0.5', veto_threshold: '0.33' } },
+    deposit: { deposit_params: { min_deposit: [{ denom: 'agxn', amount: '1' }] } },
+  };
+  let broken = true;
+  const http = mockQueryHttp(url => {
+    const kind = url.pathname.split('/').at(-1) as keyof typeof params;
+    return broken && kind === failed ? { [kind === 'tallying' ? 'tally_params' : kind + '_params']: {} } : params[kind];
+  });
+  const query = client();
+  await expect(getGovParams(query)).rejects.toMatchObject({ info: { kind: 'schema' } });
+  broken = false;
+  const recovered = await getGovParams(query);
+  expect(recovered.voting?.votingPeriod).toBe('100s');
+  expect(recovered.tallying?.threshold).toBe('0.5');
+  expect(recovered.deposit?.minDeposit).toEqual([{ denom: 'agxn', amount: '1' }]);
+  expect(http).toHaveBeenCalledTimes(4);
+  await Promise.all([getGovParams(query), getGovParams(client())]);
+  expect(http).toHaveBeenCalledTimes(4);
+});
+it('governance params share valid responses, expire, invalidate and isolate chain identity, endpoint and height', async () => {
+  vi.useFakeTimers();
+  const params = { voting_period: '100s', quorum: '0.3', threshold: '0.5', veto_threshold: '0.33', min_deposit: [] };
+  const http = mockQueryHttp(() => ({ params })), query = client();
+  await Promise.all([getGovParams(query), getGovParams(client())]); expect(http).toHaveBeenCalledTimes(3);
+  await getGovParams(query); expect(http).toHaveBeenCalledTimes(3);
+  for (const chain of [{ ...query.chain, chainId: 'other' }, { ...query.chain, key: 'other' }, { ...query.chain, lcdUrl: 'https://other.test' }]) await getGovParams(createQueryClient(chain));
+  expect(http).toHaveBeenCalledTimes(12);
+  await query.lcdGetObserved('/cosmos/gov/v1/params/voting', '123'); expect(http).toHaveBeenCalledTimes(13);
+  await vi.advanceTimersByTimeAsync(30_000); await getGovParams(query); expect(http).toHaveBeenCalledTimes(16);
+  invalidateQueryReads(query.chain); await getGovParams(query); expect(http).toHaveBeenCalledTimes(19);
+});
+it('invalid oracle params do not poison the shared success cache', async () => {
+  const http = mockQueryHttp(() => ({ params: { enable: 'invalid' } })), query = client();
+  await expect(getOracleParams(query)).rejects.toMatchObject({ info: { kind: 'schema' } });
+  http.mockResolvedValue(Response.json({ params: { enable: true } }));
+  expect((await getOracleParams(query))?.enable).toBe(true);
+  expect(http).toHaveBeenCalledTimes(2);
+});
+it('malformed metadata fields recover inside the TTL', async () => {
+  const http = mockQueryHttp(() => ({ metadatas: [{ base: 'agxn', symbol: 5 }] })), query = client();
+  await expect(getDenomsMetadata(query)).rejects.toThrow();
+  http.mockResolvedValue(Response.json({ metadatas: [{ base: 'agxn', symbol: 'GXN' }] }));
+  expect((await getDenomsMetadata(query))[0].symbol).toBe('GXN');
   expect(http).toHaveBeenCalledTimes(2);
 });

@@ -23,7 +23,7 @@ export function validateLcdJson<T>(path: string, value: T): T {
     [/\/accounts\/[^/]+$/, 'account'], [/\/requests\/[^/]+$/, 'request'],
     [/\/discounts\/[^/]+$/, 'discount'], [/\/params$/, 'params'], [/\/tally$/, 'tally'],
   ];
-  for (const [pattern, field] of objects) if (pattern.test(route) && (!body[field] || typeof body[field] !== 'object')) schemaError(serviceText("invalid_in_the_response", { value0: String(field) }));
+  for (const [pattern, field] of objects) if (pattern.test(route) && (!body[field] || typeof body[field] !== 'object' || Array.isArray(body[field]))) schemaError(serviceText("invalid_in_the_response", { value0: String(field) }));
   if (/\/blocks\/[^/]+$/.test(route)) {
     const header = (body.block as { header?: { height?: string; time?: string } }).header;
     if (!header?.height || !/^\d+$/.test(header.height) || !header.time || !Number.isFinite(Date.parse(header.time))) schemaError(serviceText("invalid_block_height_or_time"));
@@ -42,6 +42,14 @@ export function validateLcdJson<T>(path: string, value: T): T {
   }
   const rows = (field: string) => (body[field] ?? []) as Record<string, unknown>[];
   if (rows('balances').some(row => typeof row.denom !== 'string' || typeof row.amount !== 'string' || !/^\d+$/.test(row.amount))) schemaError(serviceText("invalid_balance_response"));
+  // These values are retained by the metadata TTL cache. Reject malformed
+  // optional field types before downstream trimming/denom-unit mapping.
+  if (/\/denoms_metadata$/.test(route)) for (const row of rows('metadatas')) {
+    for (const field of ['display', 'name', 'symbol', 'description']) {
+      if (row[field] != null && typeof row[field] !== 'string') schemaError();
+    }
+    if (row.denom_units != null && (!Array.isArray(row.denom_units) || row.denom_units.some(unit => !unit || typeof unit !== 'object' || Array.isArray(unit)))) schemaError();
+  }
   if (rows('metadatas').some(row => typeof row.base !== 'string' || !row.base.trim())) schemaError(serviceText("metadata_base_denom_missing"));
   if (rows('validators').some(row => typeof row.operator_address !== 'string')) schemaError(serviceText("validator_address_missing"));
   if (rows('proposals').some(row => row.id === undefined && row.proposal_id === undefined)) schemaError(serviceText("proposal_id_missing"));
@@ -51,10 +59,25 @@ export function validateLcdJson<T>(path: string, value: T): T {
   if (/\/moderator_address$/.test(route) && typeof (body.moderator_address ?? body.moderatorAddress) !== 'string') schemaError(serviceText("invalid_moderator_response"));
   if (/\/node_info$/.test(route) && (!body.default_node_info || !body.application_version)) schemaError(serviceText("invalid_node_info_response"));
   if (/\/result$/.test(route) && !("result" in body)) schemaError(serviceText("invalid_oracle_result_response"));
+  // Check the semantic requirements used by cached params consumers before
+  // sharedRead can retain the HTTP success. A schema failure must be retryable.
+  if (route === '/cosmos/staking/v1beta1/params') {
+    const params = body.params as Record<string, unknown>;
+    if (typeof params.bond_denom !== 'string' || !params.bond_denom || typeof params.unbonding_time !== 'string' || !params.unbonding_time) schemaError(serviceText('bond_denom_or_unbonding_parameters_unknown'));
+  }
+  if (route === '/guru/oracle/v2/params') {
+    const params = body.params as Record<string, unknown>;
+    if (params.enable != null && typeof params.enable !== 'boolean') schemaError(serviceText('invalid_oracle_enable_field'));
+  }
   if (/\/params\/(voting|tallying|deposit)$/.test(route)) {
     const key = route.endsWith('/voting') ? 'voting_params' : route.endsWith('/tallying') ? 'tally_params' : 'deposit_params';
     const container = route.startsWith('/cosmos/gov/v1/') ? body.params ?? body[key] : body[key];
     if (!container || typeof container !== 'object' || Array.isArray(container)) schemaError(serviceText("invalid_params_in_the_response", { value0: String(key) }));
+    const params = container as Record<string, unknown>;
+    const text = (field: string) => typeof params[field] === 'string' && !!params[field];
+    if (key === 'voting_params' && !text('voting_period')) schemaError(serviceText('invalid_voting_parameters_response'));
+    if (key === 'tally_params' && !['quorum', 'threshold', 'veto_threshold'].every(text)) schemaError(serviceText('invalid_tally_parameters_response'));
+    if (key === 'deposit_params' && !Array.isArray(params.min_deposit)) schemaError(serviceText('invalid_deposit_parameters_response'));
   }
   return value;
 }

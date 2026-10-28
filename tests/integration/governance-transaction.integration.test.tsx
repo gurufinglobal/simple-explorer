@@ -428,3 +428,73 @@ it('deposit validates its own deadline when voting timestamps are not assigned y
   expect((await prepareGovernanceTx(params)).snapshot.recipient).toBe(originalId);
   deadline = ''; await expect(prepareGovernanceTx(params)).rejects.toThrow('기간'); expect(boundary.wallet).not.toHaveBeenCalled();
 });
+
+describe('LOAD-3 claimed page refresh outcomes', () => {
+  it.each([['proposal', 'ko'], ['vote', 'ko'], ['proposal', 'en'], ['vote', 'en']] as const)('%s HTTP failure reaches the receipt with one page request and recovers (%s)', async (action, locale) => {
+    if (action === 'proposal') {
+      render(<GovernancePage />, { locale });
+      await screen.findByRole('link', { name: /Current proposal/ });
+    } else {
+      render(<GovernanceProposalPage />, { locale });
+      await screen.findByText('Current proposal');
+      await waitFor(() => expect(http.mock.calls.some(([u]) => String(u).includes('/votes?'))).toBe(true));
+    }
+    const tx = await prepareGovernanceTx(input(action));
+    const receipt = await queryReceipt(await tx.execute(() => {}));
+    queryFailure = action === 'proposal' ? '/proposals' : '/votes';
+    http.mockClear();
+    render(<TransactionResult receipt={receipt} />, { locale });
+    const failureText = locale === 'ko' ? /거래 성공 후 화면 갱신 실패/ : /Transaction succeeded but screen refresh failed/;
+    await screen.findByText(failureText);
+    expect(screen.getAllByText(/HTTP 503/).length).toBeGreaterThan(1);
+    expect(screen.getByText(locale === 'ko' ? /체인 포함 성공/ : /Included successfully on chain/)).toBeTruthy();
+    expect(http.mock.calls.filter(([u]) => new URL(String(u)).pathname.endsWith(queryFailure))).toHaveLength(1);
+    queryFailure = '';
+    fireEvent.click(screen.getByRole('button', { name: locale === 'ko' ? '거래 상태·관련 조회 다시 읽기' : 'Reload transaction status and related queries' }));
+    await waitFor(() => expect(screen.queryByText(failureText)).toBeNull());
+    expect(screen.getAllByText('Updated proposal').length).toBeGreaterThan(0);
+    expect(boundary.broadcast).toHaveBeenCalledOnce();
+  });
+
+  it.each([['proposal', 'ko'], ['vote', 'ko'], ['proposal', 'en'], ['vote', 'en']] as const)('%s partial refresh reaches the caller and keeps valid rows (%s)', async (action, locale) => {
+    render(action === 'proposal' ? <GovernancePage /> : <GovernanceProposalPage />, { locale });
+    await screen.findByText('Current proposal');
+    const tx = await prepareGovernanceTx(input(action));
+    const receipt = await queryReceipt(await tx.execute(() => {}));
+    const path = action === 'proposal' ? '/proposals' : '/votes';
+    http.mockImplementation(async u => new URL(String(u)).pathname.endsWith(path)
+      ? Response.json(action === 'proposal'
+        ? { proposals: Array.from({ length: 100 }, (_, i) => rawProposal(String(i + 1))) }
+        : { votes: [{ voter: 'valid-voter', option: 'VOTE_OPTION_YES' }, { voter: '' }] })
+      : response(String(u)));
+    http.mockClear();
+    let errors: string[] = [];
+    await act(async () => { errors = await refreshTransactionReads(receipt); });
+    expect(errors).toHaveLength(1);
+    expect(http.mock.calls.filter(([u]) => new URL(String(u)).pathname.endsWith(path))).toHaveLength(1);
+    expect(screen.getAllByText(action === 'proposal' ? 'Updated proposal' : 'valid-voter').length).toBeGreaterThan(0);
+    expect(screen.getByText(action === 'proposal'
+      ? locale === 'ko' ? /서버가 다음 cursor를 제공하지 않아/ : /server did not provide another cursor/
+      : locale === 'ko' ? /식별자가 올바르지/ : /Invalid identifiers in/)).toBeTruthy();
+    http.mockImplementation(async u => response(String(u)));
+    await act(async () => { errors = await refreshTransactionReads(receipt); });
+    expect(errors).toEqual([]);
+  });
+
+  it('unmount cancels a claimed page refresh instead of reporting success', async () => {
+    const page = render(<GovernancePage />);
+    await screen.findByText('Current proposal');
+    const tx = await prepareGovernanceTx(input('proposal'));
+    const receipt = await queryReceipt(await tx.execute(() => {}));
+    http.mockImplementation(async (u, init) => new URL(String(u)).pathname.endsWith('/proposals')
+      ? new Promise<Response>((_, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(new DOMException('Aborted', 'AbortError')), { once: true });
+      }) : response(String(u)));
+    http.mockClear();
+    let pending!: Promise<string[]>;
+    act(() => { pending = refreshTransactionReads(receipt); });
+    await waitFor(() => expect(http.mock.calls.some(([u]) => new URL(String(u)).pathname.endsWith('/proposals'))).toBe(true));
+    page.unmount();
+    expect(await pending).toEqual([expect.stringContaining('취소')]);
+  });
+});

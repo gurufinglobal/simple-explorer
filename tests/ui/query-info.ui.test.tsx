@@ -19,6 +19,7 @@ function body(path: string) {
   if (path.endsWith('/params/deposit')) return { deposit_params: { min_deposit: [{ denom: 'agxn', amount: '1' }] } };
   if (path.endsWith('/params/voting')) return { voting_params: { voting_period: '100s' } };
   if (path.endsWith('/params/tallying')) return { tally_params: { quorum: '0.3', threshold: '0.5', veto_threshold: '0.33' } };
+  if (path.endsWith('/staking/v1beta1/params')) return { params: { bond_denom: 'agxn', unbonding_time: '100s' } };
   return { params: { enabled: true } };
 }
 it('proposal route collapses all sources, exposes observations with keyboard and retains selected tab through refresh', async () => {
