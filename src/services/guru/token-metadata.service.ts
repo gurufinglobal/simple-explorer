@@ -1,3 +1,4 @@
+import { boundedRows, withReadDeadline } from '../query-budget';
 
 import { serviceText, serviceMessage } from '@/i18n/service-message';
 import { PartialQueryError, QueryError, queryError, schemaError } from "@/lib/query-result";
@@ -142,35 +143,41 @@ export async function getTokenMetadata(tokenRef: string, apiClients: QueryClient
 
 export async function getDenomsMetadata(apiClients: QueryClient = defaultClients): Promise<TokenDenomMetadata[]> {
   const metadatas: TokenDenomMetadata[] = [];
+  let rawRows = 0;
   try {
-    let nextKey: string | null | undefined = undefined;
-    let pageCount = 0;
-    const seen = new Set<string>();
+    return await withReadDeadline(apiClients, async apiClients => {
+      let nextKey: string | null | undefined = undefined;
+      let pageCount = 0;
+      const seen = new Set<string>();
 
-    do {
-      const query: string = nextKey
-        ? `?pagination.limit=200&pagination.key=${encodeURIComponent(nextKey)}`
-        : "?pagination.limit=200";
-      const response = await apiClients.lcdGet<DenomsMetadataListResponse>(
-        `/cosmos/bank/v1beta1/denoms_metadata${query}`,
-      );
-      const normalized = (response.metadatas ?? schemaError())
-        .map((item) => normalizeDenomMetadata(item))
-        .filter((item): item is TokenDenomMetadata => item !== null);
-      metadatas.push(...normalized);
+      do {
+        const query: string = nextKey
+          ? `?pagination.limit=200&pagination.key=${encodeURIComponent(nextKey)}`
+          : "?pagination.limit=200";
+        const response = await apiClients.lcdGet<DenomsMetadataListResponse>(
+          `/cosmos/bank/v1beta1/denoms_metadata${query}`,
+        );
+        const page = boundedRows(response.metadatas ?? schemaError(), 5000 - rawRows);
+        rawRows += page.length;
+        const normalized = page
+          .map((item) => normalizeDenomMetadata(item))
+          .filter((item): item is TokenDenomMetadata => item !== null);
+        metadatas.push(...normalized);
 
-      nextKey = response.pagination?.next_key;
-      pageCount += 1;
-      if (nextKey && seen.has(nextKey)) {
-        throw new QueryError({ kind: "incomplete", ...serviceMessage("stopped_after_detecting_a_repeated_or_cyclic_metadata_cursor_results") });
-      }
-      if (nextKey) seen.add(nextKey);
-      if (pageCount >= 50 && nextKey) {
-        throw new QueryError({ kind: "incomplete", ...serviceMessage("reached_the_metadata_query_limit_50_pages_results_are_partial") });
-      }
-    } while (nextKey);
+        nextKey = response.pagination?.next_key;
+        pageCount += 1;
+        if (nextKey && seen.has(nextKey)) {
+          throw new QueryError({ kind: "incomplete", ...serviceMessage("stopped_after_detecting_a_repeated_or_cyclic_metadata_cursor_results") });
+        }
+        if (nextKey) seen.add(nextKey);
+        if (rawRows >= 5000 && nextKey) throw new QueryError({ kind: "incomplete", ...serviceMessage("query_budget_exceeded") });
+        if (pageCount >= 50 && nextKey) {
+          throw new QueryError({ kind: "incomplete", ...serviceMessage("reached_the_metadata_query_limit_50_pages_results_are_partial") });
+        }
+      } while (nextKey);
 
-    return Array.from(new Map(metadatas.map(row => [row.baseDenom, row])).values()).sort((a, b) => a.symbol.localeCompare(b.symbol) || a.baseDenom.localeCompare(b.baseDenom));
+      return Array.from(new Map(metadatas.map(row => [row.baseDenom, row])).values()).sort((a, b) => a.symbol.localeCompare(b.symbol) || a.baseDenom.localeCompare(b.baseDenom));
+    });
   } catch (error) {
     if (metadatas.length) throw new PartialQueryError(Array.from(new Map(metadatas.map(row => [row.baseDenom, row])).values()), queryError(error));
     throw error;

@@ -81,13 +81,13 @@ function formatInflation(raw: string): string {
   return `${(numeric * 100).toFixed(2)}%`;
 }
 
-async function fetchAverageBlockTimeRecent(latestHeight: number, sampleBlocks = 10, apiClients: QueryClient = defaultClients): Promise<number | null> {
+async function fetchAverageBlockTimeRecent(latest: LcdBlockResponse, latestHeight: number, sampleBlocks = 10, apiClients: QueryClient = defaultClients): Promise<number | null> {
   if (latestHeight <= 1) {
     return null;
   }
   const start = Math.max(1, latestHeight - sampleBlocks + 1);
   const heights: number[] = [];
-  for (let h = latestHeight; h >= start; h--) {
+  for (let h = latestHeight - 1; h >= start; h--) {
     heights.push(h);
   }
   const blocks = await Promise.all(
@@ -97,7 +97,7 @@ async function fetchAverageBlockTimeRecent(latestHeight: number, sampleBlocks = 
       ),
     ),
   );
-  const timesMs = blocks
+  const timesMs = [latest, ...blocks]
     .map((item) => item.block?.header?.time)
     .map((iso) => (iso ? Date.parse(iso) : Number.NaN))
     .filter((ms) => Number.isFinite(ms));
@@ -133,7 +133,7 @@ export async function getNetworkSummary(apiClients: QueryClient = defaultClients
         if (!Number.isSafeInteger(height) || height < 1 || !latest.block?.header?.chain_id) schemaError();
         summary.blockHeight = height;
         summary.chainId = latest.block.header.chain_id;
-        summary.averageBlockTimeSec = await fetchAverageBlockTimeRecent(height, 10, apiClients);
+        summary.averageBlockTimeSec = await fetchAverageBlockTimeRecent(latest, height, 10, apiClients);
       }),
       (async () => {
         if (!baseDenom) schemaError(serviceText("native_denom_unknown"));

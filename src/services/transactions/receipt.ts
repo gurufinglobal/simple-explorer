@@ -1,3 +1,4 @@
+import { clearLiveTransactionCache } from '../guru/live-history.service';
 import serviceTemplates from "@/i18n/service-messages.json";
 
 import { describeServiceMessage, ServiceError, serviceText, type ServiceCode } from '@/i18n/service-message';
@@ -7,7 +8,7 @@ import { getDelegatorValidatorPosition, getValidatorDetail, getTopValidators } f
 import { getWalletPortfolio } from "@/services/guru/wallet-portfolio.service";
 import { getChainByKey } from "@/lib/env";
 import { getActiveChainConfig } from "@/lib/chain-selection";
-import { requestJson, createQueryClient } from "@/services/clients";
+import { invalidateQueryReads, requestJson, createQueryClient } from "@/services/clients";
 import { verifyLcdChain } from "@/services/wallet/chain-eligibility";
 import { getAddressBalances } from "@/services/guru/address-profile.service";
 import { getTransactionsByAddress } from "@/services/guru/transactions.service";
@@ -131,34 +132,38 @@ export async function queryReceipt(receipt: TransactionReceipt): Promise<Transac
 
 export async function refreshTransactionReads(receipt: TransactionReceipt): Promise<string[]> {
   const chain = receiptChain(receipt);
+  invalidateQueryReads(chain);
+  clearLiveTransactionCache();
   const client = createQueryClient(chain);
-  const jobs: [string, () => Promise<unknown>][] = [
-    [serviceText("sender_balance"), () => getAddressBalances(receipt.sender, client)],
-    [serviceText("address_transactions"), () => getTransactionsByAddress(receipt.sender, 30, client)],
+  const jobs: [string, string, () => Promise<unknown>][] = [
+    [serviceText("sender_balance"), `balances:${receipt.sender}`, () => getAddressBalances(receipt.sender, client)],
+    [serviceText("address_transactions"), `address-transactions:${receipt.sender}`, () => getTransactionsByAddress(receipt.sender, 30, client)],
   ];
   const staking = receipt.staking;
   const gov = receipt.governance;
   if (gov) {
-    if (gov.action === "proposal") jobs.push([serviceText("proposal_list"), () => listProposals(100, client)]);
+    if (gov.action === "proposal") jobs.push([serviceText("proposal_list"), "governance", () => listProposals(100, client)]);
     if (gov.proposalId) {
       const id = gov.proposalId;
-      jobs.push([serviceText("proposal_status_and_total_deposit"), () => getProposal(id, client)], [serviceText("original_proposal"), () => getProposalRaw(id, client)]);
+      jobs.push([serviceText("proposal_status_and_total_deposit"), `proposal:${id}`, () => getProposal(id, client)], [serviceText("original_proposal"), `proposal-raw:${id}`, () => getProposalRaw(id, client)]);
       if (gov.action === "vote") jobs.push(
-        [serviceText("my_vote"), () => getVoteForVoter(id, receipt.sender, client)],
-        [serviceText("vote_tally"), () => getProposalTally(id, client)],
-        [serviceText("vote_list"), () => listVotes(id, client)],
+        [serviceText("my_vote"), `my-vote:${id}:${receipt.sender}`, () => getVoteForVoter(id, receipt.sender, client)],
+        [serviceText("vote_tally"), `tally:${id}`, () => getProposalTally(id, client)],
+        [serviceText("vote_list"), `votes:${id}`, () => listVotes(id, client)],
       );
-      if (gov.action === "deposit") jobs.push([serviceText("deposit_list"), () => listDeposits(id, client)]);
+      if (gov.action === "deposit") jobs.push([serviceText("deposit_list"), `deposits:${id}`, () => listDeposits(id, client)]);
     }
   }
   if (staking) jobs.push(
-    [serviceText("my_delegation_position"), () => getDelegatorValidatorPosition(receipt.sender, staking.validator, client)],
-    [serviceText("assets_rewards_and_unbonding"), () => getWalletPortfolio(receipt.sender, client)],
-    [serviceText("validator_details"), () => getValidatorDetail(staking.validator, client)],
-    [serviceText("validator_list"), () => getTopValidators(100, client)],
+    [serviceText("my_delegation_position"), `delegator:${receipt.sender}:${staking.validator}`, () => getDelegatorValidatorPosition(receipt.sender, staking.validator, client)],
+    [serviceText("assets_rewards_and_unbonding"), `address-portfolio:${receipt.sender}`, () => getWalletPortfolio(receipt.sender, client)],
+    [serviceText("validator_details"), `staking:${staking.validator}`, () => getValidatorDetail(staking.validator, client)],
+    [serviceText("validator_list"), "staking", () => getTopValidators(100, client)],
   );
   if (getActiveChainConfig().key === chain.key && useWalletSessionStore.getState().bech32Address === receipt.sender) {
-    jobs.push([serviceText("wallet_assets"), async () => {
+    const duplicate = jobs.findIndex(([, target]) => target === `address-portfolio:${receipt.sender}`);
+    if (duplicate >= 0) jobs.splice(duplicate, 1);
+    jobs.push([serviceText("wallet_assets"), "wallet-assets-store", async () => {
       const portfolio = useWalletPortfolioStore.getState();
       portfolio.clear();
       await portfolio.refresh(receipt.sender);
@@ -168,14 +173,17 @@ export async function refreshTransactionReads(receipt: TransactionReceipt): Prom
       }
     }]);
   }
+  const claimed = new Set<string>();
+  const refreshes: Promise<void>[] = [];
   window.dispatchEvent(new CustomEvent("explorer:queries-invalidated", { detail: {
-    chain: chain.key,
+    chain: chain.key, claimed, refreshes,
     targets: [`balances:${receipt.sender}`, `address-transactions:${receipt.sender}`, `address-portfolio:${receipt.sender}`, `transaction:${receipt.hash}`, ...(staking ? [`delegator:${receipt.sender}:${staking.validator}`, `staking:${staking.validator}`, "staking", "dashboard-validators", "dashboard-summary"] : []),
       ...(gov ? ["governance", "new-proposal-params", ...(gov.proposalId ? [
         `proposal:${gov.proposalId}`, `proposal-raw:${gov.proposalId}`, `gov-params:${gov.proposalId}`,
         `tally:${gov.proposalId}`, `votes:${gov.proposalId}`, `deposits:${gov.proposalId}`, `my-vote:${gov.proposalId}:${receipt.sender}`,
       ] : [])] : [])],
   } }));
-  const results = await Promise.allSettled(jobs.map(([, read]) => read()));
-  return results.flatMap((result, i) => result.status === "rejected" ? [serviceText("related_read_failed", { value0: jobs[i][0], value1: errorMessage(result.reason) })] : []);
+  const directJobs = jobs.filter(([, target]) => !claimed.has(target));
+  const results = await Promise.allSettled([...directJobs.map(([, , read]) => read()), ...refreshes]);
+  return results.flatMap((result, i) => result.status === "rejected" ? [serviceText("related_read_failed", { value0: directJobs[i]?.[0] ?? serviceText("screen_data_refresh"), value1: errorMessage(result.reason) })] : []);
 }

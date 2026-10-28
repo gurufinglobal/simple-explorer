@@ -193,6 +193,7 @@ it.each(["defaults", "file", "process"])("initializes the actual Vitest worker w
   symlinkSync(join(root, "node_modules"), join(directory, "node_modules"), "dir");
   symlinkSync(join(root, "src"), join(directory, "src"), "dir");
   mkdirSync(join(directory, "tests"));
+  symlinkSync(join(root, "tests/helpers"), join(directory, "tests/helpers"), "dir");
   const expected = mode === "process" ? "https://process.example" : mode === "file" ? "https://file.example" : "https://trpc.gurufin.io:1317";
   writeFileSync(join(directory, "tests/worker.test.ts"), `
     import { expect, it, vi } from 'vitest';

@@ -379,10 +379,10 @@ describe('W06 service context guards', () => {
 
 describe('W06 refreshed rendered data', () => {
   it('keeps the included receipt and form mounted during a delayed validator refresh', async () => {
-    let included = false;
+    let included = false, detailRefreshes = 0;
     const refresh = deferred<void>();
     http.mockImplementation(async url => {
-      if (included && new URL(String(url)).pathname.endsWith(`/validators/${validator}`)) await refresh.promise;
+      if (included && new URL(String(url)).pathname.endsWith(`/validators/${validator}`)) { detailRefreshes++; await refresh.promise; }
       return response(String(url));
     });
     render(<ValidatorDetailPage />);
@@ -401,6 +401,7 @@ describe('W06 refreshed rendered data', () => {
     expect(await screen.findByRole('link', { name: new RegExp(hash) })).toBeTruthy();
     await act(async () => refresh.resolve());
     await screen.findByText('0.005678 GXN');
+    expect(detailRefreshes).toBe(1); // Mounted query owns refresh; no duplicate direct detail job.
     expect(screen.getByText(/체인 포함 성공/)).toBeTruthy();
     expect(boundary.broadcast).toHaveBeenCalledOnce();
   });

@@ -1,3 +1,4 @@
+import { acquireRequest, sharedRead, invalidateSharedReads } from './request-control';
 import { ServiceError } from "@/i18n/service-message";
 
 import { serviceMessage, serviceText } from '@/i18n/service-message';
@@ -25,11 +26,16 @@ export type ReadOptions = { signal?: AbortSignal; timeoutMs?: number; onResponse
 export async function requestJson<T>(url: string, init: RequestInit = {}, options: ReadOptions = {}): Promise<T> {
   const controller = new AbortController();
   let timedOut = false;
+  const deadline = Date.now() + (options.timeoutMs ?? 10_000);
   const cancel = () => controller.abort();
   options.signal?.addEventListener("abort", cancel, { once: true });
   if (options.signal?.aborted) cancel();
   const timer = setTimeout(() => { timedOut = true; controller.abort(); }, options.timeoutMs ?? 10_000);
+  let release: (() => void) | undefined;
   try {
+    const permit = acquireRequest(url, controller.signal);
+    release = typeof permit === "function" ? permit : await permit;
+    if (Date.now() >= deadline) { timedOut = true; controller.abort(); }
     if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
     const response = await fetch(url, { ...init, cache: "no-store", signal: controller.signal });
     if (controller.signal.aborted) throw new DOMException("Aborted", "AbortError");
@@ -54,7 +60,7 @@ export async function requestJson<T>(url: string, init: RequestInit = {}, option
   } catch (error) {
     if (controller.signal.aborted) throw new QueryError({ kind: timedOut ? "timeout" : "cancelled", message: timedOut ? serviceText("query_exceeded_the_10_second_timeout") : serviceText("query_cancelled") });
     throw error instanceof QueryError ? error : new QueryError(queryError(error));
-  } finally { clearTimeout(timer); options.signal?.removeEventListener("abort", cancel); }
+  } finally { release?.(); clearTimeout(timer); options.signal?.removeEventListener("abort", cancel); }
 }
 
 function resolveRpcBaseUrl(chain: ChainConfig): string {
@@ -75,7 +81,17 @@ function getActiveChainConfigForRuntime(): ChainConfig {
   return getActiveChainConfigFromClientCookie();
 }
 
-async function readObserved<T>(chain: ChainConfig, path: string, signal?: AbortSignal, height?: string) {
+export function queryIdentity(chain: ChainConfig): string { return JSON.stringify([chain.key, chain.chainId, chain.lcdUrl]); }
+export function invalidateQueryReads(chain?: ChainConfig) { invalidateSharedReads(chain ? queryIdentity(chain) : undefined); }
+
+async function readObserved<T>(chain: ChainConfig, path: string, signal?: AbortSignal, height?: string, fresh = false) {
+  if (fresh) return readObservedUncached<T>(chain, path, signal, height);
+  requireModule(chain, path);
+  const ttl = /\/denoms_metadata(?:\?|$)|\/params(?:\/[^?]+)?(?:\?|$)/.test(path) ? 30_000 : 0;
+  return sharedRead(queryIdentity(chain) + '|' + JSON.stringify([path, height]), ttl, signal,
+    sharedSignal => readObservedUncached<T>(chain, path, sharedSignal, height));
+}
+async function readObservedUncached<T>(chain: ChainConfig, path: string, signal?: AbortSignal, height?: string) {
   try {
     requireModule(chain, path);
     let blockHeight: string | null = null;
@@ -85,24 +101,20 @@ async function readObserved<T>(chain: ChainConfig, path: string, signal?: AbortS
         blockHeight = raw && /^\d+$/.test(raw) ? raw : null;
       },
     });
-    return { data: validateLcdJson(path, data), blockHeight };
+    return { data: validateLcdJson(path, data), blockHeight, observedAt: new Date().toISOString() };
   } catch (error) {
     throw new QueryError({ ...queryError(error), endpoint: toUrl(chain.lcdUrl, path) });
   }
 }
 
 export const apiClients = {
-  lcdGetObserved: <T>(path: string, height?: string) => readObserved<T>(getActiveChainConfigForRuntime(), path, undefined, height),
+  lcdGetObserved: <T>(path: string, height?: string, options?: ReadOptions) => readObserved<T>(getActiveChainConfigForRuntime(), path, options?.signal, height),
   get chain() { return getActiveChainConfigForRuntime(); },
   // URL helpers and requests must use the same selected chain.
   lcdUrl: (path: string) => toUrl(getActiveChainConfigForRuntime().lcdUrl, path),
   rpcUrl: (path: string) => toUrl(resolveRpcBaseUrl(getActiveChainConfigForRuntime()), path),
   evmRpcUrl: (path: string) => toUrl(resolveEvmRpcBaseUrl(getActiveChainConfigForRuntime()), path),
-  lcdGet: async <T>(pathOrUrl: string) => {
-    const chain = getActiveChainConfigForRuntime();
-    requireModule(chain, pathOrUrl);
-    return validateLcdJson(pathOrUrl, await requestJson<T>(toUrl(chain.lcdUrl, pathOrUrl)));
-  },
+  lcdGet: async <T>(path: string, options?: ReadOptions) => (await readObserved<T>(getActiveChainConfigForRuntime(), path, options?.signal)).data,
   rpcGet: async <T>(pathOrUrl: string) => {
     const chain = getActiveChainConfigForRuntime();
     return requestJson<T>(toUrl(resolveRpcBaseUrl(chain), pathOrUrl));
@@ -130,24 +142,26 @@ export async function getActiveChainRpcUrl(): Promise<string> {
 }
 
 /** Pins every request in a read to the same chain and cancellation signal. */
-export function createQueryClient(chain: ChainConfig, signal?: AbortSignal) {
+export function createQueryClient(chain: ChainConfig, signal?: AbortSignal, fresh = false) {
   const observations: QueryObservation[] = [];
-  const observed = async <T>(path: string, height?: string) => {
-    const result = await readObserved<T>(chain, path, signal, height);
-    observations.push({ endpoint: toUrl(chain.lcdUrl, path), observedAt: new Date().toISOString(), blockHeight: result.blockHeight });
+  const observed = async <T>(path: string, height?: string, options?: ReadOptions) => {
+    const combined = signal && options?.signal ? AbortSignal.any([signal, options.signal]) : signal ?? options?.signal;
+    const result = await readObserved<T>(chain, path, combined, height, fresh);
+    observations.push({ endpoint: toUrl(chain.lcdUrl, path), observedAt: result.observedAt, blockHeight: result.blockHeight });
     return result;
   };
   return {
     observations,
+    signal,
     chain,
     lcdUrl: (path: string) => toUrl(chain.lcdUrl, path),
     rpcUrl: (path: string) => toUrl(resolveRpcBaseUrl(chain), path),
     evmRpcUrl: (path: string) => toUrl(resolveEvmRpcBaseUrl(chain), path),
     lcdGetObserved: observed,
-    lcdGet: async <T>(path: string) => (await observed<T>(path)).data,
+    lcdGet: async <T>(path: string, options?: ReadOptions) => (await observed<T>(path, undefined, options)).data,
     rpcGet: <T>(path: string) => requestJson<T>(toUrl(resolveRpcBaseUrl(chain), path), {}, { signal }),
     evmRpcGet: <T>(path: string) => requestJson<T>(toUrl(resolveEvmRpcBaseUrl(chain), path), {}, { signal }),
     rpcJson: <T>(method: string, params: unknown[] = []) => requestJson<T>(resolveRpcBaseUrl(chain), { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) }, { signal }),
   };
 }
-export type QueryClient = Omit<ReturnType<typeof createQueryClient>, "observations"> & { observations?: QueryObservation[] };
+export type QueryClient = Omit<ReturnType<typeof createQueryClient>, "observations" | "signal"> & { observations?: QueryObservation[]; signal?: AbortSignal };

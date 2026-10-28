@@ -60,20 +60,20 @@ it('counts initial/unchanged/new/empty polls, preserves cursor on failures and i
     return { tx_responses: h % 2 ? [] : [{ txhash: String(h), height: String(h), code: 0 }], txs: [], total: h % 2 ? '0' : '1' };
   });
   const chain = getActiveChainConfig(), client = createQueryClient(chain);
-  const first = await getLiveTransactions(client, null); expect(http).toHaveBeenCalledTimes(121);
-  expect(first.fromHeight).toBe(31);
-  await getLiveTransactions(client, first); expect(http).toHaveBeenCalledTimes(122);
-  height = 151; const empty = await getLiveTransactions(client, first); expect(http).toHaveBeenCalledTimes(124); expect(empty.height).toBe('151');
-  await getLiveTransactions(client, empty); expect(http).toHaveBeenCalledTimes(125);
-  height = 152; const fresh = await getLiveTransactions(client, empty); expect(http).toHaveBeenCalledTimes(127); expect(fresh.rows[0].height).toBe('152');
+  const first = await getLiveTransactions(client, null); expect(http).toHaveBeenCalledTimes(31);
+  expect(first.fromHeight).toBe(121);
+  await getLiveTransactions(client, first); expect(http).toHaveBeenCalledTimes(32);
+  height = 151; const empty = await getLiveTransactions(client, first); expect(http).toHaveBeenCalledTimes(34); expect(empty.height).toBe('151');
+  await getLiveTransactions(client, empty); expect(http).toHaveBeenCalledTimes(35);
+  height = 152; const fresh = await getLiveTransactions(client, empty); expect(http).toHaveBeenCalledTimes(37); expect(fresh.rows[0].height).toBe('152');
   height = 212; failed = 210;
   await expect(getLiveTransactions(client, fresh)).rejects.toThrow('HTTP 500'); expect(fresh.height).toBe('152');
   failed = 0; scanned.length = 0;
   const recovered = await getLiveTransactions(client, fresh);
-  expect(scanned).toEqual(Array.from({ length: 60 }, (_, i) => 212 - i)); expect(recovered.height).toBe('212');
+  expect(scanned).toEqual(Array.from({ length: 28 }, (_, i) => 210 - i)); expect(recovered.height).toBe('212');
   expect(new Set(recovered.rows.map(row => row.hash)).size).toBe(recovered.rows.length);
   scanned.length = 0;
-  await getLiveTransactions(createQueryClient({ ...chain, key: 'other' }), recovered); expect(scanned).toHaveLength(120);
+  await getLiveTransactions(createQueryClient({ ...chain, key: 'other' }), recovered); expect(scanned).toHaveLength(30);
   height = 211; await expect(getLiveTransactions(client, recovered)).rejects.toThrow('이전 성공 높이보다 낮습니다');
 });
 it('shows per-height truncation and unknown totals without claiming full history, caps rows at 150', async () => {

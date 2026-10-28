@@ -15,7 +15,7 @@ describe('network summary HTTP boundary', () => {
         supply: '123456789.012345 GXN', bonded: '4.5 GXN', inflation: '4.20%', supplyRaw: '123456789012345678900000000 agxn', bondedRaw: '4500000000000000000 agxn',
       }
     });
-    expect(http).toHaveBeenCalledTimes(9);
+    expect(http).toHaveBeenCalledTimes(8);
   });
   it('keeps minimal TGXN supply unknown with a partial result and no supply HTTP', async () => {
     vi.stubEnv('NEXT_PUBLIC_CHAINS', JSON.stringify([{ key: 'tgxn', name: 'TGXN', lcdUrl: 'https://tgxn.gurufin.io:1317' }]));

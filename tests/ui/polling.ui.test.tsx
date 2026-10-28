@@ -8,8 +8,8 @@ import { TransactionsLiveList } from '@/components/explorer/transactions-live-li
 import { setActiveChainKeyCookie } from '@/lib/chain-selection';
 import { block, mockQueryHttp } from '../helpers/query-http';
 
-beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-21T00:00:00Z')); Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }); });
-afterEach(() => { cleanup(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); document.cookie = 'gf_chain=; max-age=0; path=/'; });
+beforeEach(() => { vi.spyOn(Math, 'random').mockReturnValue(0); vi.useFakeTimers(); vi.setSystemTime(new Date('2026-10-21T00:00:00Z')); Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' }); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); document.cookie = 'gf_chain=; max-age=0; path=/'; });
 async function tick(ms = 0) { await act(async () => { await vi.advanceTimersByTimeAsync(ms); }); }
 function visibility(value: string) { act(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, value }); document.dispatchEvent(new Event('visibilitychange')); }); }
 function Probe({ target = 'probe', poll = 3000 }: { target?: string; poll?: number }) {
@@ -172,12 +172,12 @@ it('AC07-3: Blocks DOM restores 60-height gap, shows exact bounded range and pre
 it('AC07-5: empty Transactions tracks block height independently of rows and skips unchanged scans', async () => {
   let height = 150;
   const http = mockQueryHttp(url => url.pathname.endsWith('/latest') ? { ...block('1'), block: { ...block('1').block, header: { ...block('1').block.header, height: String(height) } } } : { tx_responses: [], txs: [], total: '0' });
-  render(<TransactionsLiveList />); await tick(); expect(http).toHaveBeenCalledTimes(121);
+  render(<TransactionsLiveList />); await tick(); expect(http).toHaveBeenCalledTimes(31);
   expect(screen.getByText('최근 조회 범위에서 트랜잭션이 없습니다.')).toBeTruthy();
   expect(screen.getByText(/마지막 API 성공:.*높이 150/)).toBeTruthy();
-  await tick(3000); expect(http).toHaveBeenCalledTimes(122);
+  await tick(3000); expect(http).toHaveBeenCalledTimes(32);
   expect(screen.getByText(/직전 성공 조회와 높이 동일/)).toBeTruthy();
-  height++; await tick(3000); expect(http).toHaveBeenCalledTimes(124);
+  height++; await tick(3000); expect(http).toHaveBeenCalledTimes(34);
   expect(screen.getByText(/높이 151/)).toBeTruthy();
 });
 it('invalidation keeps the visible blocks but reloads the same height without the old cursor', async () => {

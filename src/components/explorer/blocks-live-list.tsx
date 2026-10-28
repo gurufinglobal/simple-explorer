@@ -11,7 +11,7 @@ import { Box, Card, CardContent, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { useNowTick } from "@/hooks/use-now-tick";
 import { formatRelativePastFromIso } from "@/lib/relative-time";
-import type { BlockDetail } from "@/services/guru/block-details.service";
+import type { BlockSummary } from "@/services/guru/block-details.service";
 
 import { lcdBytesToHex } from "@/lib/bytes";
 
@@ -27,7 +27,7 @@ function hasTransactions(txCount: number | string): boolean {
 
 export function BlocksLiveList() {
   const t = useTranslations("explorer");
-  const query = useQuery<LiveHistory<BlockDetail>>("blocks", getLiveBlocks, POLL_MS);
+  const query = useQuery<LiveHistory<BlockSummary>>("blocks", getLiveBlocks, POLL_MS);
   const blocks = query.result.data?.rows ?? [];
   const locale = useLocale();
   const nowMs = useNowTick(POLL_MS);

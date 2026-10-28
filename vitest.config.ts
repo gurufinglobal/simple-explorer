@@ -11,6 +11,7 @@ export default defineConfig({
   envDir: false,
   oxc: { jsx: { runtime: "automatic" } },
   test: {
+    setupFiles: ["tests/helpers/reset-query-cache.ts"],
     pool: "threads",
     environment: "node",
     include: ["tests/**/*.test.{ts,tsx}"],

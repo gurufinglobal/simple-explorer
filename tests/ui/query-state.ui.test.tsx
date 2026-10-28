@@ -12,7 +12,7 @@ import { getAddressBalances } from '@/services/guru/address-profile.service';
 import { setActiveChainKeyCookie } from '@/lib/chain-selection';
 import { block, mockQueryHttp } from '../helpers/query-http';
 import { mockNetworkSummaryHttp, restoreHttpBoundary } from '../helpers/network-summary';
-afterEach(() => { cleanup(); vi.useRealTimers(); document.cookie = 'gf_chain=; max-age=0; path=/'; restoreHttpBoundary(); });
+afterEach(() => { cleanup(); vi.restoreAllMocks(); vi.useRealTimers(); document.cookie = 'gf_chain=; max-age=0; path=/'; restoreHttpBoundary(); });
 function AddressRead({ address }: { address: string }) {
   const query = useQuery(`balance:${address}`, client => getAddressBalances(address, client));
   return <><QueryStatus {...query} />{query.result.data?.map(row => <span key={row.denom}>{row.amount} {row.denom}</span>)}</>;
@@ -20,6 +20,7 @@ function AddressRead({ address }: { address: string }) {
 describe('real service and query DOM', () => {
   it('shows HTTP polling state and preserves stale blocks after the retry deadline', async () => {
     vi.useFakeTimers();
+    vi.spyOn(Math, 'random').mockReturnValue(0);
     const http = mockQueryHttp(() => new Response('', { status: 500 }));
     render(<BlocksLiveList />);
     expect(screen.queryByText('조회한 블록이 없습니다.')).toBeNull();

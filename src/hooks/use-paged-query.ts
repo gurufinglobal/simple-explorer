@@ -6,7 +6,7 @@ import { getActiveChainConfig } from '@/lib/chain-selection';
 import type { ChainConfig } from '@/lib/env';
 import { initialResult, PartialQueryError, queryError, type QueryResult, type QueryErrorInfo } from '@/lib/query-result';
 import type { QueryPage } from '@/lib/query-page';
-import { createQueryClient, type QueryClient } from '@/services/clients';
+import { invalidateQueryReads, queryIdentity, createQueryClient, type QueryClient } from '@/services/clients';
 
 type State<T> = {
   key: string; result: QueryResult<T[]>; nextCursor: string | null;
@@ -18,7 +18,7 @@ export function usePagedQuery<T>(target: string, load: (client: QueryClient, cur
   identify: (row: T) => string, pinnedChain?: ChainConfig, filter = '') {
   const [, changeChain] = useState(0);
   const chain = pinnedChain ?? getActiveChainConfig();
-  const key = JSON.stringify([chain.key, target, filter]);
+  const key = JSON.stringify([queryIdentity(chain), target, filter]);
   const fresh = useCallback((): State<T> => ({ key, result: initialResult({ chain: chain.key, target }), nextCursor: null, seen: [], pages: 0 }), [key, chain.key, target]);
   const [state, setState] = useState<State<T>>(fresh);
   const [busy, setBusy] = useState(false);
@@ -69,13 +69,14 @@ export function usePagedQuery<T>(target: string, load: (client: QueryClient, cur
     }
   }, [key, fresh]);
   const refresh = useCallback(() => {
+    invalidateQueryReads(refs.current.chain);
     active.current?.abort(); active.current = null;
-    void fetchPage(true);
+    return fetchPage(true);
   }, [fetchPage]);
   useEffect(() => {
     const change = () => {
       if (pinnedChain) return;
-      try { if (getActiveChainConfig().key === refs.current.chain.key) return; }
+      try { if (queryIdentity(getActiveChainConfig()) === queryIdentity(refs.current.chain)) return; }
       catch { active.current?.abort(); active.current = null; return; }
       active.current?.abort(); active.current = null;
       changeChain(n => n + 1);
@@ -85,8 +86,8 @@ export function usePagedQuery<T>(target: string, load: (client: QueryClient, cur
   }, [pinnedChain]);
   useEffect(() => {
     const invalidate = (event: Event) => {
-      const detail = (event as CustomEvent<{ chain: string; targets: string[] }>).detail;
-      if (detail.chain === refs.current.chain.key && detail.targets.includes(target)) refresh();
+      const detail = (event as CustomEvent<{ chain: string; targets: string[]; claimed?: Set<string>; refreshes?: Promise<void>[] }>).detail;
+      if (detail.chain === refs.current.chain.key && detail.targets.includes(target)) { detail.claimed?.add(target); const pending = refresh(); detail.refreshes?.push(pending); }
     };
     window.addEventListener('explorer:queries-invalidated', invalidate);
     return () => window.removeEventListener('explorer:queries-invalidated', invalidate);

@@ -1,6 +1,6 @@
 import { collectQuery, schemaError } from "@/lib/query-result";
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
-import { getBlockDetail, type BlockDetail } from "./block-details.service";
+import { getBlockSummary, type BlockSummary } from "./block-details.service";
 
 type RpcStatusResponse = {
   block?: {
@@ -21,7 +21,7 @@ export async function getLatestBlockHeight(apiClients: QueryClient = defaultClie
 }
 
 /** Fetches blocks with height strictly greater than `heightExclusive` (newest first). */
-export async function fetchBlocksNewerThan(heightExclusive: string, maxBlocks: number, apiClients: QueryClient = defaultClients): Promise<BlockDetail[]> {
+export async function fetchBlocksNewerThan(heightExclusive: string, maxBlocks: number, apiClients: QueryClient = defaultClients): Promise<BlockSummary[]> {
 
   const latest = await getLatestBlockHeight(apiClients);
   const exclusive = Number(heightExclusive);
@@ -32,11 +32,11 @@ export async function fetchBlocksNewerThan(heightExclusive: string, maxBlocks: n
   for (let h = latest; h > exclusive && heights.length < maxBlocks; h--) {
     heights.push(String(h));
   }
-  const blocks = await collectQuery(heights.map((height) => getBlockDetail(height, apiClients)));
+  const blocks = await collectQuery(heights.map((height) => getBlockSummary(height, apiClients)));
   return blocks.filter((item): item is NonNullable<typeof item> => item !== null);
 }
 
-export async function getLatestBlocks(limit = 10, apiClients: QueryClient = defaultClients): Promise<BlockDetail[]> {
+export async function getLatestBlocks(limit = 10, apiClients: QueryClient = defaultClients): Promise<BlockSummary[]> {
 
   const latestHeight = await getLatestBlockHeight(apiClients);
 
@@ -44,6 +44,6 @@ export async function getLatestBlocks(limit = 10, apiClients: QueryClient = defa
     (height) => Number(height) > 0,
   );
 
-  const blocks = await collectQuery(heights.map((height) => getBlockDetail(height, apiClients)));
-  return blocks.filter((item): item is BlockDetail => item !== null);
+  const blocks = await collectQuery(heights.map((height) => getBlockSummary(height, apiClients)));
+  return blocks.filter((item): item is BlockSummary => item !== null);
 }

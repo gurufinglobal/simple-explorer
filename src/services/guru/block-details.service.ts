@@ -26,7 +26,7 @@ export type BlockDetail = {
   txs: Array<{ hash: string }>;
 };
 
-type LcdBlockResponse = {
+export type LcdBlockResponse = {
   block_id?: {
     hash?: string;
     part_set_header?: {
@@ -68,6 +68,14 @@ type LcdBlockResponse = {
     };
   };
 };
+
+export type BlockSummary = Pick<BlockDetail, 'height' | 'hash' | 'time' | 'proposer' | 'txCount' | 'chainId'>;
+export async function getBlockSummary(height: string, client: QueryClient = defaultClients): Promise<BlockSummary | null> {
+  const response = await client.lcdGet<LcdBlockResponse>(`/cosmos/base/tendermint/v1beta1/blocks/${encodeURIComponent(height)}`);
+  const header = response.block?.header;
+  if (!header) return null;
+  return { height: header.height ?? height, hash: response.block_id?.hash ?? '-', time: header.time ?? '-', proposer: header.proposer_address ?? '-', txCount: response.block?.data?.txs?.length ?? 0, chainId: header.chain_id ?? '-' };
+}
 
 function orDash(value: string | undefined): string {
   if (value === undefined || value === "") {

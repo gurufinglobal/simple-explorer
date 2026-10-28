@@ -1,3 +1,4 @@
+import { boundedRows, collectPages } from '../query-budget';
 
 import { serviceText } from '@/i18n/service-message';
 import { schemaError } from "@/lib/query-result";
@@ -63,22 +64,16 @@ export function getSpendableBalances(address: string, client: QueryClient = defa
 
 async function getBalances(address: string, apiClients: QueryClient, kind: "balances" | "spendable_balances"): Promise<AddressBalance[]> {
 
-  const balances: AddressBalance[] = [];
-  let cursor: string | null = null;
-  const seen = new Set<string>();
-  do {
-    const response: LcdBalancesResponse & { pagination?: { next_key?: string | null } } = await apiClients.lcdGet(
-      `/cosmos/bank/v1beta1/${kind}/${encodeURIComponent(address)}${cursor ? `?pagination.key=${encodeURIComponent(cursor)}` : ""}`,
+  return collectPages(apiClients, async (client, cursor, remaining) => {
+    const response = await client.lcdGet<LcdBalancesResponse & { pagination?: { next_key?: string | null } }>(
+      `/cosmos/bank/v1beta1/${kind}/${encodeURIComponent(address)}?pagination.limit=100${cursor ? `&pagination.key=${encodeURIComponent(cursor)}` : ""}`,
     );
-    for (const item of response.balances ?? schemaError()) {
+    const rows = boundedRows(response.balances ?? schemaError(), remaining).map(item => {
       if (!item.denom || !item.amount || !/^\d+$/.test(item.amount)) schemaError();
-      balances.push({ denom: item.denom, amount: item.amount });
-    }
-    cursor = response.pagination?.next_key ?? null;
-    if (cursor && seen.has(cursor)) schemaError(serviceText("balance_page_repeated"));
-    if (cursor) seen.add(cursor);
-  } while (cursor);
-  return balances;
+      return { denom: item.denom, amount: item.amount };
+    });
+    return { rows, next: response.pagination?.next_key };
+  });
 }
 
 export async function getAddressAccountInfo(address: string, apiClients: QueryClient = defaultClients): Promise<AddressAccountInfo> {

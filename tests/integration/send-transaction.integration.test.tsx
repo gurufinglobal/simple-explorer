@@ -503,3 +503,16 @@ describe('W05 preflight and execution contracts', () => {
     expect(Object.keys(loadReceipts()[0])).not.toContain('sessionTopic'); localStorage.setItem('explorer:transaction-receipts:v1', '{'); expect(loadReceipts()).toEqual([]);
   });
 });
+
+it.each(['prepare', 'before-sign'] as const)('blocks incomplete balances before any wallet signature (%s)', async stage => {
+  const prepared = stage === 'before-sign' ? await prepareSendTx(input) : null;
+  let pages = 0;
+  http.mockImplementation(async url => new URL(String(url)).pathname.includes('/balances/')
+    ? Response.json({ balances, pagination: { next_key: String(++pages) } }) : response(String(url)));
+  const attempt = prepared ? submitSendTx(prepared) : prepareSendTx(input);
+  await expect(attempt).rejects.toMatchObject({ info: { kind: 'incomplete', messageCode: 'query_budget_exceeded' } });
+  expect(pages).toBe(50);
+  expect(boundary.wallet).not.toHaveBeenCalled();
+  expect(boundary.sign).not.toHaveBeenCalled();
+  expect(boundary.broadcast).not.toHaveBeenCalled();
+});

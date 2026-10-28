@@ -83,7 +83,7 @@ describe("W08 chain-aware search and actual service reads", () => {
     const input = address(chain.bech32Prefix!).toUpperCase();
     const result = await lookupByQuery(input, { chain: chain.key, cookieChain: chain.key === "a" ? "b" : "a" });
     expect(result.status).toBe(200);
-    expect(http.mock.calls[0][0]).toBe(chain.lcdUrl + "/cosmos/bank/v1beta1/balances/" + input.toLowerCase());
+    expect(http.mock.calls[0][0]).toBe(chain.lcdUrl + "/cosmos/bank/v1beta1/balances/" + input.toLowerCase() + "?pagination.limit=100");
   });
   it.each(["0x", "0X", ""])("AC05-2 %s hash and case normalize to the same Cosmos query", async prefix => {
     await lookupByQuery(prefix + e09.response.tx_response.txhash.toLowerCase(), { chain: "a" });
@@ -133,8 +133,8 @@ describe("W08 chain-aware search and actual service reads", () => {
     useWalletSessionStore.setState({ status: "connected", bech32Address: raw, evmAddress: null, chainKey: "a" });
     render(route({ address: raw }, <><AddressPage /><WalletPortfolioHydrator /></>));
     await screen.findByText("주소 (canonical Bech32): " + canonical);
-    await waitFor(() => expect(http.mock.calls.filter(([url]) => String(url).includes("/balances/")).length).toBeGreaterThanOrEqual(2));
-    expect(http.mock.calls.filter(([url]) => String(url).includes("/balances/")).every(([url]) => String(url).endsWith("/" + canonical))).toBe(true);
+    await waitFor(() => expect(http.mock.calls.filter(([url]) => String(url).includes("/balances/")).length).toBe(1));
+    expect(http.mock.calls.filter(([url]) => String(url).includes("/balances/")).every(([url]) => new URL(String(url)).pathname.endsWith("/" + canonical))).toBe(true);
   });
   it("invalid address detail blocks metadata/account/bank/portfolio/transaction HTTP alike", () => {
     render(route({ address: "guru1invalid" }, <AddressPage />));

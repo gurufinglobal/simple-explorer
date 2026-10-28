@@ -58,7 +58,7 @@ export async function prepareTransaction(params: SigningInput, setup: (context: 
   assertCurrent();
   const sender = state.bech32Address!;
   assertCosmosWalletKey(chain, sender, state.pubkey!, "secp256k1");
-  const query = createQueryClient(chain);
+  const query = createQueryClient(chain, undefined, true);
   const { message, policy, display, context, governance, check, allowedSigning, assertValid } = await setup({ chain, query, sender, assertCurrent });
   assertActionCurrent = assertValid ?? (() => {});
   assertCurrent();

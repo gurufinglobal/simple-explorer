@@ -1,3 +1,4 @@
+import { withReadDeadline } from '../query-budget';
 
 import { serviceText } from '@/i18n/service-message';
 import { PartialQueryError, collectQuery, queryError, schemaError } from "@/lib/query-result";
@@ -24,7 +25,7 @@ type TxsResponse = {
   }>;
 };
 
-const MAX_SCAN_BLOCKS = 120;
+const MAX_SCAN_BLOCKS = 30;
 
 function mapTxRows(response: TxsResponse): TxDetail[] {
   const txResponses = response.tx_responses ?? [];
@@ -51,33 +52,35 @@ function mapTxRows(response: TxsResponse): TxDetail[] {
 
 export async function getRecentTransactions(limit = 10, apiClients: QueryClient = defaultClients): Promise<TxDetail[]> {
 
-  const rows: TxDetail[] = [];
-  try {
-    const latestHeight = await getLatestBlockHeight(apiClients);
-    if (latestHeight <= 0) {
-      return [];
-    }
-
-    for (
-      let height = latestHeight, scanned = 0;
-      height > 0 && scanned < MAX_SCAN_BLOCKS && rows.length < limit;
-      height--, scanned++
-    ) {
-      const query = encodeURIComponent(`tx.height=${height}`);
-      const response = await apiClients.lcdGet<TxsResponse>(
-        `/cosmos/tx/v1beta1/txs?query=${query}&pagination.limit=${limit - rows.length}&order_by=ORDER_BY_DESC`,
-      );
-      const mapped = mapTxRows(response);
-      if (mapped.length > 0) {
-        rows.push(...mapped);
+  return withReadDeadline(apiClients, async apiClients => {
+    const rows: TxDetail[] = [];
+    try {
+      const latestHeight = await getLatestBlockHeight(apiClients);
+      if (latestHeight <= 0) {
+        return [];
       }
-    }
 
-    return rows.slice(0, limit);
-  } catch (error) {
-    if (rows.length) throw new PartialQueryError(rows, queryError(error));
-    throw error;
-  }
+      for (
+        let height = latestHeight, scanned = 0;
+        height > 0 && scanned < MAX_SCAN_BLOCKS && rows.length < limit;
+        height--, scanned++
+      ) {
+        const query = encodeURIComponent(`tx.height=${height}`);
+        const response = await apiClients.lcdGet<TxsResponse>(
+          `/cosmos/tx/v1beta1/txs?query=${query}&pagination.limit=${limit - rows.length}&order_by=ORDER_BY_DESC`,
+        );
+        const mapped = mapTxRows(response);
+        if (mapped.length > 0) {
+          rows.push(...mapped);
+        }
+      }
+
+      return rows.slice(0, limit);
+    } catch (error) {
+      if (rows.length) throw new PartialQueryError(rows, queryError(error));
+      throw error;
+    }
+  });
 }
 
 export async function getTransactionsByAddress(address: string, limit = 30, apiClients: QueryClient = defaultClients): Promise<TxDetail[]> {

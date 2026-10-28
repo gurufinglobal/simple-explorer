@@ -354,7 +354,13 @@
       "evm_no_code": "No contract code exists at this address on the selected chain.",
       "evm_read_only": "Read calls only allow view or pure functions.",
       "evm_write_only": "Use a read call for view or pure functions.",
-      "evm_invalid_hash": "Enter a 32-byte EVM hash starting with 0x. Cosmos hashes are separate."
+      "evm_invalid_hash": "Enter a 32-byte EVM hash starting with 0x. Cosmos hashes are separate.",
+      "request_queue_full": "The request queue is full. Try again shortly.",
+      "query_budget_exceeded": "The query limit (50 pages, 5,000 rows, 30 seconds) was reached. Results are incomplete; the full total is unavailable.",
+      "pagination_cursor_repeated": "A repeated page cursor stopped the query. The full total is unavailable.",
+      "query_cycle_deadline": "The query cycle exceeded its 30-second deadline.",
+      "bounded_transaction_scope": "Query range: #{value0}–#{value1}. At most 30 heights and 30 seconds per cycle; showing the latest 150 transactions. History outside this range is omitted. {value2}",
+      "screen_data_refresh": "Screen data refresh"
     },
     "externalError": "The request could not be completed.",
     "originalDetail": "Original detail",

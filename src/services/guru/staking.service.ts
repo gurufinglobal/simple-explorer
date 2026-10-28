@@ -1,5 +1,5 @@
+import { boundedRows, collectPages } from '../query-budget';
 
-import { serviceText } from '@/i18n/service-message';
 import { cursorParam, pageRows, queryPage, type LcdPagination } from '@/lib/query-page';
 import { sumCoins, type Coin, type AmountMetadata } from "@/lib/cosmos-amount";
 import { withAmountMetadata, getStakingParams } from "./amount-context.service";
@@ -185,26 +185,15 @@ async function operatorToAccountAddress(operatorAddress: string): Promise<string
 }
 
 async function fetchValidatorDelegationTotal(operatorAddress: string, apiClients: QueryClient = defaultClients): Promise<Coin[]> {
-  let nextKey: string | null | undefined;
-  const coins: Coin[] = [];
-  const seen = new Set<string>();
-
-  do {
-    const path =
-      nextKey === undefined || nextKey === null
-        ? `/cosmos/staking/v1beta1/validators/${encodeURIComponent(operatorAddress)}/delegations?pagination.limit=100`
-        : `/cosmos/staking/v1beta1/validators/${encodeURIComponent(operatorAddress)}/delegations?pagination.limit=100&pagination.key=${encodeURIComponent(nextKey)}`;
-    const page = await apiClients.lcdGet<ValidatorDelegationsPage>(path);
-    for (const delegation of page.delegation_responses ?? schemaError()) {
+  const coins = await collectPages(apiClients, async (client, cursor, remaining) => {
+    const page = await client.lcdGet<ValidatorDelegationsPage>(`/cosmos/staking/v1beta1/validators/${encodeURIComponent(operatorAddress)}/delegations?pagination.limit=100${cursor ? `&pagination.key=${encodeURIComponent(cursor)}` : ""}`);
+    const rows = boundedRows(page.delegation_responses ?? schemaError(), remaining).map(delegation => {
       const balance = delegation.balance ?? schemaError();
       if (!balance.amount || !balance.denom || !/^\d+$/.test(balance.amount)) schemaError();
-      coins.push({ amount: balance.amount, denom: balance.denom });
-    }
-    nextKey = page.pagination?.next_key ?? null;
-    if (nextKey && seen.has(nextKey)) schemaError(serviceText("delegation_page_repeated"));
-    if (nextKey) seen.add(nextKey);
-  } while (nextKey);
-
+      return { amount: balance.amount, denom: balance.denom };
+    });
+    return { rows, next: page.pagination?.next_key };
+  });
   return sumCoins(coins);
 }
 

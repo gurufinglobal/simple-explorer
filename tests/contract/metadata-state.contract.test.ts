@@ -1,3 +1,4 @@
+import { invalidateQueryReads } from '@/services/clients';
 import { afterEach, describe, expect, it } from 'vitest';
 import { readQuery } from '@/lib/query-result';
 import { getWalletPortfolio } from '@/services/guru/wallet-portfolio.service';
@@ -49,6 +50,7 @@ it('R1 preserves retry timing, raw details, stale data and recovery across metad
   const success = await readQuery(context, () => getWalletPortfolio('a'), partial);
   expect(success).toMatchObject({ status: 'success', error: null, data: { staking: '1 GXN, 1.234567 TEST' } });
   failed = true;
+  invalidateQueryReads(); // Explicit refresh must observe the new outage despite metadata TTL.
   const stale = await readQuery(context, () => getWalletPortfolio('a'), success);
   expect(stale).toMatchObject({ status: 'stale', data: success.data, observedAt: success.observedAt, error: { status: 429 } });
 });
