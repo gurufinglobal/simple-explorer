@@ -177,7 +177,10 @@ describe("W08 chain-aware search and actual service reads", () => {
   });
   it("AC05-7 keeps E09 Cosmos height/code/fee/message and clearly marks unavailable EVM data", async () => {
     render(route({ hash: "0x" + e09.response.tx_response.txhash.toLowerCase() }, <TxPage />));
-    await screen.findByText("MsgEthereumTx");
+    const summary = await screen.findByText("메시지 본문 및 추가 정보", { selector: "summary" });
+    fireEvent.click(summary);
+    fireEvent(summary.parentElement!, new Event("toggle"));
+    await screen.findByText(/#1 .*MsgEthereumTx/, { selector: "summary" });
     expect(screen.getByText(/158612886367191703 agxn/)).toBeTruthy();
     expect(screen.getByRole("link", { name: "19611783" }).getAttribute("href")).toBe("/blocks/19611783?chain=a");
     expect(screen.getByText("성공")).toBeTruthy();

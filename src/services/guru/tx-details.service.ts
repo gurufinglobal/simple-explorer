@@ -1,3 +1,4 @@
+import { schemaError } from "@/lib/query-result";
 import { apiClients as defaultClients, type QueryClient } from "@/services/clients";
 
 export type TxDetail = {
@@ -20,45 +21,22 @@ export type TxDetail = {
   timestamp?: string;
 };
 
-type LcdTxResponse = {
-  tx_response?: {
-    height?: string;
-    txhash?: string;
-    codespace?: string;
-    code?: number;
-    gas_used?: string;
-    gas_wanted?: string;
-    timestamp?: string;
-    raw_log?: string;
-  };
-  tx?: {
-    body?: {
-      memo?: string;
-      timeout_height?: string;
-      messages?: Array<{
-        "@type"?: string;
-        type_url?: string;
-        [key: string]: unknown;
-      }>;
-    };
-    auth_info?: {
-      signer_infos?: Array<{
-        public_key?: {
-          key?: string;
-        };
-      }>;
-      fee?: {
-        amount?: Array<{
-          denom?: string;
-          amount?: string;
-        }>;
-        gas_limit?: string;
-        payer?: string;
-        granter?: string;
-      };
-    };
-  };
+/** Only the detail request retains the full LCD payload; list rows stay lightweight. */
+export type TxInspection = Omit<TxDetail, "code"> & {
+  code: number | null;
+  raw: Record<string, unknown>;
+  selectedTx: Record<string, unknown> | null;
+  txSource: "top" | "nested" | "missing" | "invalid";
+  messageBodies: unknown;
+  events: unknown;
+  logs: unknown;
 };
+
+export function txRecord(value: unknown): Record<string, unknown> | null {
+  return value !== null && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown> : null;
+}
+const text = (value: unknown, fallback = "") => typeof value === "string" ? value : fallback;
 
 function shortType(typeUrl: string): string {
   if (!typeUrl.trim()) {
@@ -96,50 +74,57 @@ function collectAddressesFromMessageValue(value: unknown, out: Set<string>): voi
   }
 }
 
-export async function getTxDetail(hash: string, apiClients: QueryClient = defaultClients): Promise<TxDetail | null> {
-
-  const response = await apiClients.lcdGet<LcdTxResponse>(
+export async function getTxDetail(hash: string, apiClients: QueryClient = defaultClients): Promise<TxInspection> {
+  const payload = await apiClients.lcdGet<unknown>(
     `/cosmos/tx/v1beta1/txs/${encodeURIComponent(hash)}`,
   );
-  const txResponse = response.tx_response;
-  if (!txResponse) {
-    return null;
-  }
-  const messagesRaw = response.tx?.body?.messages ?? [];
-  const messages = messagesRaw.map((message) => {
-    const typeUrl = message["@type"] ?? message.type_url ?? "";
-    return {
-      typeUrl,
-      shortType: shortType(typeUrl),
-    };
-  });
+  const response = txRecord(payload);
+  const txResponse = txRecord(response?.tx_response);
+  if (!response || !txResponse) schemaError();
 
+  // Top-level tx wins when provided. Null/absent falls back to tx_response.tx.
+  // A malformed provided top-level tx is disclosed, never silently replaced.
+  const top = response.tx !== undefined && response.tx !== null;
+  const candidate = top ? response.tx : txResponse.tx;
+  const selectedTx = txRecord(candidate);
+  const txSource = selectedTx ? (top ? "top" : "nested")
+    : candidate === undefined || candidate === null ? "missing" : "invalid";
+  const body = txRecord(selectedTx?.body);
+  const fee = txRecord(txRecord(selectedTx?.auth_info)?.fee);
+  const messagesRaw = Array.isArray(body?.messages) ? body.messages : [];
   const participants = new Set<string>();
-  for (const msg of messagesRaw) {
-    collectAddressesFromMessageValue(msg, participants);
-  }
-
-  const feeAmount = (response.tx?.auth_info?.fee?.amount ?? []).map((coin) => ({
-    denom: coin.denom ?? "-",
-    amount: coin.amount ?? "0",
-  }));
-
+  const messages = messagesRaw.map((value) => {
+    const message = txRecord(value);
+    const typeUrl = text(message?.["@type"], text(message?.type_url));
+    collectAddressesFromMessageValue(value, participants);
+    return { typeUrl, shortType: shortType(typeUrl) };
+  });
+  const feeAmount = (Array.isArray(fee?.amount) ? fee.amount : []).map((value) => {
+    const coin = txRecord(value);
+    return { denom: text(coin?.denom, "—"), amount: text(coin?.amount, "—") };
+  });
   return {
-    hash: txResponse.txhash ?? hash,
-    code: txResponse.code ?? 0,
-    codespace: txResponse.codespace ?? "",
-    height: txResponse.height ?? "0",
-    gasUsed: txResponse.gas_used ?? "0",
-    gasWanted: txResponse.gas_wanted ?? "0",
-    memo: response.tx?.body?.memo ?? "",
-    rawLog: txResponse.raw_log ?? "",
+    hash: text(txResponse.txhash, hash),
+    code: typeof txResponse.code === "number" && Number.isSafeInteger(txResponse.code) && txResponse.code >= 0 ? txResponse.code : null,
+    codespace: text(txResponse.codespace),
+    height: text(txResponse.height, "—"),
+    gasUsed: text(txResponse.gas_used, "—"),
+    gasWanted: text(txResponse.gas_wanted, "—"),
+    memo: text(body?.memo),
+    rawLog: text(txResponse.raw_log),
     feeAmount,
-    feePayer: response.tx?.auth_info?.fee?.payer ?? "",
-    feeGranter: response.tx?.auth_info?.fee?.granter ?? "",
-    timeoutHeight: response.tx?.body?.timeout_height ?? "0",
+    feePayer: text(fee?.payer),
+    feeGranter: text(fee?.granter),
+    timeoutHeight: text(body?.timeout_height, "—"),
     messages,
     signerAddresses: [],
     participantAddresses: Array.from(participants),
-    timestamp: txResponse.timestamp,
+    timestamp: text(txResponse.timestamp) || undefined,
+    raw: response,
+    selectedTx,
+    txSource,
+    messageBodies: body?.messages,
+    events: txResponse.events,
+    logs: txResponse.logs,
   };
 }

@@ -1,4 +1,5 @@
 "use client";
+import { TxInspectionPanels } from "@/components/explorer/tx-inspection";
 import { formatTimestamp } from "@/lib/relative-time";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -15,10 +16,6 @@ import {
   Card,
   CardContent,
   Chip,
-  Divider,
-  List,
-  ListItem,
-  ListItemText,
   Stack,
   Typography,
 } from "@mui/material";
@@ -46,12 +43,12 @@ function TxDetailContent({ hash }: { hash: string }) {
       : "-";
 
   const timestampLabel = tx.timestamp ? formatTimestamp(tx.timestamp, locale) : "-";
-  const statusLabel = tx.code === 0 ? t("success") : t("failed");
-  const statusColor = tx.code === 0 ? "success" : "error";
+  const statusLabel = tx.code === null ? t("tx_inspection.unknown_status") : tx.code === 0 ? t("success") : t("failed");
+  const statusColor = tx.code === null ? "default" : tx.code === 0 ? "success" : "error";
   const feeLabel = tx.feeAmount.length > 0 ? tx.feeAmount.map((coin) => `${coin.amount} ${coin.denom}`).join(", ") : "-";
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={2} sx={{ minWidth: 0, overflowWrap: "anywhere" }}>
       <CopyPageLink />
       {tx.messages.some(message => message.shortType === "MsgEthereumTx") && <Alert severity="info">{t("cosmos_transaction_summary_evm_transaction_hash_mapping_receipts_logs")}</Alert>}
       <QueryStatus {...query} />
@@ -72,7 +69,7 @@ function TxDetailContent({ hash }: { hash: string }) {
             <CopyValue label={t("copy_cosmos_transaction_hash_hex")} value={tx.hash} />
             <Typography>
               <strong>{t("height")}</strong>{" "}
-              {tx.height !== "0" ? (
+              {/^[1-9]\d*$/.test(tx.height) ? (
                 <Link href={`/blocks/${tx.height}`} style={{ color: "inherit" }}>
                   {tx.height}
                 </Link>
@@ -84,11 +81,11 @@ function TxDetailContent({ hash }: { hash: string }) {
               <strong>{t("timestamp")}</strong> {timestampLabel}
             </Typography>
             <Typography>
-              <strong>{t("code")}</strong> {tx.code}
+              <strong>{t("code")}</strong> {tx.code ?? "—"}
               {tx.codespace ? ` (${tx.codespace})` : ""}
             </Typography>
             <Typography>
-              <strong>{t("messages")}</strong> {tx.messages.length}
+              <strong>{t("messages")}</strong> {Array.isArray(tx.messageBodies) ? tx.messages.length : t("tx_inspection.missing")}
             </Typography>
             <Typography>
               <strong>{t("memo")}</strong> {tx.memo || "-"}
@@ -127,31 +124,7 @@ function TxDetailContent({ hash }: { hash: string }) {
         </CardContent>
       </Card>
 
-      <Card variant="outlined">
-        <CardContent>
-          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-             {t("message_types")} </Typography>
-          {tx.messages.length === 0 ? (
-            <Typography variant="body2" color="text.secondary">
-               {t("no_message_information_available")} </Typography>
-          ) : (
-            <List dense disablePadding>
-              {tx.messages.map((message, index) => (
-                <ListItem key={`${message.typeUrl}-${index}`} disablePadding sx={{ py: 0.5 }}>
-                  <ListItemText
-                    primary={message.shortType}
-                    secondary={
-                      <Typography variant="caption" sx={{ fontFamily: "monospace", wordBreak: "break-all" }}>
-                        {message.typeUrl}
-                      </Typography>
-                    }
-                  />
-                </ListItem>
-              ))}
-            </List>
-          )}
-        </CardContent>
-      </Card>
+      <TxInspectionPanels key={hash} tx={tx} />
 
       <Card variant="outlined">
         <CardContent>
@@ -174,20 +147,6 @@ function TxDetailContent({ hash }: { hash: string }) {
         </CardContent>
       </Card>
 
-      <Card variant="outlined">
-        <CardContent>
-          <Typography variant="subtitle2" color="text.secondary" sx={{ mb: 1 }}>
-             {t("raw_log")} </Typography>
-          <Divider sx={{ mb: 1 }} />
-          <Typography
-            component="pre"
-            variant="caption"
-            sx={{ whiteSpace: "pre-wrap", wordBreak: "break-word", fontFamily: "monospace", m: 0 }}
-          >
-            {tx.rawLog || "-"}
-          </Typography>
-        </CardContent>
-      </Card>
     </Stack>
   );
 }
